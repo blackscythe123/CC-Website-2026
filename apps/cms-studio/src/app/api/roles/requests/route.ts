@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Octokit } from "@octokit/rest";
 import {
   readRoles,
   writeRolesAndSyncCodeowners,
@@ -8,6 +9,73 @@ import {
   RoleRequest,
 } from "@/lib/roles";
 import { getSessionToken } from "@/lib/session";
+
+const REPO_OWNER = "blackscythe123";
+const REPO_NAME = "CC-Website-2026";
+const LABEL_ROLE_APPLICATION = "role-application";
+
+interface GitHubIssueItem {
+  number: number;
+  title: string;
+  body?: string | null;
+  state: string;
+  state_reason?: string | null;
+  created_at: string;
+  user?: {
+    login?: string;
+    avatar_url?: string;
+  } | null;
+  closed_by?: {
+    login?: string;
+  } | null;
+}
+
+function parseRoleRequestIssue(issue: GitHubIssueItem): RoleRequest {
+  const body = issue.body || "";
+  let metadata: {
+    username?: string;
+    displayName?: string;
+    avatarUrl?: string;
+    requestedRole?: "member" | "deputy" | "vertical_head";
+    vertical?: string;
+    note?: string;
+  } = {};
+
+  const jsonMatch = body.match(/```json:metadata\s*([\s\S]*?)\s*```/);
+  if (jsonMatch) {
+    try {
+      metadata = JSON.parse(jsonMatch[1]);
+    } catch {
+      // ignore json parse error
+    }
+  }
+
+  // Fallback to title parsing: [Role Application] @username for vertical (role)
+  const titleMatch = issue.title.match(/\[Role Application\]\s*@?([^\s]+)\s+for\s+([^\s]+)\s*\(([^)]+)\)/i);
+  const username = metadata.username || (titleMatch ? titleMatch[1] : issue.user?.login || "unknown");
+  const vertical = metadata.vertical || (titleMatch ? titleMatch[2] : "ai-ml");
+  const rawRole = metadata.requestedRole || (titleMatch ? titleMatch[3].toLowerCase() : "member");
+  const requestedRole: "member" | "deputy" | "vertical_head" =
+    rawRole === "vertical_head" ? "vertical_head" : rawRole === "deputy" ? "deputy" : "member";
+
+  let status: "pending" | "approved" | "rejected" = "pending";
+  if (issue.state === "closed") {
+    status = issue.state_reason === "not_planned" ? "rejected" : "approved";
+  }
+
+  return {
+    id: issue.number.toString(),
+    username,
+    displayName: metadata.displayName || username,
+    avatarUrl: metadata.avatarUrl || issue.user?.avatar_url || "",
+    requestedRole,
+    vertical,
+    note: metadata.note || "",
+    createdAt: issue.created_at,
+    status,
+    reviewedBy: issue.closed_by?.login,
+  };
+}
 
 export async function GET(request: NextRequest) {
   const token = getSessionToken(request);
@@ -30,8 +98,32 @@ export async function GET(request: NextRequest) {
 
     const userData = await userRes.json();
     const roleInfo = getUserRoleInfo(userData.login);
+    const octokit = new Octokit({ auth: token });
+
+    let issueRequests: RoleRequest[] = [];
+    try {
+      const { data: issues } = await octokit.issues.listForRepo({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        labels: LABEL_ROLE_APPLICATION,
+        state: "all",
+        sort: "created",
+        direction: "desc",
+        per_page: 50,
+      });
+
+      issueRequests = issues.map(parseRoleRequestIssue);
+    } catch (issueErr) {
+      console.warn("Failed to fetch issues for role applications:", issueErr);
+    }
+
+    // Also include any legacy requests from roles.json
     const roles = readRoles();
-    const allRequests: RoleRequest[] = roles.pending_requests || [];
+    const legacyRequests: RoleRequest[] = roles.pending_requests || [];
+    const allRequests: RoleRequest[] = [
+      ...issueRequests,
+      ...legacyRequests.filter((r) => !issueRequests.some((ir) => ir.id === r.id)),
+    ];
 
     // Filter requests according to review authority:
     const visibleRequests = allRequests.filter((req) => {
@@ -93,44 +185,77 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const roles = readRoles();
-    roles.pending_requests = roles.pending_requests || [];
+    const octokit = new Octokit({ auth: token });
 
-    // Check if duplicate pending request already exists
-    const existing = roles.pending_requests.find(
-      (r) =>
-        r.username.toLowerCase() === userData.login.toLowerCase() &&
-        r.vertical === vertical &&
-        r.requestedRole === requestedRole &&
-        r.status === "pending"
-    );
+    // Check if duplicate open issue already exists
+    let existingDuplicate = false;
+    try {
+      const { data: existingIssues } = await octokit.issues.listForRepo({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        labels: LABEL_ROLE_APPLICATION,
+        state: "open",
+        creator: userData.login,
+      });
 
-    if (existing) {
+      existingDuplicate = existingIssues.some((iss) => {
+        const parsed = parseRoleRequestIssue(iss);
+        return (
+          parsed.username.toLowerCase() === userData.login.toLowerCase() &&
+          parsed.vertical === vertical &&
+          parsed.requestedRole === requestedRole
+        );
+      });
+    } catch {
+      // continue if list fails
+    }
+
+    if (existingDuplicate) {
       return NextResponse.json(
-        { error: "You already have a pending request for this role and vertical." },
+        { error: "You already have a pending application for this role and vertical." },
         { status: 400 }
       );
     }
 
-    const newRequest: RoleRequest = {
-      id: `req-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      username: userData.login,
-      displayName: userData.name || userData.login,
-      avatarUrl: userData.avatar_url,
-      requestedRole,
-      vertical,
-      note: note || "",
-      createdAt: new Date().toISOString(),
-      status: "pending",
-    };
+    const title = `[Role Application] @${userData.login} for ${vertical} (${requestedRole})`;
+    const issueBody = `### SSN Coding Club CMS Role Application
 
-    roles.pending_requests.push(newRequest);
-    await writeRolesAndSyncCodeowners(roles, token);
+- **Applicant:** @${userData.login}
+- **Display Name:** ${userData.name || userData.login}
+- **Requested Role:** \`${requestedRole}\`
+- **Vertical:** \`${vertical}\`
+- **Note:** ${note ? note : "None provided."}
+
+\`\`\`json:metadata
+${JSON.stringify(
+  {
+    username: userData.login,
+    displayName: userData.name || userData.login,
+    avatarUrl: userData.avatar_url,
+    requestedRole,
+    vertical,
+    note: note || "",
+  },
+  null,
+  2
+)}
+\`\`\`
+`;
+
+    const { data: createdIssue } = await octokit.issues.create({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      title,
+      labels: [LABEL_ROLE_APPLICATION],
+      body: issueBody,
+    });
+
+    const parsedRequest = parseRoleRequestIssue(createdIssue);
 
     return NextResponse.json({
       success: true,
-      message: `Your request to join ${vertical} as ${requestedRole} has been submitted for review!`,
-      request: newRequest,
+      message: `Your request to join ${vertical} as ${requestedRole} has been submitted as Application #${createdIssue.number}!`,
+      request: parsedRequest,
     });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Failed to submit request";
@@ -168,10 +293,28 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    let roles = readRoles();
-    roles.pending_requests = roles.pending_requests || [];
+    const octokit = new Octokit({ auth: token });
+    const issueNumber = parseInt(requestId, 10);
+    let targetReq: RoleRequest | null = null;
 
-    const targetReq = roles.pending_requests.find((r) => r.id === requestId);
+    if (!isNaN(issueNumber)) {
+      try {
+        const { data: issue } = await octokit.issues.get({
+          owner: REPO_OWNER,
+          repo: REPO_NAME,
+          issue_number: issueNumber,
+        });
+        targetReq = parseRoleRequestIssue(issue);
+      } catch (err) {
+        console.warn("Could not fetch issue:", err);
+      }
+    }
+
+    let roles = readRoles();
+    if (!targetReq) {
+      targetReq = roles.pending_requests?.find((r) => r.id === requestId) || null;
+    }
+
     if (!targetReq) {
       return NextResponse.json({ error: "Request not found." }, { status: 404 });
     }
@@ -192,14 +335,62 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    targetReq.status = action === "approve" ? "approved" : "rejected";
-    targetReq.reviewedBy = userData.login;
-
     if (action === "approve") {
       roles = assignRole(roles, targetReq.username, targetReq.requestedRole, targetReq.vertical);
-    }
+      if (roles.pending_requests) {
+        roles.pending_requests = roles.pending_requests.filter((r) => r.id !== targetReq.id);
+      }
+      await writeRolesAndSyncCodeowners(roles, token);
 
-    await writeRolesAndSyncCodeowners(roles, token);
+      if (!isNaN(issueNumber)) {
+        try {
+          await octokit.issues.createComment({
+            owner: REPO_OWNER,
+            repo: REPO_NAME,
+            issue_number: issueNumber,
+            body: `✅ **Approved & Assigned**: @${userData.login} approved this application. @${targetReq.username} is now assigned as \`${targetReq.requestedRole}\` of \`${targetReq.vertical}\`.`,
+          });
+          await octokit.issues.update({
+            owner: REPO_OWNER,
+            repo: REPO_NAME,
+            issue_number: issueNumber,
+            state: "closed",
+          });
+        } catch (closeErr) {
+          console.warn("Failed to close issue:", closeErr);
+        }
+      }
+    } else {
+      // Reject
+      if (roles.pending_requests) {
+        const r = roles.pending_requests.find((r) => r.id === targetReq.id);
+        if (r) {
+          r.status = "rejected";
+          r.reviewedBy = userData.login;
+          await writeRolesAndSyncCodeowners(roles, token);
+        }
+      }
+
+      if (!isNaN(issueNumber)) {
+        try {
+          await octokit.issues.createComment({
+            owner: REPO_OWNER,
+            repo: REPO_NAME,
+            issue_number: issueNumber,
+            body: `❌ **Rejected**: Application was reviewed and rejected by @${userData.login}.`,
+          });
+          await octokit.issues.update({
+            owner: REPO_OWNER,
+            repo: REPO_NAME,
+            issue_number: issueNumber,
+            state: "closed",
+            state_reason: "not_planned",
+          });
+        } catch (closeErr) {
+          console.warn("Failed to close issue:", closeErr);
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,

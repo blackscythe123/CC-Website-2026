@@ -321,25 +321,96 @@ export default function AdminRolesPage() {
   const isDeputy = roleInfo?.role === "deputy";
   const canManage = isSuperadmin || isVerticalHead || isDeputy;
 
+  const myPendingRequests = requests.filter(
+    (r) => r.status === "pending" && r.username.toLowerCase() === user?.login.toLowerCase()
+  );
+
   if (!canManage) {
     return (
       <div className="min-h-screen bg-gray-50 font-sans">
         <StudioNav user={user} roleInfo={roleInfo} />
-        <div className="mx-auto max-w-lg px-4 py-20 text-center space-y-4">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-100 text-purple-600">
-            <Shield className="h-8 w-8" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900">Join a Technical Vertical</h2>
-          <p className="text-sm text-gray-500">
-            You are logged in as a student member. To start drafting articles for a vertical, request to join below!
-          </p>
-          <button
-            onClick={() => setShowApplyModal(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-purple-700 transition"
-          >
-            <Send className="h-4 w-4" />
-            <span>Apply to Join a Vertical</span>
-          </button>
+        <div className="mx-auto max-w-lg px-4 py-12 space-y-6">
+          {feedback && (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 text-xs font-semibold text-emerald-800 flex items-center justify-between">
+              <span>{feedback}</span>
+              <button onClick={() => setFeedback("")} className="text-emerald-600 hover:text-emerald-900">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {errorFeedback && (
+            <div className="rounded-2xl border border-red-200 bg-red-50/80 p-4 text-xs font-semibold text-red-800 flex items-center justify-between">
+              <span>{errorFeedback}</span>
+              <button onClick={() => setErrorFeedback("")} className="text-red-600 hover:text-red-900">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {myPendingRequests.length > 0 ? (
+            <div className="rounded-3xl border border-purple-200 bg-white p-6 shadow-xs space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-100 text-purple-600">
+                  <Clock className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Application Pending Review</h2>
+                  <p className="text-xs text-gray-500">Your join request is awaiting approval by a Vertical Head or Super Admin.</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {myPendingRequests.map((req) => (
+                  <div key={req.id} className="rounded-2xl border border-gray-100 bg-purple-50/40 p-4 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="rounded-md bg-purple-100 px-2 py-0.5 font-bold text-purple-800 uppercase">
+                        {ALL_VERTICALS.find((v) => v.slug === req.vertical)?.name || req.vertical}
+                      </span>
+                      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800 uppercase">
+                        ⏳ Pending Approval
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-700">
+                      Requested Role: <strong className="capitalize">{req.requestedRole}</strong>
+                    </div>
+                    {req.note && (
+                      <p className="text-xs text-gray-500 italic">&ldquo;{req.note}&rdquo;</p>
+                    )}
+                    <div className="text-[10px] text-gray-400">
+                      Submitted on {new Date(req.createdAt).toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-2 flex justify-center">
+                <button
+                  onClick={() => setShowApplyModal(true)}
+                  className="text-xs text-purple-700 hover:text-purple-900 font-semibold"
+                >
+                  + Apply for Another Vertical
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center space-y-4 pt-8">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-100 text-purple-600">
+                <Shield className="h-8 w-8" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900">Join a Technical Vertical</h2>
+              <p className="text-sm text-gray-500">
+                You are logged in as a student member. To start drafting articles for a vertical, request to join below!
+              </p>
+              <button
+                onClick={() => setShowApplyModal(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-purple-700 transition"
+              >
+                <Send className="h-4 w-4" />
+                <span>Apply to Join a Vertical</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Apply Modal */}

@@ -1,0 +1,38 @@
+# SSN Coding Club CMS - Code Owners & Editorial Approval Mapping
+# Learn more: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default reviewer across the repository
+* @blackscythe123
+
+# Announcements & Core Club Posts
+content/club/** @blackscythe123
+
+# 1. AI & Machine Learning Vertical
+content/verticals/ai-ml/** @blackscythe123
+
+# 2. Web Development Vertical
+content/verticals/web-dev/** @blackscythe123
+
+# 3. Cybersecurity & CTF Vertical
+content/verticals/cybersecurity/** @blackscythe123
+
+# 4. Cloud & DevOps Vertical
+content/verticals/cloud-devops/** @blackscythe123
+
+# 5. Competitive Programming Vertical
+content/verticals/competitive-programming/** @blackscythe123
+
+# 6. Mobile Development Vertical
+content/verticals/mobile-dev/** @blackscythe123
+
+# 7. UI / UX Design Vertical
+content/verticals/ui-ux/** @blackscythe123
+
+# 8. Blockchain & Web3 Vertical
+content/verticals/blockchain/** @blackscythe123
+
+# 9. IoT & Embedded Systems Vertical
+content/verticals/iot-embedded/** @blackscythe123
+
+# 10. Game Dev & XR Vertical
+content/verticals/game-dev/** @blackscythe123

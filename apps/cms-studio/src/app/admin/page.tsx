@@ -26,6 +26,9 @@ import {
   Check,
   Bell,
   Clock,
+  Cloud,
+  CloudUpload,
+  FolderOpen,
 } from "lucide-react";
 
 import {
@@ -52,18 +55,6 @@ const ALL_VERTICALS = [
   { slug: "design-ui-ux", name: "🎨 Design & UI/UX" },
   { slug: "full-stack", name: "🌐 Full Stack" },
   { slug: "open-source", name: "💻 Open Source (OSS)" },
-];
-
-const ALL_PORTALS = [
-  { id: "main-portal", name: "🌐 Main Coding Club Portal", domain: "codingclub.tech", vertical: "all" },
-  { id: "ai-ml-portal", name: "🤖 AI / ML Portal", domain: "ai.codingclub.tech", vertical: "ai-ml" },
-  { id: "ar-vr-portal", name: "🎮 AR, VR & Game Dev Portal", domain: "arvr.codingclub.tech", vertical: "ar-vr-game-dev" },
-  { id: "cp-portal", name: "🏆 Competitive Programming Portal", domain: "cp.codingclub.tech", vertical: "competitive-programming" },
-  { id: "cybersecurity-portal", name: "🛡️ Cyber Security Portal", domain: "cybersecurity.codingclub.tech", vertical: "cybersecurity" },
-  { id: "ssnhacks-portal", name: "⚡ SSN Hacks Portal", domain: "hacks.codingclub.tech", vertical: "ssnhacks" },
-  { id: "design-portal", name: "🎨 Design & UI/UX Portal", domain: "design.codingclub.tech", vertical: "design-ui-ux" },
-  { id: "full-stack-portal", name: "🌐 Full Stack Portal", domain: "web.codingclub.tech", vertical: "full-stack" },
-  { id: "oss-portal", name: "💻 Open Source (OSS) Portal", domain: "oss.codingclub.tech", vertical: "open-source" },
 ];
 
 export default function AdminEditorPage() {
@@ -99,10 +90,9 @@ export default function AdminEditorPage() {
     return Math.max(1, Math.ceil(wordCount / 200));
   }, [wordCount]);
 
-  // Publishing Drawer State & Multi-Portal Targets
+  // Publishing Drawer State
   const [showDrawer, setShowDrawer] = useState(false);
   const [selectedVertical, setSelectedVertical] = useState("ai-ml");
-  const [selectedPortals, setSelectedPortals] = useState<string[]>(["main-portal"]);
   const [summary, setSummary] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -117,6 +107,19 @@ export default function AdminEditorPage() {
   const [recoveredDraft, setRecoveredDraft] = useState<StoredDraft | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
+
+  // Cross-Device Git Cloud Drafts State (Zero-DB Persistence)
+  const [showRemoteDraftsModal, setShowRemoteDraftsModal] = useState(false);
+  const [remoteDrafts, setRemoteDrafts] = useState<{
+    branch: string;
+    slug: string;
+    vertical: string;
+    title: string;
+    updatedAt: string;
+  }[]>([]);
+  const [loadingRemoteDrafts, setLoadingRemoteDrafts] = useState(false);
+  const [isSavingRemoteDraft, setIsSavingRemoteDraft] = useState(false);
+  const [remoteDraftSuccessMessage, setRemoteDraftSuccessMessage] = useState<string | null>(null);
 
   // In-App Editorial Notifications & Review Requests
   const [authorPendingPrs, setAuthorPendingPrs] = useState<{
@@ -135,15 +138,6 @@ export default function AdminEditorPage() {
   const [loadingFeedbackDraft, setLoadingFeedbackDraft] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Filter selectable destination portals according to role (must be at top level before early returns)
-  const allowedPortals = useMemo(() => {
-    if (!roleInfo) return ALL_PORTALS.filter((p) => p.id === "main-portal");
-    if (roleInfo.role === "superadmin") return ALL_PORTALS;
-    return ALL_PORTALS.filter(
-      (p) => p.id === "main-portal" || (p.vertical && roleInfo.verticals?.includes(p.vertical))
-    );
-  }, [roleInfo]);
 
   useEffect(() => {
     // 1. Check for recoverable IndexedDB local draft
@@ -229,7 +223,7 @@ export default function AdminEditorPage() {
       .catch(() => setLoading(false));
   }, []);
 
-  // Manual Save Draft Handler
+  // Manual Save Draft Handler (Local Browser Storage)
   const handleManualSaveDraft = async () => {
     if (!title.trim() && !content.trim() && pendingImages.length === 0) {
       setErrorMessage("Nothing to save yet! Start writing your article first.");
@@ -249,11 +243,97 @@ export default function AdminEditorPage() {
         tags,
         pendingImages,
       });
-      setLastSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setLastSavedAt(`Local (${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})`);
     } catch (err) {
       console.warn("Failed manual draft save:", err);
     } finally {
       setIsSavingDraft(false);
+    }
+  };
+
+  // Cross-Device Save to GitHub Personal Draft Branch (Zero-DB Persistence)
+  const handleSaveRemoteDraft = async () => {
+    if (!title.trim() && !content.trim()) {
+      setErrorMessage("Please write a title or body before saving to cloud branch.");
+      return;
+    }
+    setIsSavingRemoteDraft(true);
+    setErrorMessage("");
+    try {
+      await handleManualSaveDraft();
+
+      const res = await fetch("/api/posts/drafts/remote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          markdownBody: content,
+          vertical: selectedVertical,
+          summary,
+          tags,
+          coverImage,
+          pendingImages: pendingImages.map((img) => ({
+            filename: img.filename,
+            base64: img.base64,
+            placeholderUrl: img.placeholderUrl,
+          })),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to save to cloud draft branch");
+      }
+
+      setLastSavedAt(`Cloud Branch (${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})`);
+      setRemoteDraftSuccessMessage(`Saved to Git branch: ${data.branch}`);
+      setTimeout(() => setRemoteDraftSuccessMessage(null), 5000);
+    } catch (err: any) {
+      console.error("Cloud save failed:", err);
+      setErrorMessage(err.message || "Failed to save draft to cloud branch");
+    } finally {
+      setIsSavingRemoteDraft(false);
+    }
+  };
+
+  // Fetch list of remote personal draft branches from GitHub
+  const handleFetchRemoteDrafts = async () => {
+    setShowRemoteDraftsModal(true);
+    setLoadingRemoteDrafts(true);
+    try {
+      const res = await fetch("/api/posts/drafts/remote");
+      const data = await res.json();
+      if (data.drafts && Array.isArray(data.drafts)) {
+        setRemoteDrafts(data.drafts);
+      }
+    } catch (err) {
+      console.error("Failed to load remote drafts:", err);
+    } finally {
+      setLoadingRemoteDrafts(false);
+    }
+  };
+
+  // Load a remote draft branch into editor
+  const handleLoadRemoteDraft = async (branchName: string) => {
+    setLoadingRemoteDrafts(true);
+    try {
+      const res = await fetch(`/api/posts/drafts/remote?branch=${encodeURIComponent(branchName)}`);
+      const data = await res.json();
+      if (data.draft) {
+        setTitle(data.draft.title || "");
+        setContent(data.draft.markdownBody || "");
+        setCoverImage(data.draft.coverImage || "");
+        if (data.draft.vertical) setSelectedVertical(data.draft.vertical);
+        setSummary(data.draft.summary || "");
+        setTags(data.draft.tags || []);
+        setShowRemoteDraftsModal(false);
+        setLastSavedAt(`Restored from ${branchName}`);
+      }
+    } catch (err) {
+      console.error("Error loading remote draft branch:", err);
+      setErrorMessage("Failed to restore remote draft from branch.");
+    } finally {
+      setLoadingRemoteDrafts(false);
     }
   };
 
@@ -458,16 +538,6 @@ export default function AdminEditorPage() {
     setTags(tags.filter((item) => item !== t));
   };
 
-  const togglePortalSelection = (portalId: string) => {
-    if (selectedPortals.includes(portalId)) {
-      if (selectedPortals.length > 1) {
-        setSelectedPortals(selectedPortals.filter((p) => p !== portalId));
-      }
-    } else {
-      setSelectedPortals([...selectedPortals, portalId]);
-    }
-  };
-
   const handleSubmitDraft = async () => {
     if (!title.trim()) {
       setErrorMessage("Please enter an article title.");
@@ -492,7 +562,6 @@ export default function AdminEditorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           vertical: selectedVertical,
-          targetPortals: selectedPortals,
           title: title.trim(),
           summary: summary.trim(),
           coverImage,
@@ -572,27 +641,33 @@ export default function AdminEditorPage() {
       {/* Editor Sub-Header Toolbar */}
       <div className="sticky top-16 z-40 border-b border-gray-100 bg-white/95 px-4 py-2.5 backdrop-blur-md">
         <div className={`mx-auto flex ${viewMode === "split" ? "max-w-7xl" : "max-w-4xl"} items-center justify-between gap-4 transition-all duration-200`}>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
-            <span className="font-semibold text-gray-700">Writing in:</span>
-            <span className="rounded-full bg-blue-50 px-2.5 py-0.5 font-medium text-blue-700">
-              {selectedVertical === "club"
-                ? "📢 Coding Club Announcements"
-                : ALL_VERTICALS.find((v) => v.slug === selectedVertical)?.name || selectedVertical}
-            </span>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+            <span className="font-semibold text-gray-700">Vertical:</span>
+            <select
+              value={selectedVertical}
+              onChange={(e) => setSelectedVertical(e.target.value)}
+              className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-800 shadow-2xs focus:border-blue-500 focus:bg-white focus:outline-hidden"
+            >
+              {availableVerticals.map((v) => (
+                <option key={v.slug} value={v.slug}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
             <span>•</span>
-            <span className="text-amber-600 font-medium">Draft (Requires Editorial Approval)</span>
+            <span className="text-amber-600 font-medium hidden sm:inline">Requires Approval</span>
             {pendingImages.length > 0 && (
               <>
-                <span>•</span>
+                <span className="hidden sm:inline">•</span>
                 <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-0.5 font-semibold text-purple-700">
                   <ImageIcon className="h-3 w-3" />
-                  {pendingImages.length} image{pendingImages.length > 1 ? "s" : ""} cached (deferred upload)
+                  {pendingImages.length} image{pendingImages.length > 1 ? "s" : ""}
                 </span>
               </>
             )}
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             {/* View Mode Segmented Pill */}
             <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50/90 p-0.5 text-xs font-medium shadow-xs">
               <button
@@ -636,23 +711,34 @@ export default function AdminEditorPage() {
               </button>
             </div>
 
-            {/* Save Draft Button with Local State Indicator */}
-            <div className="flex items-center gap-2">
+            {/* Cloud Drafts / Cross-Device Sync Button */}
+            <button
+              type="button"
+              onClick={handleFetchRemoteDrafts}
+              className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition"
+              title="View and restore drafts saved to GitHub branches across devices"
+            >
+              <Cloud className="h-3.5 w-3.5 text-blue-600" />
+              <span className="hidden md:inline">Cloud Drafts</span>
+            </button>
+
+            {/* Save to Cloud Branch (Zero-DB Remote Persistence) */}
+            <div className="flex items-center gap-1.5">
               {lastSavedAt && (
-                <span className="hidden lg:inline-flex items-center gap-1 text-[11px] text-gray-500 font-mono">
+                <span className="hidden xl:inline-flex items-center gap-1 text-[11px] text-gray-500 font-mono">
                   <Check className="h-3 w-3 text-emerald-600" />
-                  <span>Saved at {lastSavedAt}</span>
+                  <span>{lastSavedAt}</span>
                 </span>
               )}
               <button
                 type="button"
-                onClick={handleManualSaveDraft}
-                disabled={isSavingDraft}
+                onClick={handleSaveRemoteDraft}
+                disabled={isSavingRemoteDraft || isSavingDraft}
                 className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 shadow-xs hover:bg-gray-50 hover:border-gray-400 transition active:scale-95 disabled:opacity-50"
-                title="Save draft immediately to local browser storage"
+                title="Push WIP draft to your personal Git draft branch (drafts/username/slug) so you can resume on another device"
               >
-                <Save className="h-3.5 w-3.5 text-gray-600" />
-                <span>{isSavingDraft ? "Saving..." : "Save Draft"}</span>
+                <CloudUpload className="h-3.5 w-3.5 text-blue-600" />
+                <span>{isSavingRemoteDraft ? "Syncing..." : "Save Draft"}</span>
               </button>
             </div>
 
@@ -902,6 +988,41 @@ export default function AdminEditorPage() {
               }}
             />
 
+            {/* Author Byline Card (Medium-Style in Write Canvas) */}
+            {user && (
+              <div className="flex items-center justify-between border-y border-gray-100 py-3 my-2 text-xs">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={user.avatar_url}
+                    alt={user.name || user.login}
+                    className="h-9 w-9 rounded-full ring-2 ring-gray-100 object-cover shadow-2xs"
+                  />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900">{user.name || user.login}</span>
+                      <span className="text-[11px] font-mono text-gray-400">@{user.login}</span>
+                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 capitalize">
+                        {roleInfo?.role.replace("_", " ") || "Author"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-0.5">
+                      <span>Targeting:</span>
+                      <span className="font-medium text-gray-700">
+                        {selectedVertical === "club"
+                          ? "📢 Coding Club Announcements"
+                          : ALL_VERTICALS.find((v) => v.slug === selectedVertical)?.name || selectedVertical}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="hidden sm:flex items-center gap-3 text-gray-400 font-mono text-[11px]">
+                  <span>{wordCount} words</span>
+                  <span>•</span>
+                  <span>{readingTime} min read</span>
+                </div>
+              </div>
+            )}
+
             {/* Floating Formatting Toolbar */}
             <div className="sticky top-28 z-30 flex flex-wrap items-center gap-1.5 rounded-xl border border-gray-200 bg-white/95 p-1.5 shadow-sm backdrop-blur-md">
               <button
@@ -1131,19 +1252,11 @@ export default function AdminEditorPage() {
               {/* Vertical Selection */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-                  Select Vertical
+                  Article Vertical
                 </label>
                 <select
                   value={selectedVertical}
-                  onChange={(e) => {
-                    const newVertical = e.target.value;
-                    setSelectedVertical(newVertical);
-                    // Automatically add corresponding vertical portal if allowed and available
-                    const matching = allowedPortals.find((p) => p.vertical === newVertical);
-                    if (matching && !selectedPortals.includes(matching.id)) {
-                      setSelectedPortals([...selectedPortals, matching.id]);
-                    }
-                  }}
+                  onChange={(e) => setSelectedVertical(e.target.value)}
                   className="w-full rounded-xl border border-gray-200 bg-white p-2.5 text-sm font-medium text-gray-900 shadow-xs focus:border-blue-600 focus:outline-hidden"
                 >
                   {availableVerticals.map((v) => (
@@ -1152,56 +1265,18 @@ export default function AdminEditorPage() {
                     </option>
                   ))}
                 </select>
-              </div>
-
-              {/* Target Subdomain Portals / Multi-Website Destinations */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
-                    Publish To Portal(s)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (selectedPortals.length === allowedPortals.length) {
-                        setSelectedPortals(["main-portal"]);
-                      } else {
-                        setSelectedPortals(allowedPortals.map((p) => p.id));
-                      }
-                    }}
-                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-800"
-                  >
-                    {selectedPortals.length === allowedPortals.length ? "Reset to Main" : "Select All"}
-                  </button>
-                </div>
-                <p className="text-[11px] text-gray-400 mb-2.5">
-                  Route to central main portal or specific vertical subdomain project websites (restricted by your role).
-                </p>
-                <div className="space-y-1.5">
-                  {allowedPortals.map((portal) => {
-                    const isChecked = selectedPortals.includes(portal.id);
-                    return (
-                      <label
-                        key={portal.id}
-                        className={`flex items-center justify-between rounded-xl border p-2.5 text-xs cursor-pointer transition ${
-                          isChecked
-                            ? "border-blue-300 bg-blue-50/60 text-blue-900 font-semibold shadow-xs"
-                            : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => togglePortalSelection(portal.id)}
-                            className="rounded text-blue-600 focus:ring-blue-500"
-                          />
-                          <span>{portal.name}</span>
-                        </div>
-                        <span className="font-mono text-[10px] text-gray-400">{portal.domain}</span>
-                      </label>
-                    );
-                  })}
+                <div className="mt-2.5 rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-xs text-blue-900">
+                  <div className="font-semibold text-blue-950 flex items-center gap-1.5">
+                    <span>🎯 Target Portal:</span>
+                    <span className="font-mono text-blue-800">
+                      {selectedVertical === "club"
+                        ? "codingclub.tech (Main Portal)"
+                        : `${selectedVertical}.codingclub.tech (${selectedVertical} Portal)`}
+                    </span>
+                  </div>
+                  <p className="text-blue-700/80 mt-1 text-[11px]">
+                    Autonomous 1-to-1 vertical routing. This article will live strictly inside its designated vertical portal and codebase.
+                  </p>
                 </div>
               </div>
 
@@ -1276,6 +1351,81 @@ export default function AdminEditorPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Cloud Drafts Modal (Zero-DB Cross-Device Sync) */}
+      {showRemoteDraftsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Cloud className="h-5 w-5 text-blue-600" />
+                <h3 className="text-base font-bold text-gray-900">Your Cloud Git Drafts</h3>
+              </div>
+              <button
+                onClick={() => setShowRemoteDraftsModal(false)}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500">
+              These are unmerged WIP drafts pushed to personal branches (<code>drafts/{user?.login}/*</code>). You can open and continue them on any device without losing work.
+            </p>
+
+            {loadingRemoteDrafts ? (
+              <div className="py-8 text-center text-xs text-gray-400 font-mono">
+                Querying GitHub draft branches...
+              </div>
+            ) : remoteDrafts.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-gray-200 py-8 text-center text-xs text-gray-400">
+                No cloud draft branches found for @{user?.login}. Click <strong>&quot;Save Draft&quot;</strong> in the toolbar to save your first cloud copy!
+              </div>
+            ) : (
+              <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+                {remoteDrafts.map((d) => (
+                  <div
+                    key={d.branch}
+                    className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/50 p-3 text-xs hover:border-blue-400 transition"
+                  >
+                    <div>
+                      <div className="font-semibold text-gray-900 capitalize">{d.title}</div>
+                      <div className="text-[11px] font-mono text-gray-400 mt-0.5">
+                        {d.branch} • {new Date(d.updatedAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleLoadRemoteDraft(d.branch)}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 font-semibold text-white shadow-2xs hover:bg-blue-700 transition"
+                    >
+                      Load Draft
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowRemoteDraftsModal(false)}
+                className="rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cloud Draft Save Success Toast */}
+      {remoteDraftSuccessMessage && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white p-4 shadow-xl text-xs font-semibold text-emerald-800 animate-slide-up">
+          <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+          <span>{remoteDraftSuccessMessage}</span>
         </div>
       )}
     </div>

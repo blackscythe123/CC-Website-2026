@@ -658,3 +658,270 @@ export async function listAllPublishedPostsFromGitHub(
   }
 }
 
+// -------------------------------------------------------------
+// Cross-Device Personal Draft Branch Functions (Zero-DB Cloud Persistence)
+// -------------------------------------------------------------
+
+export interface PersonalDraftParams {
+  token: string;
+  authorUsername: string;
+  authorDisplayName: string;
+  vertical: string;
+  slug: string;
+  title: string;
+  summary: string;
+  coverImage?: string;
+  targetPortals?: string[];
+  tags: string[];
+  markdownBody: string;
+  pendingImages?: PendingImage[];
+}
+
+export interface PersonalDraftInfo {
+  branch: string;
+  slug: string;
+  vertical: string;
+  title: string;
+  updatedAt: string;
+}
+
+/**
+ * Pushes WIP draft directly to a personal Git draft branch without opening a PR.
+ * Branch name format: drafts/{authorUsername}/{slug}
+ */
+export async function savePersonalDraftBranch(params: PersonalDraftParams): Promise<{ branch: string; commitSha: string }> {
+  const octokit = getOctokit(params.token);
+  const {
+    authorUsername,
+    authorDisplayName,
+    vertical,
+    slug,
+    title,
+    summary,
+    targetPortals,
+    tags,
+    markdownBody,
+    pendingImages,
+  } = params;
+
+  const cleanSlug = (slug || title || "untitled")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 50);
+
+  const branchName = `drafts/${authorUsername.toLowerCase()}/${cleanSlug}`;
+
+  // 1. Check if branch already exists, or branch off main
+  let branchSha: string;
+  try {
+    const { data: refData } = await octokit.git.getRef({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      ref: `heads/${branchName}`,
+    });
+    branchSha = refData.object.sha;
+  } catch {
+    // Branch doesn't exist, branch off main
+    const { data: mainRef } = await octokit.git.getRef({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      ref: `heads/${MAIN_BRANCH}`,
+    });
+    branchSha = mainRef.object.sha;
+    await octokit.git.createRef({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      ref: `refs/heads/${branchName}`,
+      sha: branchSha,
+    });
+  }
+
+  // 2. Process and upload pending images on this draft branch
+  let processedBody = markdownBody;
+  let processedCoverImage = params.coverImage || "";
+
+  if (pendingImages && pendingImages.length > 0) {
+    for (const img of pendingImages) {
+      const cleanImgName = `${Date.now()}-${img.filename.toLowerCase().replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+      const imgPath = `apps/main-portal/public/uploads/${cleanImgName}`;
+      const permanentUrl = `/uploads/${cleanImgName}`;
+
+      await octokit.repos.createOrUpdateFileContents({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        path: imgPath,
+        message: `chore(media): save ${cleanImgName} to draft branch`,
+        content: img.base64,
+        branch: branchName,
+      });
+
+      if (img.placeholderUrl) {
+        processedBody = processedBody.replaceAll(img.placeholderUrl, permanentUrl);
+        if (processedCoverImage === img.placeholderUrl) {
+          processedCoverImage = permanentUrl;
+        }
+      }
+    }
+  }
+
+  // 3. Prepare markdown frontmatter
+  const today = new Date().toISOString().split("T")[0];
+  const fileData = {
+    title: title || "Untitled Draft",
+    date: today,
+    author: authorDisplayName || authorUsername,
+    authorUsername,
+    authorAvatar: `https://github.com/${authorUsername}.png`,
+    summary: summary || "",
+    targetPortals: targetPortals && targetPortals.length > 0 ? targetPortals : ["main-portal"],
+    vertical: vertical || "club",
+    ...(processedCoverImage ? { coverImage: processedCoverImage } : {}),
+    tags: tags && tags.length > 0 ? tags : [vertical],
+    isWipDraft: true,
+  };
+
+  const fileContent = matter.stringify(processedBody, fileData);
+  const contentBase64 = Buffer.from(fileContent, "utf-8").toString("base64");
+
+  const filePath =
+    vertical === "club"
+      ? `content/club/posts/${cleanSlug}.md`
+      : `content/verticals/${vertical}/posts/${cleanSlug}.md`;
+
+  // 4. Get file SHA if it already exists on this draft branch to update it cleanly
+  let existingSha: string | undefined;
+  try {
+    const { data: fileRes } = await octokit.repos.getContent({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: filePath,
+      ref: branchName,
+    });
+    if ("sha" in fileRes) {
+      existingSha = fileRes.sha;
+    }
+  } catch {
+    // File doesn't exist yet
+  }
+
+  const { data: commitRes } = await octokit.repos.createOrUpdateFileContents({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    path: filePath,
+    message: `draft(${vertical}): update wip draft ${cleanSlug}`,
+    content: contentBase64,
+    branch: branchName,
+    sha: existingSha,
+    author: {
+      name: authorDisplayName || authorUsername,
+      email: `${authorUsername}@users.noreply.github.com`,
+    },
+    committer: {
+      name: "SSN Coding Club Studio",
+      email: "bot@ssncodingclub.org",
+    },
+  });
+
+  return {
+    branch: branchName,
+    commitSha: commitRes.commit.sha || "",
+  };
+}
+
+/**
+ * Lists all personal WIP draft branches for a user (drafts/{authorUsername}/*)
+ */
+export async function listPersonalDraftBranches(token: string, authorUsername: string): Promise<PersonalDraftInfo[]> {
+  const octokit = getOctokit(token);
+  try {
+    const prefix = `drafts/${authorUsername.toLowerCase()}/`;
+    const { data: branches } = await octokit.repos.listBranches({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      per_page: 100,
+    });
+
+    const userDraftBranches = branches.filter((b) => b.name.startsWith(prefix));
+    const results: PersonalDraftInfo[] = [];
+
+    for (const b of userDraftBranches) {
+      try {
+        const { data: commitData } = await octokit.repos.getCommit({
+          owner: REPO_OWNER,
+          repo: REPO_NAME,
+          ref: b.commit.sha,
+        });
+
+        const slug = b.name.replace(prefix, "");
+        results.push({
+          branch: b.name,
+          slug,
+          vertical: "unknown",
+          title: slug.replace(/-/g, " "),
+          updatedAt: commitData.commit.committer?.date || new Date().toISOString(),
+        });
+      } catch {
+        // continue
+      }
+    }
+
+    return results;
+  } catch (err) {
+    console.error("Error listing personal draft branches:", err);
+    return [];
+  }
+}
+
+/**
+ * Retrieves draft content from a personal draft branch
+ */
+export async function getPersonalDraftBranch(token: string, branchName: string) {
+  const octokit = getOctokit(token);
+  try {
+    const { data: commit } = await octokit.repos.getCommit({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      ref: branchName,
+    });
+
+    const treeSha = commit.commit.tree.sha;
+    const { data: tree } = await octokit.git.getTree({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      tree_sha: treeSha,
+      recursive: "true",
+    });
+
+    const postFile = tree.tree.find(
+      (item) => item.path && item.path.startsWith("content/") && item.path.endsWith(".md")
+    );
+
+    if (!postFile || !postFile.sha) {
+      throw new Error("No article file found in draft branch");
+    }
+
+    const { data: blob } = await octokit.git.getBlob({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      file_sha: postFile.sha,
+    });
+
+    const rawContent = Buffer.from(blob.content, "base64").toString("utf-8");
+    const { data: frontmatter, content: markdownBody } = matter(rawContent);
+
+    return {
+      title: frontmatter.title || "",
+      vertical: frontmatter.vertical || "club",
+      summary: frontmatter.summary || "",
+      coverImage: frontmatter.coverImage || "",
+      tags: Array.isArray(frontmatter.tags) ? frontmatter.tags : [],
+      targetPortals: Array.isArray(frontmatter.targetPortals) ? frontmatter.targetPortals : ["main-portal"],
+      markdownBody,
+    };
+  } catch (err) {
+    console.error(`Error loading personal draft branch ${branchName}:`, err);
+    throw err;
+  }
+}
+

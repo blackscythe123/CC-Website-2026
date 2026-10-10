@@ -59,40 +59,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Portal destination permission check (Non-superadmins can only target main-portal and their assigned vertical portals)
-    const PORTAL_VERTICAL_MAP: Record<string, string> = {
-      "ai-ml-portal": "ai-ml",
-      "ar-vr-portal": "ar-vr-game-dev",
-      "cp-portal": "competitive-programming",
-      "cybersecurity-portal": "cybersecurity",
-      "ssnhacks-portal": "ssnhacks",
-      "design-portal": "design-ui-ux",
-      "full-stack-portal": "full-stack",
-      "oss-portal": "open-source",
-    };
-
-    if (roleInfo.role !== "superadmin" && Array.isArray(targetPortals)) {
-      for (const pId of targetPortals) {
-        if (pId !== "main-portal" && PORTAL_VERTICAL_MAP[pId]) {
-          const requiredVert = PORTAL_VERTICAL_MAP[pId];
-          if (!roleInfo.verticals.includes(requiredVert)) {
-            return NextResponse.json(
-              {
-                error: `Unauthorized destination portal '${pId}'. You are only authorized to publish to portals belonging to: ${roleInfo.verticals.join(", ")}`,
-              },
-              { status: 403 }
-            );
-          }
-        }
-      }
-    }
-
     const cleanSlug =
       slug ||
       title
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/(^-|-$)/g, "");
+
+    // 1-to-1 Vertical to Portal Mapping (Zero Contradiction Architecture)
+    const VERTICAL_PORTAL_MAP: Record<string, string> = {
+      "ai-ml": "ai-ml-portal",
+      "ar-vr-game-dev": "ar-vr-portal",
+      "competitive-programming": "cp-portal",
+      "cybersecurity": "cybersecurity-portal",
+      "ssnhacks": "ssnhacks-portal",
+      "design-ui-ux": "design-portal",
+      "full-stack": "full-stack-portal",
+      "open-source": "oss-portal",
+      "club": "main-portal",
+    };
+
+    const assignedPortal = VERTICAL_PORTAL_MAP[vertical] || "main-portal";
 
     // Create branch & PR on GitHub (never direct merge!)
     const result = await createDraftAndPullRequest({
@@ -104,7 +91,7 @@ export async function POST(request: NextRequest) {
       title,
       summary: summary || "",
       coverImage: coverImage || "",
-      targetPortals: Array.isArray(targetPortals) && targetPortals.length > 0 ? targetPortals : ["main-portal"],
+      targetPortals: [assignedPortal],
       tags: Array.isArray(tags) ? tags : [],
       markdownBody,
       pendingImages: Array.isArray(pendingImages) ? pendingImages : [],

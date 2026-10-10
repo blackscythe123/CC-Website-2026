@@ -49,6 +49,11 @@ export default function AdminEditorPage() {
   const [content, setContent] = useState("");
   const [coverImage, setCoverImage] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [pendingImages, setPendingImages] = useState<{
+    filename: string;
+    base64: string;
+    placeholderUrl: string;
+  }[]>([]);
 
   // Publishing Drawer State
   const [showDrawer, setShowDrawer] = useState(false);
@@ -82,27 +87,69 @@ export default function AdminEditorPage() {
       .catch(() => setLoading(false));
   }, []);
 
-  // Image Upload Handler
-  const handleImageUpload = async (file: File) => {
+  // Alert user before closing or reloading if there are unsaved edits or pending images
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (title.trim() || content.trim() || pendingImages.length > 0) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [title, content, pendingImages]);
+
+  // Local In-Browser Image Handler (Deferred Upload until Final Submission)
+  const handleImageUpload = async (file: File): Promise<string | null> => {
+    const allowedMimes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+      "image/svg+xml",
+    ];
+    if (!allowedMimes.includes(file.type)) {
+      setErrorMessage("Only JPEG, PNG, WebP, GIF, and SVG images are supported.");
+      return null;
+    }
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+    if (file.size > MAX_SIZE) {
+      setErrorMessage("Image exceeds 5MB size limit.");
+      return null;
+    }
+
     setUploadingImage(true);
-    const formData = new FormData();
-    formData.append("file", file);
+    setErrorMessage("");
 
     try {
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const res = reader.result as string;
+          const base64Content = res.split(",")[1];
+          resolve(base64Content);
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
       });
-      const data = await res.json();
-      if (data.url) {
-        return data.url;
-      }
+
+      const placeholderUrl = URL.createObjectURL(file);
+      setPendingImages((prev) => [
+        ...prev,
+        {
+          filename: file.name,
+          base64,
+          placeholderUrl,
+        },
+      ]);
+      return placeholderUrl;
     } catch (err) {
-      console.error("Upload error:", err);
+      console.error("Local image caching error:", err);
+      setErrorMessage("Failed to process image in browser.");
+      return null;
     } finally {
       setUploadingImage(false);
     }
-    return null;
   };
 
   // Drag & Drop handler on editor
@@ -161,6 +208,11 @@ export default function AdminEditorPage() {
     setSubmitting(true);
     setErrorMessage("");
 
+    // Only upload images that are still active in content or cover
+    const activeImages = pendingImages.filter(
+      (img) => content.includes(img.placeholderUrl) || coverImage === img.placeholderUrl
+    );
+
     try {
       const res = await fetch("/api/posts/draft", {
         method: "POST",
@@ -172,6 +224,7 @@ export default function AdminEditorPage() {
           coverImage,
           tags,
           markdownBody: content,
+          pendingImages: activeImages,
         }),
       });
 
@@ -185,6 +238,7 @@ export default function AdminEditorPage() {
         prUrl: data.prUrl,
       });
       setShowDrawer(false);
+      setPendingImages([]);
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Error submitting post");
     } finally {
@@ -249,6 +303,15 @@ export default function AdminEditorPage() {
             </span>
             <span>•</span>
             <span className="text-amber-600 font-medium">Draft (Requires Editorial Approval)</span>
+            {pendingImages.length > 0 && (
+              <>
+                <span>•</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-0.5 font-semibold text-purple-700">
+                  <ImageIcon className="h-3 w-3" />
+                  {pendingImages.length} image{pendingImages.length > 1 ? "s" : ""} cached in browser (deferred upload)
+                </span>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -418,7 +481,7 @@ export default function AdminEditorPage() {
 
           <label className="flex items-center gap-1 cursor-pointer rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition ml-auto">
             <ImageIcon className="h-3.5 w-3.5" />
-            <span>{uploadingImage ? "Uploading..." : "Insert Mid-Post Image"}</span>
+            <span>{uploadingImage ? "Processing..." : "Insert Mid-Post Image"}</span>
             <input
               type="file"
               accept="image/*"

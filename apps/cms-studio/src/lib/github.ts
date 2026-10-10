@@ -9,6 +9,12 @@ export function getOctokit(token: string): Octokit {
   return new Octokit({ auth: token });
 }
 
+export interface PendingImage {
+  filename: string;
+  base64: string;
+  placeholderUrl: string;
+}
+
 export interface CreateDraftParams {
   token: string;
   authorUsername: string;
@@ -20,6 +26,7 @@ export interface CreateDraftParams {
   coverImage?: string;
   tags: string[];
   markdownBody: string;
+  pendingImages?: PendingImage[];
 }
 
 export interface DraftResult {
@@ -37,9 +44,9 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     slug,
     title,
     summary,
-    coverImage,
     tags,
     markdownBody,
+    pendingImages,
   } = params;
 
   // 1. Get SHA of main branch head
@@ -62,18 +69,46 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     sha: mainSha,
   });
 
-  // 3. Prepare markdown frontmatter
+  // 3. Process and upload pending images ON THE DRAFT BRANCH (never to main directly!)
+  let processedBody = markdownBody;
+  let processedCoverImage = params.coverImage || "";
+
+  if (pendingImages && pendingImages.length > 0) {
+    for (const img of pendingImages) {
+      const cleanImgName = `${Date.now()}-${img.filename.toLowerCase().replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+      const imgPath = `apps/main-portal/public/uploads/${cleanImgName}`;
+      const permanentUrl = `/uploads/${cleanImgName}`;
+
+      await octokit.repos.createOrUpdateFileContents({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        path: imgPath,
+        message: `chore(media): upload ${cleanImgName} on draft branch`,
+        content: img.base64,
+        branch: branchName,
+      });
+
+      if (img.placeholderUrl) {
+        processedBody = processedBody.replaceAll(img.placeholderUrl, permanentUrl);
+        if (processedCoverImage === img.placeholderUrl) {
+          processedCoverImage = permanentUrl;
+        }
+      }
+    }
+  }
+
+  // 4. Prepare markdown frontmatter
   const today = new Date().toISOString().split("T")[0];
   const fileData = {
     title,
     date: today,
     author: authorDisplayName || authorUsername,
     summary,
-    ...(coverImage ? { coverImage } : {}),
+    ...(processedCoverImage ? { coverImage: processedCoverImage } : {}),
     tags: tags && tags.length > 0 ? tags : [vertical],
   };
 
-  const fileContent = matter.stringify(markdownBody, fileData);
+  const fileContent = matter.stringify(processedBody, fileData);
   const contentBase64 = Buffer.from(fileContent, "utf-8").toString("base64");
 
   const filePath =
@@ -81,7 +116,7 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
       ? `content/club/posts/${cleanSlug}.md`
       : `content/verticals/${vertical}/posts/${cleanSlug}.md`;
 
-  // 4. Commit file to draft branch
+  // 5. Commit file to draft branch
   await octokit.repos.createOrUpdateFileContents({
     owner: REPO_OWNER,
     repo: REPO_NAME,
@@ -100,7 +135,7 @@ New article submission for the **${vertical}** technical vertical.
 - **Author:** ${authorDisplayName} (@${authorUsername})
 - **Date:** ${today}
 - **Summary:** ${summary}
-${coverImage ? `\n- **Cover Banner:** ![](${coverImage})\n` : ""}
+${processedCoverImage ? `\n- **Cover Banner:** ![](${processedCoverImage})\n` : ""}
 
 ## Editorial Governance
 - [x] Validated frontmatter schema

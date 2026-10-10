@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     const roleInfo = getUserRoleInfo(userData.login);
 
     const body = await request.json();
-    const { vertical, slug, title, summary, coverImage, tags, markdownBody } = body;
+    const { vertical, slug, title, summary, coverImage, tags, markdownBody, pendingImages } = body;
 
     if (!vertical || !title || !markdownBody) {
       return NextResponse.json(
@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
       coverImage: coverImage || "",
       tags: Array.isArray(tags) ? tags : [],
       markdownBody,
+      pendingImages: Array.isArray(pendingImages) ? pendingImages : [],
     });
 
     return NextResponse.json({

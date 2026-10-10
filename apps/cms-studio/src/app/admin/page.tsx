@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import StudioNav from "@/components/StudioNav";
 import { UserRoleInfo } from "@/lib/roles";
+import { marked } from "marked";
 import {
   Image as ImageIcon,
   Code,
@@ -18,6 +19,9 @@ import {
   AlertCircle,
   X,
   ExternalLink,
+  Eye,
+  Edit3,
+  Columns,
 } from "lucide-react";
 
 interface UserProfile {
@@ -49,11 +53,32 @@ export default function AdminEditorPage() {
   const [content, setContent] = useState("");
   const [coverImage, setCoverImage] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [viewMode, setViewMode] = useState<"write" | "split" | "preview">("write");
   const [pendingImages, setPendingImages] = useState<{
     filename: string;
     base64: string;
     placeholderUrl: string;
   }[]>([]);
+
+  // Real-time Markdown Parsing & Stats for Preview
+  const parsedHtml = useMemo(() => {
+    try {
+      return marked.parse(content || "*Start writing to preview your article...*", {
+        gfm: true,
+        breaks: true,
+      }) as string;
+    } catch {
+      return "<p class='text-red-500'>Error parsing markdown</p>";
+    }
+  }, [content]);
+
+  const wordCount = useMemo(() => {
+    return content.trim() ? content.trim().split(/\s+/).length : 0;
+  }, [content]);
+
+  const readingTime = useMemo(() => {
+    return Math.max(1, Math.ceil(wordCount / 200));
+  }, [wordCount]);
 
   // Publishing Drawer State
   const [showDrawer, setShowDrawer] = useState(false);
@@ -295,8 +320,8 @@ export default function AdminEditorPage() {
 
       {/* Editor Sub-Header Toolbar */}
       <div className="sticky top-16 z-40 border-b border-gray-100 bg-white/95 px-4 py-2.5 backdrop-blur-md">
-        <div className="mx-auto flex max-w-4xl items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-gray-400">
+        <div className={`mx-auto flex ${viewMode === "split" ? "max-w-7xl" : "max-w-4xl"} items-center justify-between gap-4 transition-all duration-200`}>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
             <span className="font-semibold text-gray-700">Writing in:</span>
             <span className="rounded-full bg-blue-50 px-2.5 py-0.5 font-medium text-blue-700">
               {ALL_VERTICALS.find((v) => v.slug === selectedVertical)?.name || selectedVertical}
@@ -308,13 +333,56 @@ export default function AdminEditorPage() {
                 <span>•</span>
                 <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-0.5 font-semibold text-purple-700">
                   <ImageIcon className="h-3 w-3" />
-                  {pendingImages.length} image{pendingImages.length > 1 ? "s" : ""} cached in browser (deferred upload)
+                  {pendingImages.length} image{pendingImages.length > 1 ? "s" : ""} cached (deferred upload)
                 </span>
               </>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
+            {/* View Mode Segmented Pill */}
+            <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50/90 p-0.5 text-xs font-medium shadow-xs">
+              <button
+                type="button"
+                onClick={() => setViewMode("write")}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1 transition ${
+                  viewMode === "write"
+                    ? "bg-white text-gray-900 shadow-xs font-semibold"
+                    : "text-gray-500 hover:text-gray-900"
+                }`}
+                title="Canvas Editor only"
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Write</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("split")}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1 transition ${
+                  viewMode === "split"
+                    ? "bg-white text-gray-900 shadow-xs font-semibold"
+                    : "text-gray-500 hover:text-gray-900"
+                }`}
+                title="Split screen: write & see real-time preview side-by-side"
+              >
+                <Columns className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Split</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("preview")}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1 transition ${
+                  viewMode === "preview"
+                    ? "bg-white text-gray-900 shadow-xs font-semibold"
+                    : "text-gray-500 hover:text-gray-900"
+                }`}
+                title="Full live reading preview"
+              >
+                <Eye className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Preview</span>
+              </button>
+            </div>
+
             <button
               onClick={() => setShowDrawer(true)}
               className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 transition"
@@ -374,141 +442,263 @@ export default function AdminEditorPage() {
         </div>
       )}
 
-      {/* Canvas Writing Container (Medium-style) */}
-      <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-        {/* Cover Image Selector */}
-        <div className="mb-8">
-          {coverImage ? (
-            <div className="relative group overflow-hidden rounded-2xl border border-gray-200 shadow-sm">
-              <img
-                src={coverImage}
-                alt="Cover"
-                className="h-64 w-full object-cover sm:h-80 transition"
-              />
-              <button
-                onClick={() => setCoverImage("")}
-                className="absolute top-3 right-3 rounded-full bg-black/60 p-1.5 text-white backdrop-blur-sm hover:bg-black transition"
-                title="Remove cover"
-              >
-                <X className="h-4 w-4" />
-              </button>
+      {/* Reusable Editor Canvas Form */}
+      {(() => {
+        const editorFormNode = (
+          <div className="space-y-6">
+            {/* Cover Image Selector */}
+            <div>
+              {coverImage ? (
+                <div className="relative group overflow-hidden rounded-2xl border border-gray-200 shadow-sm">
+                  <img
+                    src={coverImage}
+                    alt="Cover"
+                    className="h-64 w-full object-cover sm:h-80 transition"
+                  />
+                  <button
+                    onClick={() => setCoverImage("")}
+                    className="absolute top-3 right-3 rounded-full bg-black/60 p-1.5 text-white backdrop-blur-sm hover:bg-black transition"
+                    title="Remove cover"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex h-24 w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/50 hover:bg-gray-50 hover:border-blue-400 transition">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-gray-500">
+                    <UploadCloud className="h-5 w-5 text-gray-400" />
+                    <span>Add a cover banner image (drag &amp; drop or click to upload)</span>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      if (e.target.files?.[0]) {
+                        const url = await handleImageUpload(e.target.files[0]);
+                        if (url) setCoverImage(url);
+                      }
+                    }}
+                  />
+                </label>
+              )}
             </div>
-          ) : (
-            <label className="flex h-24 w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/50 hover:bg-gray-50 hover:border-blue-400 transition">
-              <div className="flex items-center gap-2 text-xs font-semibold text-gray-500">
-                <UploadCloud className="h-5 w-5 text-gray-400" />
-                <span>Add a cover banner image (drag &amp; drop or click to upload)</span>
-              </div>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={async (e) => {
-                  if (e.target.files?.[0]) {
-                    const url = await handleImageUpload(e.target.files[0]);
-                    if (url) setCoverImage(url);
-                  }
-                }}
-              />
-            </label>
-          )}
-        </div>
 
-        {/* Title (Big Medium-style Headline) */}
-        <textarea
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Title"
-          rows={1}
-          className="w-full resize-none border-none text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900 placeholder-gray-300 focus:outline-hidden focus:ring-0 leading-tight"
-          onInput={(e) => {
-            const target = e.target as HTMLTextAreaElement;
-            target.style.height = "auto";
-            target.style.height = target.scrollHeight + "px";
-          }}
-        />
-
-        {/* Floating Formatting Toolbar */}
-        <div className="sticky top-28 z-30 my-4 flex flex-wrap items-center gap-1.5 rounded-xl border border-gray-200 bg-white/95 p-1.5 shadow-sm backdrop-blur-md">
-          <button
-            onClick={() => insertAtCursor("\n\n## Section Heading\n\n")}
-            className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
-            title="Heading 2"
-          >
-            <Heading2 className="h-3.5 w-3.5" />
-            <span>H2</span>
-          </button>
-          <button
-            onClick={() => insertAtCursor("\n\n### Subheading\n\n")}
-            className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
-            title="Heading 3"
-          >
-            <Heading3 className="h-3.5 w-3.5" />
-            <span>H3</span>
-          </button>
-          <button
-            onClick={() => insertAtCursor("\n\n> Medium-style memorable pull-quote...\n\n")}
-            className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
-            title="Quote"
-          >
-            <Quote className="h-3.5 w-3.5" />
-            <span>Quote</span>
-          </button>
-          <button
-            onClick={() => insertAtCursor("\n\n```typescript\n// Your code snippet here\n```\n\n")}
-            className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
-            title="Code Block"
-          >
-            <Code className="h-3.5 w-3.5" />
-            <span>Code</span>
-          </button>
-          <button
-            onClick={() => insertAtCursor("\n\n- Item 1\n- Item 2\n- Item 3\n\n")}
-            className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
-            title="Bulleted List"
-          >
-            <List className="h-3.5 w-3.5" />
-            <span>List</span>
-          </button>
-          <button
-            onClick={() => insertAtCursor("\n\n---\n\n")}
-            className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
-            title="Divider"
-          >
-            <Minus className="h-3.5 w-3.5" />
-            <span>Divider</span>
-          </button>
-
-          <label className="flex items-center gap-1 cursor-pointer rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition ml-auto">
-            <ImageIcon className="h-3.5 w-3.5" />
-            <span>{uploadingImage ? "Processing..." : "Insert Mid-Post Image"}</span>
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              disabled={uploadingImage}
-              onChange={async (e) => {
-                if (e.target.files?.[0]) {
-                  const url = await handleImageUpload(e.target.files[0]);
-                  if (url) {
-                    insertAtCursor(`\n\n![${e.target.files[0].name}](${url})\n\n`);
-                  }
-                }
+            {/* Title (Big Medium-style Headline) */}
+            <textarea
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Title"
+              rows={1}
+              className="w-full resize-none border-none text-3xl sm:text-5xl font-extrabold tracking-tight text-gray-900 placeholder-gray-300 focus:outline-hidden focus:ring-0 leading-tight"
+              onInput={(e) => {
+                const target = e.target as HTMLTextAreaElement;
+                target.style.height = "auto";
+                target.style.height = target.scrollHeight + "px";
               }}
             />
-          </label>
-        </div>
 
-        {/* Medium-style Body Canvas Area */}
-        <textarea
-          ref={textareaRef}
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          onDrop={handleDrop}
-          placeholder="Tell your story... Drag and drop images anywhere mid-article, or click 'Insert Mid-Post Image'..."
-          className="min-h-[500px] w-full resize-none border-none text-lg leading-relaxed text-gray-800 placeholder-gray-300 focus:outline-hidden focus:ring-0"
-        />
-      </main>
+            {/* Floating Formatting Toolbar */}
+            <div className="sticky top-28 z-30 flex flex-wrap items-center gap-1.5 rounded-xl border border-gray-200 bg-white/95 p-1.5 shadow-sm backdrop-blur-md">
+              <button
+                onClick={() => insertAtCursor("\n\n## Section Heading\n\n")}
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
+                title="Heading 2"
+              >
+                <Heading2 className="h-3.5 w-3.5" />
+                <span>H2</span>
+              </button>
+              <button
+                onClick={() => insertAtCursor("\n\n### Subheading\n\n")}
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
+                title="Heading 3"
+              >
+                <Heading3 className="h-3.5 w-3.5" />
+                <span>H3</span>
+              </button>
+              <button
+                onClick={() => insertAtCursor("\n\n> Medium-style memorable pull-quote...\n\n")}
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
+                title="Quote"
+              >
+                <Quote className="h-3.5 w-3.5" />
+                <span>Quote</span>
+              </button>
+              <button
+                onClick={() => insertAtCursor("\n\n```typescript\n// Your code snippet here\n```\n\n")}
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
+                title="Code Block"
+              >
+                <Code className="h-3.5 w-3.5" />
+                <span>Code</span>
+              </button>
+              <button
+                onClick={() => insertAtCursor("\n\n- Item 1\n- Item 2\n- Item 3\n\n")}
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
+                title="Bulleted List"
+              >
+                <List className="h-3.5 w-3.5" />
+                <span>List</span>
+              </button>
+              <button
+                onClick={() => insertAtCursor("\n\n---\n\n")}
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
+                title="Divider"
+              >
+                <Minus className="h-3.5 w-3.5" />
+                <span>Divider</span>
+              </button>
+
+              <label className="flex items-center gap-1 cursor-pointer rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition ml-auto">
+                <ImageIcon className="h-3.5 w-3.5" />
+                <span>{uploadingImage ? "Processing..." : "Insert Mid-Post Image"}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadingImage}
+                  onChange={async (e) => {
+                    if (e.target.files?.[0]) {
+                      const url = await handleImageUpload(e.target.files[0]);
+                      if (url) {
+                        insertAtCursor(`\n\n![${e.target.files[0].name}](${url})\n\n`);
+                      }
+                    }
+                  }}
+                />
+              </label>
+            </div>
+
+            {/* Medium-style Body Canvas Area */}
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              onDrop={handleDrop}
+              placeholder="Tell your story... Drag and drop images anywhere mid-article, or click 'Insert Mid-Post Image'..."
+              className="min-h-[500px] w-full resize-none border-none text-lg leading-relaxed text-gray-800 placeholder-gray-300 focus:outline-hidden focus:ring-0"
+            />
+          </div>
+        );
+
+        const previewNode = (
+          <article className="rounded-2xl border border-gray-100 bg-white p-6 sm:p-10 shadow-sm transition">
+            {/* Cover Image Banner */}
+            {coverImage ? (
+              <div className="mb-8 overflow-hidden rounded-2xl shadow-sm border border-gray-100">
+                <img
+                  src={coverImage}
+                  alt={title || "Cover Image"}
+                  className="h-64 sm:h-96 w-full object-cover"
+                />
+              </div>
+            ) : null}
+
+            {/* Metadata Bar */}
+            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-4">
+              <span className="rounded-full bg-blue-50 px-2.5 py-0.5 font-semibold text-blue-700">
+                {ALL_VERTICALS.find((v) => v.slug === selectedVertical)?.name || selectedVertical}
+              </span>
+              <span>•</span>
+              <span>{new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+              <span>•</span>
+              <span className="font-medium text-gray-600">{readingTime} min read</span>
+              <span>•</span>
+              <span>{wordCount} words</span>
+            </div>
+
+            {/* Title */}
+            <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight mb-6">
+              {title.trim() ? title : <span className="text-gray-300 italic">Untitled Article</span>}
+            </h1>
+
+            {/* Author Card */}
+            {user && (
+              <div className="flex items-center gap-3.5 border-y border-gray-100 py-4 my-6">
+                <img
+                  src={user.avatar_url}
+                  alt={user.name || user.login}
+                  className="h-10 w-10 rounded-full ring-2 ring-gray-100"
+                />
+                <div>
+                  <div className="text-sm font-semibold text-gray-900">{user.name || user.login}</div>
+                  <div className="text-xs text-gray-500">
+                    @{user.login} • {roleInfo?.role ? roleInfo.role.replace("_", " ").toUpperCase() : "AUTHOR"}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Rendered Markdown Body */}
+            <div
+              className="article-preview text-gray-800"
+              dangerouslySetInnerHTML={{ __html: parsedHtml }}
+            />
+          </article>
+        );
+
+        if (viewMode === "write") {
+          return (
+            <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+              {editorFormNode}
+            </main>
+          );
+        }
+
+        if (viewMode === "preview") {
+          return (
+            <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+              <div className="mb-6 flex items-center justify-between rounded-xl bg-blue-50/80 border border-blue-100 px-4 py-2.5 text-xs text-blue-800">
+                <div className="flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-blue-600" />
+                  <span className="font-semibold">Live Article Preview</span>
+                  <span className="hidden sm:inline text-blue-500">— Exactly as readers will see it once published</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("write")}
+                  className="font-medium text-blue-700 hover:text-blue-900 underline"
+                >
+                  Return to Edit &rarr;
+                </button>
+              </div>
+              {previewNode}
+            </main>
+          );
+        }
+
+        return (
+          <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+              {/* Left Column: Markdown Canvas */}
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs">
+                <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <span className="flex items-center gap-1.5">
+                    <Edit3 className="h-3.5 w-3.5 text-blue-600" />
+                    Markdown Canvas
+                  </span>
+                  <span>{wordCount} words</span>
+                </div>
+                {editorFormNode}
+              </div>
+
+              {/* Right Column: Live Rendered Preview */}
+              <div className="lg:sticky lg:top-28">
+                <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <span className="flex items-center gap-1.5">
+                    <Eye className="h-3.5 w-3.5 text-emerald-600" />
+                    Real-Time Live Preview
+                  </span>
+                  <span className="text-emerald-600 font-medium">⚡ Instant Sync</span>
+                </div>
+                <div className="max-h-[calc(100vh-10rem)] overflow-y-auto pr-1">
+                  {previewNode}
+                </div>
+              </div>
+            </div>
+          </main>
+        );
+      })()}
 
       {/* Publish Slide-Over Drawer (Medium Style) */}
       {showDrawer && (

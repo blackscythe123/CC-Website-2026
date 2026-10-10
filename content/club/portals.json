@@ -7,32 +7,5 @@
     "appDir": "apps/main-portal",
     "isDefault": true,
     "description": "Central portal for SSN Coding Club community, verticals, and showcase."
-  },
-  {
-    "id": "design-portal",
-    "name": "Designing & Creative Wing",
-    "slug": "design",
-    "domain": "design.codingclub.tech",
-    "appDir": "apps/design-portal",
-    "isDefault": false,
-    "description": "Dedicated portal for UI/UX, product design, branding, and creative showcases."
-  },
-  {
-    "id": "cybersec-portal",
-    "name": "Cybersecurity & CTF Arena",
-    "slug": "cybersec",
-    "domain": "cybersec.codingclub.tech",
-    "appDir": "apps/cybersec-portal",
-    "isDefault": false,
-    "description": "Dedicated portal for CTF writeups, ethical hacking, and cyber defense research."
-  },
-  {
-    "id": "ai-portal",
-    "name": "AI & Intelligence Hub",
-    "slug": "ai",
-    "domain": "ai.codingclub.tech",
-    "appDir": "apps/ai-portal",
-    "isDefault": false,
-    "description": "Dedicated portal for AI, ML research papers, model demos, and data engineering."
   }
 ]

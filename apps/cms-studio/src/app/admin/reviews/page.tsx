@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import StudioNav from "@/components/StudioNav";
 import { UserRoleInfo } from "@/lib/roles";
+import { marked } from "marked";
 import {
   CheckCircle,
   ExternalLink,
@@ -14,6 +15,9 @@ import {
   MessageSquare,
   X,
   Users,
+  Eye,
+  FileText,
+  Sparkles,
 } from "lucide-react";
 
 interface PendingPR {
@@ -32,6 +36,17 @@ interface PendingPR {
   reviews?: { user: string; state: string; body: string; date: string }[];
 }
 
+interface PreviewArticleData {
+  title: string;
+  markdownBody: string;
+  coverImage?: string;
+  author: string;
+  vertical: string;
+  summary?: string;
+  tags?: string[];
+  pullNumber: number;
+}
+
 export default function EditorialReviewsPage() {
   const [user, setUser] = useState<{ login: string; name: string; avatar_url: string } | null>(
     null
@@ -42,6 +57,10 @@ export default function EditorialReviewsPage() {
   const [actionMessage, setActionMessage] = useState("");
   const [actionError, setActionError] = useState("");
   const [mergingPrNumber, setMergingPrNumber] = useState<number | null>(null);
+
+  // Article Preview Modal State
+  const [previewArticle, setPreviewArticle] = useState<PreviewArticleData | null>(null);
+  const [loadingPreviewNumber, setLoadingPreviewNumber] = useState<number | null>(null);
 
   // Rejection / Changes Requested Modal State
   const [rejectModalPr, setRejectModalPr] = useState<PendingPR | null>(null);
@@ -104,6 +123,23 @@ export default function EditorialReviewsPage() {
       setActionError(err instanceof Error ? err.message : "Error processing approval");
     } finally {
       setMergingPrNumber(null);
+    }
+  };
+
+  const handleOpenPreview = async (prNumber: number) => {
+    setLoadingPreviewNumber(prNumber);
+    setActionError("");
+    try {
+      const res = await fetch(`/api/posts/reviews?previewPullNumber=${prNumber}`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to load article preview");
+      }
+      setPreviewArticle(data.article);
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Error fetching article preview");
+    } finally {
+      setLoadingPreviewNumber(null);
     }
   };
 
@@ -255,6 +291,17 @@ export default function EditorialReviewsPage() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => handleOpenPreview(pr.number)}
+                        disabled={loadingPreviewNumber === pr.number}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 px-3.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition disabled:opacity-50"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        <span>
+                          {loadingPreviewNumber === pr.number ? "Loading Preview..." : "Preview Article"}
+                        </span>
+                      </button>
+
                       <a
                         href={pr.htmlUrl}
                         target="_blank"
@@ -404,6 +451,120 @@ export default function EditorialReviewsPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Full Article Preview Modal */}
+        {previewArticle && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 sm:p-6 overflow-y-auto">
+            <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-3xl bg-white shadow-2xl overflow-hidden border border-gray-100">
+              {/* Modal Top Header */}
+              <div className="flex items-center justify-between border-b border-gray-100 bg-white/95 px-6 py-4 backdrop-blur-md sticky top-0 z-20">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="rounded-full bg-blue-50 px-2.5 py-0.5 font-bold uppercase tracking-wider text-blue-700">
+                    {previewArticle.vertical}
+                  </span>
+                  <span className="text-gray-400">•</span>
+                  <span className="text-gray-600 font-medium">Staging Preview (PR #{previewArticle.pullNumber})</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const matchedPr = prs.find((p) => p.number === previewArticle.pullNumber);
+                    const canReview =
+                      roleInfo?.role === "superadmin" ||
+                      ((roleInfo?.role === "vertical_head" || roleInfo?.role === "deputy") &&
+                        roleInfo.verticals.includes(previewArticle.vertical));
+
+                    return (
+                      <>
+                        {canReview && matchedPr && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRejectModalPr(matchedPr);
+                                setRejectReason("");
+                                setPreviewArticle(null);
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
+                            >
+                              <XCircle className="h-3.5 w-3.5" />
+                              <span>Request Changes</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleApprove(matchedPr);
+                                setPreviewArticle(null);
+                              }}
+                              disabled={mergingPrNumber === matchedPr.number}
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 transition disabled:opacity-50"
+                            >
+                              <ShieldCheck className="h-3.5 w-3.5" />
+                              <span>Approve &amp; Publish</span>
+                            </button>
+                          </>
+                        )}
+                      </>
+                    );
+                  })()}
+
+                  <button
+                    type="button"
+                    onClick={() => setPreviewArticle(null)}
+                    className="rounded-xl p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition ml-2"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Scrollable Article Content */}
+              <div className="overflow-y-auto p-6 sm:p-10 space-y-6">
+                {previewArticle.coverImage && (
+                  <div className="overflow-hidden rounded-2xl shadow-sm border border-gray-100">
+                    <img
+                      src={previewArticle.coverImage}
+                      alt={previewArticle.title}
+                      className="h-64 sm:h-96 w-full object-cover"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 leading-tight">
+                    {previewArticle.title}
+                  </h1>
+
+                  <div className="flex items-center gap-3 border-y border-gray-100 py-3 text-xs text-gray-500">
+                    <span className="font-semibold text-gray-800">By {previewArticle.author}</span>
+                    <span>•</span>
+                    <span>Vertical: {previewArticle.vertical.toUpperCase()}</span>
+                    {previewArticle.tags && previewArticle.tags.length > 0 && (
+                      <>
+                        <span>•</span>
+                        <span>Tags: {previewArticle.tags.join(", ")}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {previewArticle.summary && (
+                  <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-600 italic border-l-4 border-blue-500">
+                    {previewArticle.summary}
+                  </div>
+                )}
+
+                <div
+                  className="article-preview text-gray-800 pt-4"
+                  dangerouslySetInnerHTML={{
+                    __html: marked.parse(previewArticle.markdownBody || "") as string,
+                  }}
+                />
+              </div>
             </div>
           </div>
         )}

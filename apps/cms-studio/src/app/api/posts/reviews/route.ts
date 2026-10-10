@@ -4,6 +4,7 @@ import {
   approveAndMergePR,
   rejectPR,
   getPRDetails,
+  getPRArticleContent,
 } from "@/lib/github";
 import { getUserRoleInfo, canUserApproveVertical, readRoles } from "@/lib/roles";
 import { getSessionToken } from "@/lib/session";
@@ -29,6 +30,14 @@ export async function GET(request: NextRequest) {
 
     const userData = await userRes.json();
     const roleInfo = getUserRoleInfo(userData.login);
+
+    const { searchParams } = new URL(request.url);
+    const previewPullNumber = searchParams.get("previewPullNumber");
+
+    if (previewPullNumber) {
+      const article = await getPRArticleContent(token, parseInt(previewPullNumber, 10));
+      return NextResponse.json({ success: true, article });
+    }
     const prs = await listPendingReviewPRs(token);
 
     // Filter PRs by user permissions

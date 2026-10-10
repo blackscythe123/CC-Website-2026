@@ -24,6 +24,13 @@ import {
   Columns,
 } from "lucide-react";
 
+import {
+  saveLocalDraft,
+  getLocalDraft,
+  clearLocalDraft,
+  StoredDraft,
+} from "@/lib/draftStorage";
+
 interface UserProfile {
   login: string;
   name: string;
@@ -45,9 +52,6 @@ const ALL_VERTICALS = [
 
 const ALL_PORTALS = [
   { id: "main-portal", name: "🌐 Main Coding Club Portal", domain: "codingclub.tech" },
-  { id: "design-portal", name: "🎨 Designing & Creative Wing", domain: "design.codingclub.tech" },
-  { id: "cybersec-portal", name: "🛡️ Cybersecurity & CTF Arena", domain: "cybersec.codingclub.tech" },
-  { id: "ai-portal", name: "🤖 AI & Intelligence Hub", domain: "ai.codingclub.tech" },
 ];
 
 export default function AdminEditorPage() {
@@ -101,9 +105,32 @@ export default function AdminEditorPage() {
   } | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
+  // Local Draft Recovery State (IndexedDB)
+  const [recoveredDraft, setRecoveredDraft] = useState<StoredDraft | null>(null);
+
+  // In-App Editorial Feedback Notifications
+  const [authorFeedbackPr, setAuthorFeedbackPr] = useState<{
+    number: number;
+    title: string;
+    feedback: string;
+    vertical: string;
+  } | null>(null);
+  const [loadingFeedbackDraft, setLoadingFeedbackDraft] = useState(false);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
+    // 1. Check for recoverable IndexedDB local draft
+    getLocalDraft().then((draft) => {
+      if (
+        draft &&
+        (draft.title.trim() || draft.content.trim() || (draft.pendingImages && draft.pendingImages.length > 0))
+      ) {
+        setRecoveredDraft(draft);
+      }
+    });
+
+    // 2. Fetch authenticated user profile & check for feedback PRs
     fetch("/api/auth/me")
       .then((res) => res.json())
       .then((data) => {
@@ -114,11 +141,51 @@ export default function AdminEditorPage() {
           if (data.roleInfo?.verticals?.length > 0) {
             setSelectedVertical(data.roleInfo.verticals[0]);
           }
+
+          // Check if any open PR authored by this user has changes requested
+          fetch("/api/posts/reviews")
+            .then((r) => r.json())
+            .then((rData) => {
+              if (rData.prs && data.user) {
+                const myPrWithFeedback = rData.prs.find(
+                  (p: { author: string; changesRequested?: boolean; latestFeedback?: string }) =>
+                    p.author.toLowerCase() === data.user.login.toLowerCase() &&
+                    p.changesRequested &&
+                    p.latestFeedback
+                );
+                if (myPrWithFeedback) {
+                  setAuthorFeedbackPr({
+                    number: myPrWithFeedback.number,
+                    title: myPrWithFeedback.title,
+                    feedback: myPrWithFeedback.latestFeedback,
+                    vertical: myPrWithFeedback.vertical,
+                  });
+                }
+              }
+            })
+            .catch(() => {});
         }
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, []);
+
+  // Debounced Auto-Save to IndexedDB (survives crashes, power outages, and tab closures)
+  useEffect(() => {
+    if (!title.trim() && !content.trim() && pendingImages.length === 0) return;
+    const timer = setTimeout(() => {
+      saveLocalDraft({
+        title,
+        content,
+        coverImage,
+        selectedVertical,
+        summary,
+        tags,
+        pendingImages,
+      });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [title, content, coverImage, selectedVertical, summary, tags, pendingImages]);
 
   // Alert user before closing or reloading if there are unsaved edits or pending images
   useEffect(() => {
@@ -131,6 +198,44 @@ export default function AdminEditorPage() {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [title, content, pendingImages]);
+
+  const handleRestoreDraft = () => {
+    if (!recoveredDraft) return;
+    setTitle(recoveredDraft.title || "");
+    setContent(recoveredDraft.content || "");
+    setCoverImage(recoveredDraft.coverImage || "");
+    if (recoveredDraft.selectedVertical) setSelectedVertical(recoveredDraft.selectedVertical);
+    setSummary(recoveredDraft.summary || "");
+    setTags(recoveredDraft.tags || []);
+    setPendingImages(recoveredDraft.pendingImages || []);
+    setRecoveredDraft(null);
+  };
+
+  const handleDiscardDraft = async () => {
+    await clearLocalDraft();
+    setRecoveredDraft(null);
+  };
+
+  const handleLoadFeedbackPR = async (prNumber: number) => {
+    setLoadingFeedbackDraft(true);
+    try {
+      const res = await fetch(`/api/posts/reviews?previewPullNumber=${prNumber}`);
+      const data = await res.json();
+      if (data.article) {
+        setTitle(data.article.title || "");
+        setContent(data.article.markdownBody || "");
+        setCoverImage(data.article.coverImage || "");
+        if (data.article.vertical) setSelectedVertical(data.article.vertical);
+        setSummary(data.article.summary || "");
+        setTags(data.article.tags || []);
+        setAuthorFeedbackPr(null);
+      }
+    } catch (err) {
+      console.error("Error loading feedback draft:", err);
+    } finally {
+      setLoadingFeedbackDraft(false);
+    }
+  };
 
   // Local In-Browser Image Handler (Deferred Upload until Final Submission)
   const handleImageUpload = async (file: File): Promise<string | null> => {
@@ -283,6 +388,7 @@ export default function AdminEditorPage() {
       });
       setShowDrawer(false);
       setPendingImages([]);
+      await clearLocalDraft();
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Error submitting post");
     } finally {
@@ -455,6 +561,68 @@ export default function AdminEditorPage() {
                 className="text-xs text-gray-400 hover:text-gray-600 pt-1"
               >
                 Close & Continue Writing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unsaved Local Draft Recovered Notification Banner */}
+      {recoveredDraft && (
+        <div className="mx-auto max-w-4xl px-4 pt-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm text-xs text-amber-900">
+            <div className="flex items-center gap-3">
+              <Sparkles className="h-5 w-5 text-amber-600 shrink-0" />
+              <div>
+                <span className="font-bold text-amber-950">⚡ Unsaved Local Draft Recovered!</span>
+                <p className="text-amber-800 mt-0.5">
+                  An unsaved draft from {new Date(recoveredDraft.updatedAt).toLocaleTimeString()} was saved in browser storage.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleRestoreDraft}
+                className="rounded-xl bg-amber-600 px-3.5 py-1.5 font-bold text-white shadow-xs hover:bg-amber-700 transition"
+              >
+                Restore Draft
+              </button>
+              <button
+                type="button"
+                onClick={handleDiscardDraft}
+                className="rounded-xl border border-amber-300 bg-white px-3 py-1.5 font-semibold text-amber-800 hover:bg-amber-100 transition"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Editorial Changes Requested Notification Banner */}
+      {authorFeedbackPr && (
+        <div className="mx-auto max-w-4xl px-4 pt-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 shadow-sm text-xs text-red-900">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-bold text-red-950">
+                  ⚠️ Editorial Feedback on PR #{authorFeedbackPr.number}: &ldquo;{authorFeedbackPr.title}&rdquo;
+                </div>
+                <p className="text-red-800 mt-1 whitespace-pre-wrap font-sans">
+                  <strong>Revision Required:</strong> {authorFeedbackPr.feedback}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+              <button
+                type="button"
+                onClick={() => handleLoadFeedbackPR(authorFeedbackPr.number)}
+                disabled={loadingFeedbackDraft}
+                className="rounded-xl bg-red-600 px-3.5 py-1.5 font-bold text-white shadow-xs hover:bg-red-700 transition disabled:opacity-50"
+              >
+                {loadingFeedbackDraft ? "Loading..." : "Load Draft & Revise"}
               </button>
             </div>
           </div>

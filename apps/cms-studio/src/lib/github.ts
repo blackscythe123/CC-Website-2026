@@ -272,6 +272,53 @@ export async function getPRDetails(token: string, pullNumber: number) {
   return prData;
 }
 
+export async function getPRArticleContent(token: string, pullNumber: number) {
+  const octokit = getOctokit(token);
+  const { data: files } = await octokit.pulls.listFiles({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    pull_number: pullNumber,
+  });
+
+  const mdFile = files.find((f) => f.filename.endsWith(".md") || f.filename.endsWith(".mdx"));
+  if (!mdFile) {
+    throw new Error("No article file found in this draft PR.");
+  }
+
+  const { data: prData } = await octokit.pulls.get({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    pull_number: pullNumber,
+  });
+
+  const { data: fileRes } = await octokit.repos.getContent({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    path: mdFile.filename,
+    ref: prData.head.sha,
+  });
+
+  if ("content" in fileRes && typeof fileRes.content === "string") {
+    const raw = Buffer.from(fileRes.content, "base64").toString("utf-8");
+    const parsed = matter(raw);
+    return {
+      filePath: mdFile.filename,
+      frontmatter: parsed.data,
+      markdownBody: parsed.content,
+      branch: prData.head.ref,
+      title: (parsed.data.title as string) || prData.title,
+      coverImage: (parsed.data.coverImage as string) || "",
+      summary: (parsed.data.summary as string) || "",
+      tags: (parsed.data.tags as string[]) || [],
+      vertical: (parsed.data.vertical as string) || "general",
+      author: (parsed.data.author as string) || prData.user?.login || "unknown",
+      pullNumber,
+    };
+  }
+
+  throw new Error("Could not read draft file content.");
+}
+
 export async function rejectPR(
   token: string,
   pullNumber: number,

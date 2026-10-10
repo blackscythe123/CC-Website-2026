@@ -116,10 +116,20 @@ export async function GET(request: NextRequest) {
       </html>
     `;
 
-    return new NextResponse(successHtml, {
+    const responseObj = new NextResponse(successHtml, {
       status: 200,
       headers: { "Content-Type": "text/html" },
     });
+
+    responseObj.cookies.set("cc_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+    });
+
+    return responseObj;
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Internal Server Error";
     return new NextResponse(`Error in OAuth callback: ${errorMsg}`, { status: 500 });

@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: "/admin",
+        source: "/legacy-admin",
         destination: "/admin/index.html",
       },
       {

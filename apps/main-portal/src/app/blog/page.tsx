@@ -3,8 +3,8 @@ import { getAllPosts } from "@/lib/posts";
 import { getAllVerticals } from "@/lib/verticals";
 
 export const metadata = {
-  title: "Cross-Vertical Blog Feed | Coding Club",
-  description: "Browse articles, tutorials, and research notes from all 10 engineering verticals.",
+  title: "Cross-Vertical Blog Feed | SSN Coding Club",
+  description: "Browse articles, tutorials, and research notes across all 10 engineering verticals.",
 };
 
 export default function BlogIndexPage() {
@@ -12,73 +12,92 @@ export default function BlogIndexPage() {
   const verticals = getAllVerticals();
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8 space-y-10">
-      <div className="flex flex-col justify-between gap-4 border-b border-gray-200 pb-8 sm:flex-row sm:items-end dark:border-gray-800">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl dark:text-white">
-            Club Engineering Feed
-          </h1>
-          <p className="mt-2 text-sm text-gray-500">
-            Unified technical articles published across all 10 verticals through our Git editorial pipeline.
-          </p>
+    <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-12 space-y-10">
+      {/* Top Banner Card */}
+      <div className="rounded-3xl border border-[#E5E0D5] bg-[#FFFDF8] p-6 sm:p-10 shadow-lg relative overflow-hidden">
+        {/* Scotch Tape on top */}
+        <div className="absolute -top-3 left-16 w-16 h-5 bg-white/80 border border-stone-400/20 shadow-2xs backdrop-blur-2xs rounded-xs pointer-events-none rotate-[-2deg]" />
+
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 pb-8 border-b border-[#E8E1D2]">
+          <div>
+            <div className="font-mono text-xs sm:text-sm text-stone-600 flex items-center gap-1.5">
+              <span>ssn@codingclub:~$</span>
+              <span className="text-[#F43F5E] font-semibold">blogs</span>
+            </div>
+            <h1 className="mt-2 text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-stone-900">
+              // CLUB ENGINEERING FEED
+            </h1>
+            <div className="mt-1 font-handwriting text-xl sm:text-2xl text-stone-600 font-bold">
+              Cross-vertical tutorials, project deep-dives &amp; research.
+            </div>
+          </div>
+
+          <div className="text-left md:text-right font-mono text-xs space-y-2">
+            <a
+              href="https://ssn-coding-club-cms.vercel.app/admin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-4 py-2.5 font-bold text-white shadow-sm hover:bg-stone-800 transition"
+            >
+              <span>Write a Post</span>
+              <span className="opacity-70 text-stone-300">(/admin) ↗</span>
+            </a>
+            <div className="text-stone-500">{posts.length} published articles</div>
+          </div>
         </div>
-        <a
-          href="https://ssn-coding-club-cms.vercel.app/admin"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 self-start rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700"
-        >
-          <span>Write a Post</span>
-          <span className="font-mono opacity-80">/admin</span>
-        </a>
+
+        {/* Vertical Filter Pills (Sticky Notes style) */}
+        <div className="mt-6 flex flex-wrap items-center gap-2">
+          <span className="font-mono text-xs font-bold text-stone-500 mr-1">Filter by Wing:</span>
+          {verticals.map((v) => (
+            <Link
+              key={v.slug}
+              href={`/verticals/${v.slug}`}
+              className="rounded-lg border border-stone-300/80 bg-white px-3 py-1 font-mono text-xs font-medium text-stone-700 hover:border-stone-900 hover:text-stone-900 hover:bg-stone-50 transition shadow-2xs"
+            >
+              #{v.name}
+            </Link>
+          ))}
+        </div>
       </div>
 
-      {/* Vertical Pills Quick Filter */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold text-gray-400">Filter by Vertical:</span>
-        {verticals.map((v) => (
-          <Link
-            key={v.slug}
-            href={`/verticals/${v.slug}`}
-            className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:border-blue-500 hover:text-blue-600 transition dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
-          >
-            {v.name}
-          </Link>
-        ))}
-      </div>
-
-      {/* Posts List */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {posts.map((post) => (
+      {/* Posts Grid with Scotch Tape */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {posts.map((post, idx) => (
           <article
             key={`${post.vertical}-${post.slug}`}
-            className="flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-xs hover:border-blue-400 transition dark:border-gray-800 dark:bg-gray-900"
+            className={`relative flex flex-col justify-between rounded-2xl border border-stone-200 bg-white p-6 shadow-sm hover:shadow-md transition-all hover:-translate-y-1 ${
+              idx % 3 === 0 ? "rotate-[-0.4deg]" : idx % 3 === 1 ? "rotate-[0.4deg]" : "rotate-0"
+            }`}
           >
+            {/* Scotch Tape on top */}
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-12 h-4 bg-white/80 border border-stone-400/20 shadow-2xs backdrop-blur-2xs rounded-xs pointer-events-none rotate-[-1deg]" />
+
             <div>
-              <div className="flex items-center justify-between text-xs text-gray-400">
+              <div className="flex items-center justify-between font-mono text-xs">
                 <Link
                   href={`/verticals/${post.vertical}`}
-                  className="rounded-full bg-blue-50 px-2.5 py-0.5 font-semibold text-blue-700 hover:underline dark:bg-blue-950 dark:text-blue-300"
+                  className="rounded bg-rose-50 px-2 py-0.5 font-bold text-[#F43F5E] border border-rose-100 hover:bg-rose-100 transition"
                 >
                   {post.vertical}
                 </Link>
-                <span>{post.date}</span>
+                <span className="text-stone-400">{post.date}</span>
               </div>
 
-              <h2 className="mt-3 text-xl font-bold tracking-tight text-gray-900 hover:text-blue-600 dark:text-white">
+              <h2 className="mt-3.5 text-lg font-bold text-stone-900 hover:text-[#F43F5E] transition-colors leading-snug">
                 <Link href={`/blog/${post.vertical}/${post.slug}`}>{post.title}</Link>
               </h2>
 
-              <p className="mt-2 text-sm leading-relaxed text-gray-600 line-clamp-3 dark:text-gray-300">
+              <p className="mt-2 text-xs sm:text-sm leading-relaxed text-stone-600 line-clamp-3 font-sans">
                 {post.summary}
               </p>
             </div>
 
-            <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-4 text-xs dark:border-gray-800">
-              <span className="text-gray-500">By {post.author}</span>
+            <div className="mt-6 flex items-center justify-between border-t border-stone-100 pt-4 font-mono text-xs">
+              <span className="text-stone-500">By {post.author}</span>
               <Link
                 href={`/blog/${post.vertical}/${post.slug}`}
-                className="font-semibold text-blue-600 hover:underline dark:text-blue-400"
+                className="font-bold text-[#F43F5E] hover:underline"
               >
                 Read full article &rarr;
               </Link>

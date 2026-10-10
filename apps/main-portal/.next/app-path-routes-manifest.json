@@ -1,8 +1,0 @@
-{
-  "/_global-error/page": "/_global-error",
-  "/_not-found/page": "/_not-found",
-  "/blog/[vertical]/[slug]/page": "/blog/[vertical]/[slug]",
-  "/blog/page": "/blog",
-  "/page": "/",
-  "/verticals/[slug]/page": "/verticals/[slug]"
-}

@@ -1,8 +1,0 @@
-{
-  "/_global-error/page": "app/_global-error/page.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/blog/[vertical]/[slug]/page": "app/blog/[vertical]/[slug]/page.js",
-  "/blog/page": "app/blog/page.js",
-  "/page": "app/page.js",
-  "/verticals/[slug]/page": "app/verticals/[slug]/page.js"
-}

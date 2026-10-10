@@ -28,6 +28,8 @@ export interface CreateDraftParams {
   tags: string[];
   markdownBody: string;
   pendingImages?: PendingImage[];
+  pullNumber?: number;
+  existingBranch?: string;
 }
 
 export interface DraftResult {
@@ -49,29 +51,36 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     tags,
     markdownBody,
     pendingImages,
+    pullNumber,
+    existingBranch,
   } = params;
 
-  // 1. Get SHA of main branch head
-  const { data: refData } = await octokit.git.getRef({
-    owner: REPO_OWNER,
-    repo: REPO_NAME,
-    ref: `heads/${MAIN_BRANCH}`,
-  });
-  const mainSha = refData.object.sha;
+  let branchName = existingBranch;
 
-  // 2. Create unique draft branch
-  const timestamp = Date.now().toString().slice(-5);
-  const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-  const branchName = `draft/${vertical}/${cleanSlug}-${timestamp}`;
+  // If this is a revision of an existing PR, reuse the existing branch!
+  if (!branchName) {
+    // 1. Get SHA of main branch head
+    const { data: refData } = await octokit.git.getRef({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      ref: `heads/${MAIN_BRANCH}`,
+    });
+    const mainSha = refData.object.sha;
 
-  await octokit.git.createRef({
-    owner: REPO_OWNER,
-    repo: REPO_NAME,
-    ref: `refs/heads/${branchName}`,
-    sha: mainSha,
-  });
+    // 2. Create unique draft branch
+    const timestamp = Date.now().toString().slice(-5);
+    const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    branchName = `draft/${vertical}/${cleanSlug}-${timestamp}`;
 
-  // 3. Process and upload pending images ON THE DRAFT BRANCH (never to main directly!)
+    await octokit.git.createRef({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      ref: `refs/heads/${branchName}`,
+      sha: mainSha,
+    });
+  }
+
+  // 3. Process and upload pending images ON THE DRAFT BRANCH
   let processedBody = markdownBody;
   let processedCoverImage = params.coverImage || "";
 
@@ -117,19 +126,39 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
   const fileContent = matter.stringify(processedBody, fileData);
   const contentBase64 = Buffer.from(fileContent, "utf-8").toString("base64");
 
+  const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   const filePath =
     vertical === "club"
       ? `content/club/posts/${cleanSlug}.md`
       : `content/verticals/${vertical}/posts/${cleanSlug}.md`;
+
+  // Get existing file sha if updating an existing branch
+  let existingFileSha: string | undefined;
+  try {
+    const { data: existingContent } = await octokit.repos.getContent({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: filePath,
+      ref: branchName,
+    });
+    if ("sha" in existingContent) {
+      existingFileSha = existingContent.sha;
+    }
+  } catch {
+    // New file
+  }
 
   // 5. Commit file to draft branch
   await octokit.repos.createOrUpdateFileContents({
     owner: REPO_OWNER,
     repo: REPO_NAME,
     path: filePath,
-    message: `feat(${vertical}): add ${cleanSlug} article`,
+    message: pullNumber
+      ? `fix(${vertical}): update revisions for PR #${pullNumber}`
+      : `feat(${vertical}): add ${cleanSlug} article`,
     content: contentBase64,
     branch: branchName,
+    sha: existingFileSha,
     author: {
       name: authorDisplayName || authorUsername,
       email: `${authorUsername}@users.noreply.github.com`,
@@ -140,7 +169,29 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     },
   });
 
-  // 5. Create Pull Request
+  // If this is an existing PR, update its title/body and post a comment!
+  if (pullNumber) {
+    const { data: existingPr } = await octokit.pulls.get({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      pull_number: pullNumber,
+    });
+
+    await octokit.issues.createComment({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      issue_number: pullNumber,
+      body: `### 🚀 Revisions Pushed by Author (@${authorUsername})\nThe article has been updated in response to editorial feedback and is ready for re-review.`,
+    });
+
+    return {
+      pullNumber,
+      prUrl: existingPr.html_url,
+      branch: branchName,
+    };
+  }
+
+  // 6. Create brand new Pull Request
   const prTitle = `feat(${vertical}): ${title}`;
   const prBody = `## Overview
 New article submission for the **${vertical}** technical vertical.

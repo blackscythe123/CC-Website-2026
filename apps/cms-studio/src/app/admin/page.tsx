@@ -134,8 +134,14 @@ export default function AdminEditorPage() {
     title: string;
     feedback: string;
     vertical: string;
+    branch?: string;
   } | null>(null);
   const [loadingFeedbackDraft, setLoadingFeedbackDraft] = useState(false);
+  const [activeRevisionPr, setActiveRevisionPr] = useState<{
+    number: number;
+    branch: string;
+    originalTitle: string;
+  } | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -440,6 +446,11 @@ export default function AdminEditorPage() {
         if (data.article.vertical) setSelectedVertical(data.article.vertical);
         setSummary(data.article.summary || "");
         setTags(data.article.tags || []);
+        setActiveRevisionPr({
+          number: prNumber,
+          branch: data.article.branch,
+          originalTitle: data.article.title || "",
+        });
         setAuthorFeedbackPr(null);
       }
     } catch (err) {
@@ -576,6 +587,8 @@ export default function AdminEditorPage() {
           tags,
           markdownBody: content,
           pendingImages: activeImages,
+          pullNumber: activeRevisionPr?.number,
+          existingBranch: activeRevisionPr?.branch,
         }),
       });
 
@@ -590,6 +603,7 @@ export default function AdminEditorPage() {
       });
       setShowDrawer(false);
       setPendingImages([]);
+      setActiveRevisionPr(null);
       await clearLocalDraft();
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : "Error submitting post");
@@ -750,13 +764,23 @@ export default function AdminEditorPage() {
               </button>
             </div>
 
-            <button
-              onClick={() => setShowDrawer(true)}
-              className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 transition"
-            >
-              <span>Publish / Submit</span>
-              <Send className="h-3.5 w-3.5" />
-            </button>
+            {activeRevisionPr ? (
+              <button
+                onClick={() => setShowDrawer(true)}
+                className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-red-700 transition"
+              >
+                <span>Update PR #{activeRevisionPr.number}</span>
+                <Send className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowDrawer(true)}
+                className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 transition"
+              >
+                <span>Publish / Submit</span>
+                <Send className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1353,9 +1377,17 @@ export default function AdminEditorPage() {
                 type="button"
                 onClick={handleSubmitDraft}
                 disabled={submitting}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-md hover:bg-emerald-700 transition disabled:opacity-50"
+                className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white shadow-md transition disabled:opacity-50 ${
+                  activeRevisionPr
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-emerald-600 hover:bg-emerald-700"
+                }`}
               >
-                {submitting ? "Opening Pull Request..." : "Submit for Editorial Review 🚀"}
+                {submitting
+                  ? "Pushing Revisions..."
+                  : activeRevisionPr
+                  ? `Update PR #${activeRevisionPr.number} with Revisions 🚀`
+                  : "Submit for Editorial Review 🚀"}
               </button>
             </div>
           </div>

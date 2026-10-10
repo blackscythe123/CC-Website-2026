@@ -27,7 +27,18 @@ export async function POST(request: NextRequest) {
     const roleInfo = getUserRoleInfo(userData.login);
 
     const body = await request.json();
-    const { vertical, slug, title, summary, coverImage, tags, markdownBody, pendingImages, targetPortals } = body;
+    const {
+      vertical,
+      slug,
+      title,
+      summary,
+      coverImage,
+      tags,
+      markdownBody,
+      pendingImages,
+      pullNumber,
+      existingBranch,
+    } = body;
 
     if (!vertical || !title || !markdownBody) {
       return NextResponse.json(
@@ -81,7 +92,7 @@ export async function POST(request: NextRequest) {
 
     const assignedPortal = VERTICAL_PORTAL_MAP[vertical] || "main-portal";
 
-    // Create branch & PR on GitHub (never direct merge!)
+    // Create or update branch & PR on GitHub (never direct merge!)
     const result = await createDraftAndPullRequest({
       token,
       authorUsername: userData.login,
@@ -95,11 +106,15 @@ export async function POST(request: NextRequest) {
       tags: Array.isArray(tags) ? tags : [],
       markdownBody,
       pendingImages: Array.isArray(pendingImages) ? pendingImages : [],
+      pullNumber: pullNumber ? parseInt(String(pullNumber), 10) : undefined,
+      existingBranch: existingBranch || undefined,
     });
 
     return NextResponse.json({
       success: true,
-      message: `Post submitted for review! Pull Request #${result.pullNumber} opened.`,
+      message: pullNumber
+        ? `Revisions committed to PR #${pullNumber} successfully!`
+        : `Post submitted for review! Pull Request #${result.pullNumber} opened.`,
       ...result,
     });
   } catch (err: unknown) {

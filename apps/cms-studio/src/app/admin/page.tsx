@@ -155,6 +155,24 @@ export default function AdminEditorPage() {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Filter selectable verticals according to role (must be at top level before early returns)
+  const isSuperadmin = roleInfo?.role === "superadmin";
+  const userVerticals = roleInfo?.verticals || [];
+  const availableVerticals = useMemo(() => {
+    if (isSuperadmin) {
+      return [{ slug: "club", name: "📢 Coding Club Announcements" }, ...ALL_VERTICALS];
+    }
+    return ALL_VERTICALS.filter((v) => userVerticals.includes(v.slug));
+  }, [isSuperadmin, userVerticals]);
+
+  const isUnassignedMember = !isSuperadmin && availableVerticals.length === 0;
+
+  useEffect(() => {
+    if (availableVerticals.length > 0 && !availableVerticals.some((v) => v.slug === selectedVertical)) {
+      setSelectedVertical(availableVerticals[0].slug);
+    }
+  }, [availableVerticals, selectedVertical]);
+
   useEffect(() => {
     // 1. Check for recoverable IndexedDB local draft
     getLocalDraft().then((draft) => {
@@ -740,23 +758,6 @@ export default function AdminEditorPage() {
       </div>
     );
   }
-
-  // Filter selectable verticals according to role
-  const isSuperadmin = roleInfo?.role === "superadmin";
-  const userVerticals = roleInfo?.verticals || [];
-  const availableVerticals = isSuperadmin
-    ? [{ slug: "club", name: "📢 Coding Club Announcements" }, ...ALL_VERTICALS]
-    : roleInfo?.role === "vertical_head" || roleInfo?.role === "deputy"
-    ? ALL_VERTICALS.filter((v) => userVerticals.includes(v.slug))
-    : ALL_VERTICALS.filter((v) => userVerticals.includes(v.slug));
-
-  const isUnassignedMember = !isSuperadmin && availableVerticals.length === 0;
-
-  useEffect(() => {
-    if (availableVerticals.length > 0 && !availableVerticals.some((v) => v.slug === selectedVertical)) {
-      setSelectedVertical(availableVerticals[0].slug);
-    }
-  }, [availableVerticals, selectedVertical]);
 
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans">

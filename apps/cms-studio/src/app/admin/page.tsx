@@ -589,8 +589,8 @@ export default function AdminEditorPage() {
   };
 
   const handleSubmitDraft = async () => {
-    if (!title.trim()) {
-      setErrorMessage("Please enter an article title.");
+    if (!title.trim() || title.trim().length < 3) {
+      setErrorMessage("Please enter an article title of at least 3 characters.");
       return;
     }
     if (!content.trim()) {

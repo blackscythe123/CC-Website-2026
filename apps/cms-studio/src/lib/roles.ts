@@ -179,27 +179,8 @@ export function canApproveRoleRequest(
   vertical: string
 ): boolean {
   const info = getUserRoleInfo(reviewerUsername);
-  if (info.role === "superadmin") return true;
-
-  if (requestedRole === "vertical_head") {
-    // Only Super Admin can approve a Vertical Head
-    return false;
-  }
-
-  if (requestedRole === "deputy") {
-    // Vertical Head of that vertical or Super Admin
-    return info.role === "vertical_head" && info.verticals.includes(vertical);
-  }
-
-  if (requestedRole === "member") {
-    // Deputy of that vertical, Vertical Head of that vertical, or Super Admin
-    return (
-      (info.role === "vertical_head" || info.role === "deputy") &&
-      info.verticals.includes(vertical)
-    );
-  }
-
-  return false;
+  // Only Super Admin can approve/commit role changes because main branch is protected
+  return info.role === "superadmin";
 }
 
 export function assignRole(

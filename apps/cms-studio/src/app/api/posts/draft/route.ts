@@ -76,6 +76,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (title.trim().length < 3) {
+      return NextResponse.json(
+        { error: "Article title must be at least 3 characters." },
+        { status: 400 }
+      );
+    }
+
     // Role check for club-wide announcements
     if (vertical === "club" && roleInfo.role !== "superadmin") {
       return NextResponse.json(
@@ -152,7 +159,7 @@ export async function POST(request: NextRequest) {
       title,
       summary: summary || "",
       coverImage: coverImage || "",
-      targetPortals: [assignedPortal],
+      targetPortals: Array.from(new Set([assignedPortal, "main-portal"])),
       tags: Array.isArray(tags) ? tags : [],
       markdownBody,
       pendingImages: Array.isArray(pendingImages) ? pendingImages : [],

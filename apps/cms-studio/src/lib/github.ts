@@ -105,6 +105,8 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     title,
     date: today,
     author: authorDisplayName || authorUsername,
+    authorUsername,
+    authorAvatar: `https://github.com/${authorUsername}.png`,
     summary,
     targetPortals: targetPortals && targetPortals.length > 0 ? targetPortals : ["main-portal"],
     vertical,

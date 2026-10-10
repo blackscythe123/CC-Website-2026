@@ -10,6 +10,8 @@ export interface PostSummary {
   title: string;
   date: string;
   author: string;
+  authorUsername?: string;
+  authorAvatar?: string;
   summary: string;
   coverImage?: string;
   targetPortals?: string[];
@@ -75,6 +77,8 @@ export function getAllPosts(portalId: string = "main-portal"): PostSummary[] {
               title: data.title || slug,
               date: data.date ? String(data.date).split("T")[0] : "",
               author: data.author || "Club Member",
+              authorUsername: data.authorUsername || "",
+              authorAvatar: data.authorAvatar || (data.authorUsername ? `https://github.com/${data.authorUsername}.png` : ""),
               summary: data.summary || "",
               coverImage: data.coverImage || "",
               targetPortals: Array.isArray(data.targetPortals) ? data.targetPortals : ["main-portal"],
@@ -107,6 +111,8 @@ export function getAllPosts(portalId: string = "main-portal"): PostSummary[] {
           title: data.title || slug,
           date: data.date ? String(data.date).split("T")[0] : "",
           author: data.author || "Coding Club Core",
+          authorUsername: data.authorUsername || "",
+          authorAvatar: data.authorAvatar || (data.authorUsername ? `https://github.com/${data.authorUsername}.png` : ""),
           summary: data.summary || "",
           coverImage: data.coverImage || "",
           targetPortals: Array.isArray(data.targetPortals) ? data.targetPortals : ["main-portal"],
@@ -142,12 +148,17 @@ export async function getPost(
   const { data, content } = matter(fileContents);
   const processed = await remark().use(html).process(content);
 
+  const authorUsername = data.authorUsername || "";
+  const authorAvatar = data.authorAvatar || (authorUsername ? `https://github.com/${authorUsername}.png` : "");
+
   return {
     slug: postSlug,
     vertical: verticalSlug,
     title: data.title || postSlug,
     date: data.date ? String(data.date).split("T")[0] : "",
     author: data.author || "Club Member",
+    authorUsername,
+    authorAvatar,
     summary: data.summary || "",
     coverImage: data.coverImage || "",
     tags: Array.isArray(data.tags) ? data.tags : [],

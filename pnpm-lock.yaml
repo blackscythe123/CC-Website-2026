@@ -15,6 +15,98 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
 
+  apps/ai-ml-portal:
+    dependencies:
+      gray-matter:
+        specifier: ^4.0.3
+        version: 4.0.3
+      lucide-react:
+        specifier: ^1.16.0
+        version: 1.54.0(@types/react@19.3.0)(react@19.2.4)
+      next:
+        specifier: 16.4.0
+        version: 16.4.0(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react:
+        specifier: 19.2.4
+        version: 19.2.4
+      react-dom:
+        specifier: 19.2.4
+        version: 19.2.4(react@19.2.4)
+      remark:
+        specifier: ^15.0.1
+        version: 15.0.1
+      remark-html:
+        specifier: ^16.0.1
+        version: 16.0.1
+    devDependencies:
+      '@tailwindcss/postcss':
+        specifier: ^4.2.1
+        version: 4.3.3
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      '@types/react':
+        specifier: ^19
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.3.0(@types/react@19.3.0)
+      postcss:
+        specifier: ^8.5.6
+        version: 8.5.23
+      tailwindcss:
+        specifier: ^4.2.1
+        version: 4.3.3
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
+  apps/ar-vr-portal:
+    dependencies:
+      gray-matter:
+        specifier: ^4.0.3
+        version: 4.0.3
+      lucide-react:
+        specifier: ^1.16.0
+        version: 1.54.0(@types/react@19.3.0)(react@19.2.4)
+      next:
+        specifier: 16.4.0
+        version: 16.4.0(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react:
+        specifier: 19.2.4
+        version: 19.2.4
+      react-dom:
+        specifier: 19.2.4
+        version: 19.2.4(react@19.2.4)
+      remark:
+        specifier: ^15.0.1
+        version: 15.0.1
+      remark-html:
+        specifier: ^16.0.1
+        version: 16.0.1
+    devDependencies:
+      '@tailwindcss/postcss':
+        specifier: ^4.2.1
+        version: 4.3.3
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      '@types/react':
+        specifier: ^19
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.3.0(@types/react@19.3.0)
+      postcss:
+        specifier: ^8.5.6
+        version: 8.5.23
+      tailwindcss:
+        specifier: ^4.2.1
+        version: 4.3.3
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
   apps/cms-studio:
     dependencies:
       '@octokit/rest':
@@ -53,6 +145,190 @@ importers:
         version: 19.3.0(@types/react@19.3.0)
       tailwindcss:
         specifier: ^4
+        version: 4.3.3
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
+  apps/cp-portal:
+    dependencies:
+      gray-matter:
+        specifier: ^4.0.3
+        version: 4.0.3
+      lucide-react:
+        specifier: ^1.16.0
+        version: 1.54.0(@types/react@19.3.0)(react@19.2.4)
+      next:
+        specifier: 16.4.0
+        version: 16.4.0(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react:
+        specifier: 19.2.4
+        version: 19.2.4
+      react-dom:
+        specifier: 19.2.4
+        version: 19.2.4(react@19.2.4)
+      remark:
+        specifier: ^15.0.1
+        version: 15.0.1
+      remark-html:
+        specifier: ^16.0.1
+        version: 16.0.1
+    devDependencies:
+      '@tailwindcss/postcss':
+        specifier: ^4.2.1
+        version: 4.3.3
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      '@types/react':
+        specifier: ^19
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.3.0(@types/react@19.3.0)
+      postcss:
+        specifier: ^8.5.6
+        version: 8.5.23
+      tailwindcss:
+        specifier: ^4.2.1
+        version: 4.3.3
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
+  apps/cybersecurity-portal:
+    dependencies:
+      gray-matter:
+        specifier: ^4.0.3
+        version: 4.0.3
+      lucide-react:
+        specifier: ^1.16.0
+        version: 1.54.0(@types/react@19.3.0)(react@19.2.4)
+      next:
+        specifier: 16.4.0
+        version: 16.4.0(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react:
+        specifier: 19.2.4
+        version: 19.2.4
+      react-dom:
+        specifier: 19.2.4
+        version: 19.2.4(react@19.2.4)
+      remark:
+        specifier: ^15.0.1
+        version: 15.0.1
+      remark-html:
+        specifier: ^16.0.1
+        version: 16.0.1
+    devDependencies:
+      '@tailwindcss/postcss':
+        specifier: ^4.2.1
+        version: 4.3.3
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      '@types/react':
+        specifier: ^19
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.3.0(@types/react@19.3.0)
+      postcss:
+        specifier: ^8.5.6
+        version: 8.5.23
+      tailwindcss:
+        specifier: ^4.2.1
+        version: 4.3.3
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
+  apps/design-portal:
+    dependencies:
+      gray-matter:
+        specifier: ^4.0.3
+        version: 4.0.3
+      lucide-react:
+        specifier: ^1.16.0
+        version: 1.54.0(@types/react@19.3.0)(react@19.2.4)
+      next:
+        specifier: 16.4.0
+        version: 16.4.0(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react:
+        specifier: 19.2.4
+        version: 19.2.4
+      react-dom:
+        specifier: 19.2.4
+        version: 19.2.4(react@19.2.4)
+      remark:
+        specifier: ^15.0.1
+        version: 15.0.1
+      remark-html:
+        specifier: ^16.0.1
+        version: 16.0.1
+    devDependencies:
+      '@tailwindcss/postcss':
+        specifier: ^4.2.1
+        version: 4.3.3
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      '@types/react':
+        specifier: ^19
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.3.0(@types/react@19.3.0)
+      postcss:
+        specifier: ^8.5.6
+        version: 8.5.23
+      tailwindcss:
+        specifier: ^4.2.1
+        version: 4.3.3
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
+  apps/full-stack-portal:
+    dependencies:
+      gray-matter:
+        specifier: ^4.0.3
+        version: 4.0.3
+      lucide-react:
+        specifier: ^1.16.0
+        version: 1.54.0(@types/react@19.3.0)(react@19.2.4)
+      next:
+        specifier: 16.4.0
+        version: 16.4.0(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react:
+        specifier: 19.2.4
+        version: 19.2.4
+      react-dom:
+        specifier: 19.2.4
+        version: 19.2.4(react@19.2.4)
+      remark:
+        specifier: ^15.0.1
+        version: 15.0.1
+      remark-html:
+        specifier: ^16.0.1
+        version: 16.0.1
+    devDependencies:
+      '@tailwindcss/postcss':
+        specifier: ^4.2.1
+        version: 4.3.3
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      '@types/react':
+        specifier: ^19
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.3.0(@types/react@19.3.0)
+      postcss:
+        specifier: ^8.5.6
+        version: 8.5.23
+      tailwindcss:
+        specifier: ^4.2.1
         version: 4.3.3
       typescript:
         specifier: ^5
@@ -101,7 +377,53 @@ importers:
         specifier: ^5
         version: 5.9.3
 
-  apps/vertical-portal-template:
+  apps/oss-portal:
+    dependencies:
+      gray-matter:
+        specifier: ^4.0.3
+        version: 4.0.3
+      lucide-react:
+        specifier: ^1.16.0
+        version: 1.54.0(@types/react@19.3.0)(react@19.2.4)
+      next:
+        specifier: 16.4.0
+        version: 16.4.0(@types/node@20.19.43)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react:
+        specifier: 19.2.4
+        version: 19.2.4
+      react-dom:
+        specifier: 19.2.4
+        version: 19.2.4(react@19.2.4)
+      remark:
+        specifier: ^15.0.1
+        version: 15.0.1
+      remark-html:
+        specifier: ^16.0.1
+        version: 16.0.1
+    devDependencies:
+      '@tailwindcss/postcss':
+        specifier: ^4.2.1
+        version: 4.3.3
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
+      '@types/react':
+        specifier: ^19
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.3.0(@types/react@19.3.0)
+      postcss:
+        specifier: ^8.5.6
+        version: 8.5.23
+      tailwindcss:
+        specifier: ^4.2.1
+        version: 4.3.3
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
+  apps/ssnhacks-portal:
     dependencies:
       gray-matter:
         specifier: ^4.0.3

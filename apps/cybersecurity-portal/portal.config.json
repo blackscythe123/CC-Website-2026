@@ -1,0 +1,8 @@
+{
+    "name":  "Cyber Security Wing",
+    "portalId":  "cybersecurity-portal",
+    "description":  "Autonomous portal for cybersecurity write-ups, CTF challenges, forensics, and security tools.",
+    "verticalSlug":  "cybersecurity",
+    "domain":  "cybersecurity.codingclub.tech",
+    "tagline":  "Official SSN Coding Club Cyber Security Wing Subdomain Portal"
+}

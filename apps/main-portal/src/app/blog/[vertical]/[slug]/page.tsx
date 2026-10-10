@@ -99,12 +99,30 @@ export default async function BlogPostPage({
 
         {/* Author Byline */}
         <div className="mt-6 flex items-center gap-3 pt-6 border-t border-[#E8E1D2]">
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-stone-900 font-mono font-bold text-white text-sm shadow-xs">
-            {post.author.slice(0, 2).toUpperCase()}
-          </div>
+          {post.authorAvatar ? (
+            <img
+              src={post.authorAvatar}
+              alt={post.author}
+              className="h-11 w-11 rounded-full object-cover border border-stone-300 shadow-xs"
+            />
+          ) : (
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-stone-900 font-mono font-bold text-white text-sm shadow-xs">
+              {post.author.trim().slice(0, 2).toUpperCase()}
+            </div>
+          )}
           <div>
-            <div className="font-bold text-stone-900 text-sm">
-              {post.author}
+            <div className="font-bold text-stone-900 text-sm flex items-center gap-2">
+              <span>{post.author}</span>
+              {post.authorUsername && (
+                <a
+                  href={`https://github.com/${post.authorUsername}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-xs text-stone-400 hover:text-stone-700 transition"
+                >
+                  @{post.authorUsername}
+                </a>
+              )}
             </div>
             <div className="font-mono text-xs text-stone-500">
               Editorial Pipeline • {verticalSlug === "club" ? "Coding Club Official" : `${vertical ? vertical.name : "Wing"} Contributor`}

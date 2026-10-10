@@ -1,0 +1,28 @@
+{
+    "version":  "0.1.0",
+    "name":  "@coding-club/cybersecurity-portal",
+    "scripts":  {
+                    "build":  "next build",
+                    "dev":  "next dev",
+                    "start":  "next start"
+                },
+    "devDependencies":  {
+                            "postcss":  "^8.5.6",
+                            "typescript":  "^5",
+                            "@types/react-dom":  "^19",
+                            "@tailwindcss/postcss":  "^4.2.1",
+                            "@types/react":  "^19",
+                            "@types/node":  "^20",
+                            "tailwindcss":  "^4.2.1"
+                        },
+    "dependencies":  {
+                         "remark-html":  "^16.0.1",
+                         "react-dom":  "19.2.4",
+                         "lucide-react":  "^1.16.0",
+                         "gray-matter":  "^4.0.3",
+                         "remark":  "^15.0.1",
+                         "react":  "19.2.4",
+                         "next":  "16.4.0"
+                     },
+    "private":  true
+}

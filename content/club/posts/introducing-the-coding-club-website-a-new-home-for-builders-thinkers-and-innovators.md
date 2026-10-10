@@ -3,8 +3,10 @@ title: >-
   Introducing the Coding Club Website: A New Home for Builders, Thinkers, and
   Innovators
 date: '2026-10-10'
-author: 'simiyon '
-summary: ''
+author: 'Simiyon Vinscent Samuel'
+authorUsername: 'blackscythe123'
+authorAvatar: 'https://github.com/blackscythe123.png'
+summary: 'Official welcome announcement introducing the new decentralized SSN Coding Club web ecosystem.'
 coverImage: /uploads/1791655109409-coding-club-logo.png
 tags:
   - club

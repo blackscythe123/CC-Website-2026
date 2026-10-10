@@ -136,6 +136,15 @@ export default function AdminEditorPage() {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Filter selectable destination portals according to role (must be at top level before early returns)
+  const allowedPortals = useMemo(() => {
+    if (!roleInfo) return ALL_PORTALS.filter((p) => p.id === "main-portal");
+    if (roleInfo.role === "superadmin") return ALL_PORTALS;
+    return ALL_PORTALS.filter(
+      (p) => p.id === "main-portal" || (p.vertical && roleInfo.verticals?.includes(p.vertical))
+    );
+  }, [roleInfo]);
+
   useEffect(() => {
     // 1. Check for recoverable IndexedDB local draft
     getLocalDraft().then((draft) => {
@@ -555,14 +564,6 @@ export default function AdminEditorPage() {
       ? ALL_VERTICALS.filter((v) => roleInfo.verticals.includes(v.slug))
       : ALL_VERTICALS;
 
-  // Filter selectable destination portals according to role
-  const allowedPortals = useMemo(() => {
-    if (!roleInfo) return ALL_PORTALS.filter((p) => p.id === "main-portal");
-    if (roleInfo.role === "superadmin") return ALL_PORTALS;
-    return ALL_PORTALS.filter(
-      (p) => p.id === "main-portal" || (p.vertical && roleInfo.verticals.includes(p.vertical))
-    );
-  }, [roleInfo]);
 
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans">
@@ -574,7 +575,9 @@ export default function AdminEditorPage() {
           <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
             <span className="font-semibold text-gray-700">Writing in:</span>
             <span className="rounded-full bg-blue-50 px-2.5 py-0.5 font-medium text-blue-700">
-              {ALL_VERTICALS.find((v) => v.slug === selectedVertical)?.name || selectedVertical}
+              {selectedVertical === "club"
+                ? "📢 Coding Club Announcements"
+                : ALL_VERTICALS.find((v) => v.slug === selectedVertical)?.name || selectedVertical}
             </span>
             <span>•</span>
             <span className="text-amber-600 font-medium">Draft (Requires Editorial Approval)</span>
@@ -998,7 +1001,9 @@ export default function AdminEditorPage() {
             {/* Metadata Bar */}
             <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-4">
               <span className="rounded-full bg-blue-50 px-2.5 py-0.5 font-semibold text-blue-700">
-                {ALL_VERTICALS.find((v) => v.slug === selectedVertical)?.name || selectedVertical}
+                {selectedVertical === "club"
+                  ? "📢 Coding Club Announcements"
+                  : ALL_VERTICALS.find((v) => v.slug === selectedVertical)?.name || selectedVertical}
               </span>
               <span>•</span>
               <span>{new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>

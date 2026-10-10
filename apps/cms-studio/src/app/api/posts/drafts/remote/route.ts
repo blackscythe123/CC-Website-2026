@@ -5,6 +5,7 @@ import {
   getPersonalDraftBranch,
 } from "@/lib/github";
 import { getSessionToken } from "@/lib/session";
+import { getUserRoleInfo } from "@/lib/roles";
 
 export async function GET(request: NextRequest) {
   const token = getSessionToken(request);
@@ -91,6 +92,28 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { vertical, slug, title, summary, coverImage, tags, markdownBody, pendingImages, targetPortals } = body;
+
+    // Verify role assignment: Unassigned members cannot push branches
+    const roleInfo = getUserRoleInfo(userData.login);
+    if (roleInfo.role === "member") {
+      if (!roleInfo.verticals || roleInfo.verticals.length === 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Access Denied: You must be assigned to a technical vertical in Governance & Roles before saving remote draft branches.",
+          },
+          { status: 403 }
+        );
+      }
+      if (vertical && !roleInfo.verticals.includes(vertical)) {
+        return NextResponse.json(
+          {
+            error: `As a Member, you are only authorized to save drafts for: ${roleInfo.verticals.join(", ")}`,
+          },
+          { status: 403 }
+        );
+      }
+    }
 
     const result = await savePersonalDraftBranch({
       token,

@@ -864,9 +864,13 @@ export default function AdminEditorPage() {
               <button
                 type="button"
                 onClick={handleSaveRemoteDraft}
-                disabled={isSavingRemoteDraft || isSavingDraft}
+                disabled={isSavingRemoteDraft || isSavingDraft || isUnassignedMember}
                 className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 shadow-xs hover:bg-gray-50 hover:border-gray-400 transition active:scale-95 disabled:opacity-50"
-                title="Push WIP draft to your personal Git draft branch (drafts/username/slug) so you can resume on another device"
+                title={
+                  isUnassignedMember
+                    ? "You must be assigned to a vertical in Governance & Roles before syncing cloud drafts"
+                    : "Push WIP draft to your personal Git draft branch (drafts/username/slug) so you can resume on another device"
+                }
               >
                 <CloudUpload className="h-3.5 w-3.5 text-blue-600" />
                 <span>{isSavingRemoteDraft ? "Syncing..." : "Save Draft"}</span>

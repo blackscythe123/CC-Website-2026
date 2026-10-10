@@ -3,7 +3,12 @@ import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
 import { getUserRoleInfo, canDeletePost } from "@/lib/roles";
-import { deletePublishedPost } from "@/lib/github";
+import {
+  deletePublishedPost,
+  listAllPublishedPostsFromGitHub,
+} from "@/lib/github";
+
+import { getSessionToken } from "@/lib/session";
 
 const ALL_VERTICALS = [
   "ai-ml",
@@ -29,9 +34,7 @@ interface PublishedPostItem {
 }
 
 export async function GET(request: NextRequest) {
-  const token =
-    request.cookies.get("cc_token")?.value ||
-    request.headers.get("authorization")?.replace("Bearer ", "");
+  const token = getSessionToken(request);
 
   if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -52,12 +55,33 @@ export async function GET(request: NextRequest) {
     const userData = await userRes.json();
     const roleInfo = getUserRoleInfo(userData.login);
 
+    // 1. Primary Source: Fetch live published posts tree directly from GitHub (Serverless/Vercel Safe)
+    let gitHubPosts = await listAllPublishedPostsFromGitHub(token);
+
+    if (gitHubPosts.length > 0) {
+      const posts: PublishedPostItem[] = gitHubPosts.map((p) => ({
+        slug: p.slug,
+        vertical: p.vertical,
+        title: p.title,
+        date: p.date,
+        author: p.author,
+        summary: p.summary,
+        canDelete: canDeletePost(userData.login, p.vertical),
+      }));
+
+      return NextResponse.json({
+        posts,
+        roleInfo,
+      });
+    }
+
+    // 2. Secondary Fallback: Local filesystem scan (for offline local development)
     const posts: PublishedPostItem[] = [];
     const contentBaseDir = path.resolve(process.cwd(), "../../content");
     const altContentBaseDir = path.resolve(process.cwd(), "content");
     const baseDir = fs.existsSync(contentBaseDir) ? contentBaseDir : altContentBaseDir;
 
-    // 1. Scan Club Announcements
+    // Scan Club Announcements
     const clubPostsDir = path.join(baseDir, "club", "posts");
     if (fs.existsSync(clubPostsDir)) {
       const files = fs.readdirSync(clubPostsDir).filter((f) => f.endsWith(".md"));
@@ -70,7 +94,7 @@ export async function GET(request: NextRequest) {
             slug,
             vertical: "club",
             title: data.title || slug,
-            date: data.date || "",
+            date: data.date ? String(data.date).split("T")[0] : "",
             author: data.author || "SSN Coding Club",
             summary: data.summary || "",
             canDelete: canDeletePost(userData.login, "club"),
@@ -81,7 +105,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 2. Scan Verticals
+    // Scan Verticals
     for (const vert of ALL_VERTICALS) {
       const vertPostsDir = path.join(baseDir, "verticals", vert, "posts");
       if (fs.existsSync(vertPostsDir)) {
@@ -95,7 +119,7 @@ export async function GET(request: NextRequest) {
               slug,
               vertical: vert,
               title: data.title || slug,
-              date: data.date || "",
+              date: data.date ? String(data.date).split("T")[0] : "",
               author: data.author || "Anonymous",
               summary: data.summary || "",
               canDelete: canDeletePost(userData.login, vert),
@@ -107,7 +131,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Sort descending by date
     posts.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
     return NextResponse.json({
@@ -121,9 +144,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const token =
-    request.cookies.get("cc_token")?.value ||
-    request.headers.get("authorization")?.replace("Bearer ", "");
+  const token = getSessionToken(request);
 
   if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

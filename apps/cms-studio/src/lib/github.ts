@@ -514,3 +514,94 @@ export async function uploadImageToGitHub(
 
   return `/uploads/${cleanName}`;
 }
+
+export interface PublishedPostMetadata {
+  slug: string;
+  vertical: string;
+  title: string;
+  date: string;
+  author: string;
+  summary: string;
+  coverImage?: string;
+  tags?: string[];
+  filePath: string;
+}
+
+export async function listAllPublishedPostsFromGitHub(
+  token: string
+): Promise<PublishedPostMetadata[]> {
+  const octokit = getOctokit(token);
+
+  try {
+    const { data: treeData } = await octokit.git.getTree({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      tree_sha: MAIN_BRANCH,
+      recursive: "true",
+    });
+
+    const postItems = treeData.tree.filter(
+      (item) =>
+        item.type === "blob" &&
+        item.path &&
+        (
+          (item.path.startsWith("content/verticals/") && item.path.includes("/posts/") && item.path.endsWith(".md")) ||
+          (item.path.startsWith("content/club/posts/") && item.path.endsWith(".md"))
+        )
+    );
+
+    const posts: PublishedPostMetadata[] = await Promise.all(
+      postItems.map(async (item) => {
+        const filePath = item.path!;
+        let vertical = "club";
+        if (filePath.startsWith("content/verticals/")) {
+          const parts = filePath.split("/");
+          vertical = parts[2];
+        }
+
+        const fileName = filePath.split("/").pop() || "";
+        const slug = fileName.replace(/\.md$/, "");
+
+        try {
+          const { data: blob } = await octokit.git.getBlob({
+            owner: REPO_OWNER,
+            repo: REPO_NAME,
+            file_sha: item.sha!,
+          });
+
+          const rawContent = Buffer.from(blob.content, "base64").toString("utf-8");
+          const { data } = matter(rawContent);
+
+          return {
+            slug,
+            vertical,
+            title: data.title || slug,
+            date: data.date ? String(data.date).split("T")[0] : "",
+            author: data.author || "SSN Coding Club Member",
+            summary: data.summary || "",
+            coverImage: data.coverImage || "",
+            tags: Array.isArray(data.tags) ? data.tags : [],
+            filePath,
+          };
+        } catch {
+          return {
+            slug,
+            vertical,
+            title: slug,
+            date: "",
+            author: "SSN Coding Club Member",
+            summary: "",
+            filePath,
+          };
+        }
+      })
+    );
+
+    posts.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    return posts;
+  } catch (err) {
+    console.error("Error fetching published posts tree from GitHub:", err);
+    return [];
+  }
+}
+

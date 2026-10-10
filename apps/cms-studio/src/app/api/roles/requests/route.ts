@@ -7,11 +7,10 @@ import {
   assignRole,
   RoleRequest,
 } from "@/lib/roles";
+import { getSessionToken } from "@/lib/session";
 
 export async function GET(request: NextRequest) {
-  const token =
-    request.cookies.get("cc_token")?.value ||
-    request.headers.get("authorization")?.replace("Bearer ", "");
+  const token = getSessionToken(request);
 
   if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -58,9 +57,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const token =
-    request.cookies.get("cc_token")?.value ||
-    request.headers.get("authorization")?.replace("Bearer ", "");
+  const token = getSessionToken(request);
 
   if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -142,9 +139,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const token =
-    request.cookies.get("cc_token")?.value ||
-    request.headers.get("authorization")?.replace("Bearer ", "");
+  const token = getSessionToken(request);
 
   if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

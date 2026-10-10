@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { setSessionCookie } from "@/lib/session";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -96,13 +97,7 @@ export async function GET(request: NextRequest) {
       headers: { "Content-Type": "text/html" },
     });
 
-    responseObj.cookies.set("cc_token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-    });
+    setSessionCookie(responseObj, token);
 
     return responseObj;
   } catch (err: unknown) {

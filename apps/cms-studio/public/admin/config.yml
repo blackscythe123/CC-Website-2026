@@ -29,11 +29,10 @@ collections:
       - { label: "Summary", name: "summary", widget: "text" }
       - { label: "Cover Image", name: "coverImage", widget: "image", required: false }
       - { label: "Tags", name: "tags", widget: "list", default: ["Club", "Announcement"] }
-      - label: "Body (Drag & drop images anywhere mid-post)"
+      - label: "Body"
         name: "body"
         widget: "markdown"
         modes: ["rich_text", "raw"]
-        buttons: ["bold", "italic", "code", "link", "heading-two", "heading-three", "quote", "bulleted-list", "numbered-list", "image"]
         editor_components: ["image", "code-block"]
 
   - name: ai_ml
@@ -48,11 +47,10 @@ collections:
       - { label: "Summary", name: "summary", widget: "text" }
       - { label: "Cover Image", name: "coverImage", widget: "image", required: false }
       - { label: "Tags", name: "tags", widget: "list", default: ["AI", "PyTorch"] }
-      - label: "Body (Drag & drop images anywhere mid-post)"
+      - label: "Body"
         name: "body"
         widget: "markdown"
         modes: ["rich_text", "raw"]
-        buttons: ["bold", "italic", "code", "link", "heading-two", "heading-three", "quote", "bulleted-list", "numbered-list", "image"]
         editor_components: ["image", "code-block"]
 
   - name: web_dev
@@ -67,11 +65,10 @@ collections:
       - { label: "Summary", name: "summary", widget: "text" }
       - { label: "Cover Image", name: "coverImage", widget: "image", required: false }
       - { label: "Tags", name: "tags", widget: "list", default: ["Next.js", "TypeScript"] }
-      - label: "Body (Drag & drop images anywhere mid-post)"
+      - label: "Body"
         name: "body"
         widget: "markdown"
         modes: ["rich_text", "raw"]
-        buttons: ["bold", "italic", "code", "link", "heading-two", "heading-three", "quote", "bulleted-list", "numbered-list", "image"]
         editor_components: ["image", "code-block"]
 
   - name: cybersecurity
@@ -86,11 +83,10 @@ collections:
       - { label: "Summary", name: "summary", widget: "text" }
       - { label: "Cover Image", name: "coverImage", widget: "image", required: false }
       - { label: "Tags", name: "tags", widget: "list", default: ["Security", "CTF"] }
-      - label: "Body (Drag & drop images anywhere mid-post)"
+      - label: "Body"
         name: "body"
         widget: "markdown"
         modes: ["rich_text", "raw"]
-        buttons: ["bold", "italic", "code", "link", "heading-two", "heading-three", "quote", "bulleted-list", "numbered-list", "image"]
         editor_components: ["image", "code-block"]
 
   - name: cloud_devops
@@ -105,11 +101,10 @@ collections:
       - { label: "Summary", name: "summary", widget: "text" }
       - { label: "Cover Image", name: "coverImage", widget: "image", required: false }
       - { label: "Tags", name: "tags", widget: "list", default: ["DevOps", "Docker"] }
-      - label: "Body (Drag & drop images anywhere mid-post)"
+      - label: "Body"
         name: "body"
         widget: "markdown"
         modes: ["rich_text", "raw"]
-        buttons: ["bold", "italic", "code", "link", "heading-two", "heading-three", "quote", "bulleted-list", "numbered-list", "image"]
         editor_components: ["image", "code-block"]
 
   - name: competitive_programming
@@ -124,11 +119,10 @@ collections:
       - { label: "Summary", name: "summary", widget: "text" }
       - { label: "Cover Image", name: "coverImage", widget: "image", required: false }
       - { label: "Tags", name: "tags", widget: "list", default: ["Algorithms", "DP"] }
-      - label: "Body (Drag & drop images anywhere mid-post)"
+      - label: "Body"
         name: "body"
         widget: "markdown"
         modes: ["rich_text", "raw"]
-        buttons: ["bold", "italic", "code", "link", "heading-two", "heading-three", "quote", "bulleted-list", "numbered-list", "image"]
         editor_components: ["image", "code-block"]
 
   - name: mobile_dev
@@ -143,11 +137,10 @@ collections:
       - { label: "Summary", name: "summary", widget: "text" }
       - { label: "Cover Image", name: "coverImage", widget: "image", required: false }
       - { label: "Tags", name: "tags", widget: "list", default: ["Mobile", "Flutter"] }
-      - label: "Body (Drag & drop images anywhere mid-post)"
+      - label: "Body"
         name: "body"
         widget: "markdown"
         modes: ["rich_text", "raw"]
-        buttons: ["bold", "italic", "code", "link", "heading-two", "heading-three", "quote", "bulleted-list", "numbered-list", "image"]
         editor_components: ["image", "code-block"]
 
   - name: ui_ux
@@ -162,11 +155,10 @@ collections:
       - { label: "Summary", name: "summary", widget: "text" }
       - { label: "Cover Image", name: "coverImage", widget: "image", required: false }
       - { label: "Tags", name: "tags", widget: "list", default: ["Design", "Figma"] }
-      - label: "Body (Drag & drop images anywhere mid-post)"
+      - label: "Body"
         name: "body"
         widget: "markdown"
         modes: ["rich_text", "raw"]
-        buttons: ["bold", "italic", "code", "link", "heading-two", "heading-three", "quote", "bulleted-list", "numbered-list", "image"]
         editor_components: ["image", "code-block"]
 
   - name: blockchain
@@ -181,11 +173,10 @@ collections:
       - { label: "Summary", name: "summary", widget: "text" }
       - { label: "Cover Image", name: "coverImage", widget: "image", required: false }
       - { label: "Tags", name: "tags", widget: "list", default: ["Web3", "Solidity"] }
-      - label: "Body (Drag & drop images anywhere mid-post)"
+      - label: "Body"
         name: "body"
         widget: "markdown"
         modes: ["rich_text", "raw"]
-        buttons: ["bold", "italic", "code", "link", "heading-two", "heading-three", "quote", "bulleted-list", "numbered-list", "image"]
         editor_components: ["image", "code-block"]
 
   - name: iot_embedded
@@ -200,11 +191,10 @@ collections:
       - { label: "Summary", name: "summary", widget: "text" }
       - { label: "Cover Image", name: "coverImage", widget: "image", required: false }
       - { label: "Tags", name: "tags", widget: "list", default: ["Hardware", "ESP32"] }
-      - label: "Body (Drag & drop images anywhere mid-post)"
+      - label: "Body"
         name: "body"
         widget: "markdown"
         modes: ["rich_text", "raw"]
-        buttons: ["bold", "italic", "code", "link", "heading-two", "heading-three", "quote", "bulleted-list", "numbered-list", "image"]
         editor_components: ["image", "code-block"]
 
   - name: game_dev
@@ -219,9 +209,8 @@ collections:
       - { label: "Summary", name: "summary", widget: "text" }
       - { label: "Cover Image", name: "coverImage", widget: "image", required: false }
       - { label: "Tags", name: "tags", widget: "list", default: ["GameDev", "Godot"] }
-      - label: "Body (Drag & drop images anywhere mid-post)"
+      - label: "Body"
         name: "body"
         widget: "markdown"
         modes: ["rich_text", "raw"]
-        buttons: ["bold", "italic", "code", "link", "heading-two", "heading-three", "quote", "bulleted-list", "numbered-list", "image"]
         editor_components: ["image", "code-block"]

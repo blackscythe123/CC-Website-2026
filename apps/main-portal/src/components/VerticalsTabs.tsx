@@ -71,10 +71,10 @@ export default function VerticalsTabs({ verticals }: VerticalsTabsProps) {
           {/* Right: Badge & Description */}
           <div className="max-w-md text-left md:text-right">
             <div className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-stone-700 bg-stone-100/90 border border-stone-200/80 px-3 py-1 rounded-md">
-              <span>[ 10 verticals ]</span>
+              <span>[ {verticals.length} verticals ]</span>
             </div>
             <p className="mt-2 text-xs sm:text-sm text-stone-600 leading-relaxed font-sans">
-              Ten engineering verticals, each with its own focus, projects, events and a space to grow.
+              Autonomous engineering verticals, each with its own focus, projects, events and space to grow.
             </p>
 
             {/* View Switcher Toggle */}

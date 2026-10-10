@@ -22,13 +22,19 @@ import {
   Eye,
   Edit3,
   Columns,
+  Save,
+  Check,
+  Bell,
+  Clock,
 } from "lucide-react";
 
 import {
   saveLocalDraft,
   getLocalDraft,
   clearLocalDraft,
+  base64ToBlobUrl,
   StoredDraft,
+  PendingDraftImage,
 } from "@/lib/draftStorage";
 
 interface UserProfile {
@@ -38,20 +44,26 @@ interface UserProfile {
 }
 
 const ALL_VERTICALS = [
-  { slug: "ai-ml", name: "🤖 AI & Machine Learning" },
-  { slug: "web-dev", name: "🌐 Web Development" },
-  { slug: "cybersecurity", name: "🛡️ Cybersecurity & CTF" },
-  { slug: "cloud-devops", name: "☁️ Cloud & DevOps" },
+  { slug: "ai-ml", name: "🤖 AI / ML" },
+  { slug: "ar-vr-game-dev", name: "🎮 AR, VR & Game Dev" },
   { slug: "competitive-programming", name: "🏆 Competitive Programming" },
-  { slug: "mobile-dev", name: "📱 Mobile Development" },
-  { slug: "ui-ux", name: "🎨 UI / UX Design" },
-  { slug: "blockchain", name: "⛓️ Blockchain & Web3" },
-  { slug: "iot-embedded", name: "⚡ IoT & Embedded Systems" },
-  { slug: "game-dev", name: "🎮 Game Dev & XR" },
+  { slug: "cybersecurity", name: "🛡️ Cyber Security" },
+  { slug: "ssnhacks", name: "⚡ SSN Hacks" },
+  { slug: "design-ui-ux", name: "🎨 Design & UI/UX" },
+  { slug: "full-stack", name: "🌐 Full Stack" },
+  { slug: "open-source", name: "💻 Open Source (OSS)" },
 ];
 
 const ALL_PORTALS = [
-  { id: "main-portal", name: "🌐 Main Coding Club Portal", domain: "codingclub.tech" },
+  { id: "main-portal", name: "🌐 Main Coding Club Portal", domain: "codingclub.tech", vertical: "all" },
+  { id: "ai-ml-portal", name: "🤖 AI / ML Portal", domain: "ai.codingclub.tech", vertical: "ai-ml" },
+  { id: "ar-vr-portal", name: "🎮 AR, VR & Game Dev Portal", domain: "arvr.codingclub.tech", vertical: "ar-vr-game-dev" },
+  { id: "cp-portal", name: "🏆 Competitive Programming Portal", domain: "cp.codingclub.tech", vertical: "competitive-programming" },
+  { id: "cybersecurity-portal", name: "🛡️ Cyber Security Portal", domain: "cybersecurity.codingclub.tech", vertical: "cybersecurity" },
+  { id: "ssnhacks-portal", name: "⚡ SSN Hacks Portal", domain: "hacks.codingclub.tech", vertical: "ssnhacks" },
+  { id: "design-portal", name: "🎨 Design & UI/UX Portal", domain: "design.codingclub.tech", vertical: "design-ui-ux" },
+  { id: "full-stack-portal", name: "🌐 Full Stack Portal", domain: "web.codingclub.tech", vertical: "full-stack" },
+  { id: "oss-portal", name: "💻 Open Source (OSS) Portal", domain: "oss.codingclub.tech", vertical: "open-source" },
 ];
 
 export default function AdminEditorPage() {
@@ -65,11 +77,7 @@ export default function AdminEditorPage() {
   const [coverImage, setCoverImage] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
   const [viewMode, setViewMode] = useState<"write" | "split" | "preview">("write");
-  const [pendingImages, setPendingImages] = useState<{
-    filename: string;
-    base64: string;
-    placeholderUrl: string;
-  }[]>([]);
+  const [pendingImages, setPendingImages] = useState<PendingDraftImage[]>([]);
 
   // Real-time Markdown Parsing & Stats for Preview
   const parsedHtml = useMemo(() => {
@@ -107,8 +115,17 @@ export default function AdminEditorPage() {
 
   // Local Draft Recovery State (IndexedDB)
   const [recoveredDraft, setRecoveredDraft] = useState<StoredDraft | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
 
-  // In-App Editorial Feedback Notifications
+  // In-App Editorial Notifications & Review Requests
+  const [authorPendingPrs, setAuthorPendingPrs] = useState<{
+    number: number;
+    title: string;
+    vertical: string;
+    createdAt: string;
+  }[]>([]);
+  const [reviewerPendingCount, setReviewerPendingCount] = useState(0);
   const [authorFeedbackPr, setAuthorFeedbackPr] = useState<{
     number: number;
     title: string;
@@ -130,7 +147,7 @@ export default function AdminEditorPage() {
       }
     });
 
-    // 2. Fetch authenticated user profile & check for feedback PRs
+    // 2. Fetch authenticated user profile & check for review requests / feedback
     fetch("/api/auth/me")
       .then((res) => res.json())
       .then((data) => {
@@ -142,11 +159,12 @@ export default function AdminEditorPage() {
             setSelectedVertical(data.roleInfo.verticals[0]);
           }
 
-          // Check if any open PR authored by this user has changes requested
+          // Fetch all review PRs to track authored posts and reviewer queues
           fetch("/api/posts/reviews")
             .then((r) => r.json())
             .then((rData) => {
               if (rData.prs && data.user) {
+                // 1. Author's PRs with feedback requested
                 const myPrWithFeedback = rData.prs.find(
                   (p: { author: string; changesRequested?: boolean; latestFeedback?: string }) =>
                     p.author.toLowerCase() === data.user.login.toLowerCase() &&
@@ -161,6 +179,38 @@ export default function AdminEditorPage() {
                     vertical: myPrWithFeedback.vertical,
                   });
                 }
+
+                // 2. Author's PRs currently under review
+                const myPending = rData.prs
+                  .filter(
+                    (p: { author: string; changesRequested?: boolean }) =>
+                      p.author.toLowerCase() === data.user.login.toLowerCase() &&
+                      !p.changesRequested
+                  )
+                  .map((p: { number: number; title: string; vertical: string; createdAt: string }) => ({
+                    number: p.number,
+                    title: p.title,
+                    vertical: p.vertical,
+                    createdAt: p.createdAt,
+                  }));
+                setAuthorPendingPrs(myPending);
+
+                // 3. For reviewers: PRs waiting for their review
+                if (
+                  data.roleInfo?.role === "superadmin" ||
+                  data.roleInfo?.role === "vertical_head" ||
+                  data.roleInfo?.role === "deputy"
+                ) {
+                  const forReviewer = rData.prs.filter(
+                    (p: { author: string; vertical: string }) => {
+                      const isSelf = p.author.toLowerCase() === data.user.login.toLowerCase();
+                      if (isSelf) return false;
+                      if (data.roleInfo.role === "superadmin") return true;
+                      return data.roleInfo.verticals.includes(p.vertical);
+                    }
+                  );
+                  setReviewerPendingCount(forReviewer.length);
+                }
               }
             })
             .catch(() => {});
@@ -170,19 +220,51 @@ export default function AdminEditorPage() {
       .catch(() => setLoading(false));
   }, []);
 
-  // Debounced Auto-Save to IndexedDB (survives crashes, power outages, and tab closures)
-  useEffect(() => {
-    if (!title.trim() && !content.trim() && pendingImages.length === 0) return;
-    const timer = setTimeout(() => {
-      saveLocalDraft({
+  // Manual Save Draft Handler
+  const handleManualSaveDraft = async () => {
+    if (!title.trim() && !content.trim() && pendingImages.length === 0) {
+      setErrorMessage("Nothing to save yet! Start writing your article first.");
+      return;
+    }
+    setIsSavingDraft(true);
+    try {
+      const coverImgObj = pendingImages.find((img) => img.placeholderUrl === coverImage);
+      await saveLocalDraft({
         title,
         content,
         coverImage,
+        coverImageBase64: coverImgObj?.base64,
+        coverImageMime: coverImgObj?.mimeType,
         selectedVertical,
         summary,
         tags,
         pendingImages,
       });
+      setLastSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    } catch (err) {
+      console.warn("Failed manual draft save:", err);
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
+  // Debounced Auto-Save to IndexedDB (survives crashes, power outages, and tab closures)
+  useEffect(() => {
+    if (!title.trim() && !content.trim() && pendingImages.length === 0) return;
+    const timer = setTimeout(async () => {
+      const coverImgObj = pendingImages.find((img) => img.placeholderUrl === coverImage);
+      await saveLocalDraft({
+        title,
+        content,
+        coverImage,
+        coverImageBase64: coverImgObj?.base64,
+        coverImageMime: coverImgObj?.mimeType,
+        selectedVertical,
+        summary,
+        tags,
+        pendingImages,
+      });
+      setLastSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
     }, 2000);
     return () => clearTimeout(timer);
   }, [title, content, coverImage, selectedVertical, summary, tags, pendingImages]);
@@ -201,14 +283,47 @@ export default function AdminEditorPage() {
 
   const handleRestoreDraft = () => {
     if (!recoveredDraft) return;
+
+    let restoredContent = recoveredDraft.content || "";
+    let restoredCoverImage = recoveredDraft.coverImage || "";
+
+    // Convert stored base64 images back into fresh valid browser Object URLs
+    const refreshedPendingImages = (recoveredDraft.pendingImages || []).map((img) => {
+      const freshBlobUrl = base64ToBlobUrl(img.base64, img.mimeType || "image/png");
+      if (img.placeholderUrl) {
+        restoredContent = restoredContent.replaceAll(img.placeholderUrl, freshBlobUrl);
+        if (restoredCoverImage === img.placeholderUrl) {
+          restoredCoverImage = freshBlobUrl;
+        }
+      }
+      return {
+        ...img,
+        placeholderUrl: freshBlobUrl,
+      };
+    });
+
+    // Restore cover image if it was saved as base64 or an expired blob URL
+    if (restoredCoverImage.startsWith("blob:") && recoveredDraft.coverImageBase64) {
+      restoredCoverImage = base64ToBlobUrl(
+        recoveredDraft.coverImageBase64,
+        recoveredDraft.coverImageMime || "image/png"
+      );
+    } else if (restoredCoverImage.startsWith("blob:") && refreshedPendingImages.length > 0) {
+      const matched = refreshedPendingImages.find((img) => img.placeholderUrl === restoredCoverImage);
+      if (matched) {
+        restoredCoverImage = matched.placeholderUrl;
+      }
+    }
+
     setTitle(recoveredDraft.title || "");
-    setContent(recoveredDraft.content || "");
-    setCoverImage(recoveredDraft.coverImage || "");
+    setContent(restoredContent);
+    setCoverImage(restoredCoverImage);
     if (recoveredDraft.selectedVertical) setSelectedVertical(recoveredDraft.selectedVertical);
     setSummary(recoveredDraft.summary || "");
     setTags(recoveredDraft.tags || []);
-    setPendingImages(recoveredDraft.pendingImages || []);
+    setPendingImages(refreshedPendingImages);
     setRecoveredDraft(null);
+    setLastSavedAt(new Date(recoveredDraft.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
   };
 
   const handleDiscardDraft = async () => {
@@ -277,6 +392,7 @@ export default function AdminEditorPage() {
         {
           filename: file.name,
           base64,
+          mimeType: file.type || "image/png",
           placeholderUrl,
         },
       ]);
@@ -439,6 +555,15 @@ export default function AdminEditorPage() {
       ? ALL_VERTICALS.filter((v) => roleInfo.verticals.includes(v.slug))
       : ALL_VERTICALS;
 
+  // Filter selectable destination portals according to role
+  const allowedPortals = useMemo(() => {
+    if (!roleInfo) return ALL_PORTALS.filter((p) => p.id === "main-portal");
+    if (roleInfo.role === "superadmin") return ALL_PORTALS;
+    return ALL_PORTALS.filter(
+      (p) => p.id === "main-portal" || (p.vertical && roleInfo.verticals.includes(p.vertical))
+    );
+  }, [roleInfo]);
+
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans">
       <StudioNav user={user} roleInfo={roleInfo} />
@@ -505,6 +630,26 @@ export default function AdminEditorPage() {
               >
                 <Eye className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Preview</span>
+              </button>
+            </div>
+
+            {/* Save Draft Button with Local State Indicator */}
+            <div className="flex items-center gap-2">
+              {lastSavedAt && (
+                <span className="hidden lg:inline-flex items-center gap-1 text-[11px] text-gray-500 font-mono">
+                  <Check className="h-3 w-3 text-emerald-600" />
+                  <span>Saved at {lastSavedAt}</span>
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleManualSaveDraft}
+                disabled={isSavingDraft}
+                className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 shadow-xs hover:bg-gray-50 hover:border-gray-400 transition active:scale-95 disabled:opacity-50"
+                title="Save draft immediately to local browser storage"
+              >
+                <Save className="h-3.5 w-3.5 text-gray-600" />
+                <span>{isSavingDraft ? "Saving..." : "Save Draft"}</span>
               </button>
             </div>
 
@@ -595,6 +740,75 @@ export default function AdminEditorPage() {
               >
                 Discard
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Author Review Requested Notification Banner */}
+      {authorPendingPrs.length > 0 && (
+        <div className="mx-auto max-w-4xl px-4 pt-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50/80 p-4 shadow-sm text-xs text-blue-900">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white font-bold shrink-0">
+                📬
+              </div>
+              <div>
+                <span className="font-bold text-blue-950">
+                  Review Requested: You have {authorPendingPrs.length} article{authorPendingPrs.length > 1 ? "s" : ""} under Editorial Review
+                </span>
+                <div className="text-blue-800 mt-1 space-y-0.5">
+                  {authorPendingPrs.map((pr) => (
+                    <div key={pr.number} className="flex items-center gap-2">
+                      <span>•</span>
+                      <span>
+                        <strong>PR #{pr.number}</strong> &ldquo;{pr.title}&rdquo; in
+                      </span>
+                      <span className="font-mono bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded text-[10px] font-semibold">
+                        {pr.vertical}
+                      </span>
+                      <span className="text-blue-600 text-[11px]">(Awaiting Reviewer Approval)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href="/admin/reviews"
+                className="rounded-xl bg-blue-600 px-3.5 py-1.5 font-bold text-white shadow-xs hover:bg-blue-700 transition"
+              >
+                Track in Reviews &rarr;
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reviewer Action Notice Banner */}
+      {reviewerPendingCount > 0 && (
+        <div className="mx-auto max-w-4xl px-4 pt-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 shadow-sm text-xs text-emerald-900">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold shrink-0">
+                ⚡
+              </div>
+              <div>
+                <span className="font-bold text-emerald-950">
+                  Editorial Action Required: {reviewerPendingCount} article{reviewerPendingCount > 1 ? "s" : ""} awaiting your sign-off
+                </span>
+                <p className="text-emerald-800 mt-0.5">
+                  Articles have been submitted for your vertical. Review, test, and approve or request revisions.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href="/admin/reviews"
+                className="rounded-xl bg-emerald-600 px-3.5 py-1.5 font-bold text-white shadow-xs hover:bg-emerald-700 transition"
+              >
+                Review Articles ({reviewerPendingCount}) &rarr;
+              </a>
             </div>
           </div>
         </div>
@@ -916,7 +1130,15 @@ export default function AdminEditorPage() {
                 </label>
                 <select
                   value={selectedVertical}
-                  onChange={(e) => setSelectedVertical(e.target.value)}
+                  onChange={(e) => {
+                    const newVertical = e.target.value;
+                    setSelectedVertical(newVertical);
+                    // Automatically add corresponding vertical portal if allowed and available
+                    const matching = allowedPortals.find((p) => p.vertical === newVertical);
+                    if (matching && !selectedPortals.includes(matching.id)) {
+                      setSelectedPortals([...selectedPortals, matching.id]);
+                    }
+                  }}
                   className="w-full rounded-xl border border-gray-200 bg-white p-2.5 text-sm font-medium text-gray-900 shadow-xs focus:border-blue-600 focus:outline-hidden"
                 >
                   {availableVerticals.map((v) => (
@@ -936,22 +1158,22 @@ export default function AdminEditorPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (selectedPortals.length === ALL_PORTALS.length) {
+                      if (selectedPortals.length === allowedPortals.length) {
                         setSelectedPortals(["main-portal"]);
                       } else {
-                        setSelectedPortals(ALL_PORTALS.map((p) => p.id));
+                        setSelectedPortals(allowedPortals.map((p) => p.id));
                       }
                     }}
                     className="text-[11px] font-semibold text-blue-600 hover:text-blue-800"
                   >
-                    {selectedPortals.length === ALL_PORTALS.length ? "Reset to Main" : "Select All"}
+                    {selectedPortals.length === allowedPortals.length ? "Reset to Main" : "Select All"}
                   </button>
                 </div>
                 <p className="text-[11px] text-gray-400 mb-2.5">
-                  Route to main portal or specific subdomain project websites.
+                  Route to central main portal or specific vertical subdomain project websites (restricted by your role).
                 </p>
                 <div className="space-y-1.5">
-                  {ALL_PORTALS.map((portal) => {
+                  {allowedPortals.map((portal) => {
                     const isChecked = selectedPortals.includes(portal.id);
                     return (
                       <label

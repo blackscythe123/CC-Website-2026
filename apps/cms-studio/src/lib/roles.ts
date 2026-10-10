@@ -38,15 +38,13 @@ const ALT_CODEOWNERS_PATH = path.resolve(process.cwd(), ".github/CODEOWNERS");
 
 const ALL_VERTICAL_SLUGS = [
   "ai-ml",
-  "web-dev",
-  "cybersecurity",
-  "cloud-devops",
+  "ar-vr-game-dev",
   "competitive-programming",
-  "mobile-dev",
-  "ui-ux",
-  "blockchain",
-  "iot-embedded",
-  "game-dev",
+  "cybersecurity",
+  "ssnhacks",
+  "design-ui-ux",
+  "full-stack",
+  "open-source",
 ];
 
 function getRolesFilePath(): string {

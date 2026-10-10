@@ -1,18 +1,19 @@
 {
-    "slug":  "cybersecurity",
-    "color":  "red",
-    "description":  "We train members in binary exploitation, web security, cryptography, and organize campus CTF competitions.",
-    "tagline":  "Defending networks, reverse engineering, and red team strategies",
-    "name":  "Cybersecurity \u0026 Ethical Hacking",
-    "topics":  [
-                   "Capture The Flag",
-                   "Web App Pentesting",
-                   "Cryptography",
-                   "Reverse Engineering"
-               ],
-    "lead":  {
-                 "github":  "m-thorne",
-                 "name":  "Marcus Thorne",
-                 "role":  "CyberSec Vertical Head"
-             }
+  "slug": "cybersecurity",
+  "name": "Cyber Security",
+  "tagline": "Offensive & Defensive Security, Cryptography, and Capture the Flag",
+  "description": "Focused on ethical hacking, binary exploitation, reverse engineering, web penetration testing, network defense, and CTF competitions.",
+  "color": "red",
+  "topics": [
+    "Web Security",
+    "Reverse Engineering",
+    "Cryptography",
+    "Binary Exploitation",
+    "CTF Competitions"
+  ],
+  "lead": {
+    "name": "Cyber Security Lead",
+    "role": "Vertical Head",
+    "github": "ssn-coding-club"
+  }
 }

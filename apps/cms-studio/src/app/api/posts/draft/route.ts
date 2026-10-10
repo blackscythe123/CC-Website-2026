@@ -59,6 +59,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Portal destination permission check (Non-superadmins can only target main-portal and their assigned vertical portals)
+    const PORTAL_VERTICAL_MAP: Record<string, string> = {
+      "ai-ml-portal": "ai-ml",
+      "ar-vr-portal": "ar-vr-game-dev",
+      "cp-portal": "competitive-programming",
+      "cybersecurity-portal": "cybersecurity",
+      "ssnhacks-portal": "ssnhacks",
+      "design-portal": "design-ui-ux",
+      "full-stack-portal": "full-stack",
+      "oss-portal": "open-source",
+    };
+
+    if (roleInfo.role !== "superadmin" && Array.isArray(targetPortals)) {
+      for (const pId of targetPortals) {
+        if (pId !== "main-portal" && PORTAL_VERTICAL_MAP[pId]) {
+          const requiredVert = PORTAL_VERTICAL_MAP[pId];
+          if (!roleInfo.verticals.includes(requiredVert)) {
+            return NextResponse.json(
+              {
+                error: `Unauthorized destination portal '${pId}'. You are only authorized to publish to portals belonging to: ${roleInfo.verticals.join(", ")}`,
+              },
+              { status: 403 }
+            );
+          }
+        }
+      }
+    }
+
     const cleanSlug =
       slug ||
       title

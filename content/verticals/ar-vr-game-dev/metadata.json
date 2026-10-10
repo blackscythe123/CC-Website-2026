@@ -1,0 +1,19 @@
+{
+  "slug": "ar-vr-game-dev",
+  "name": "AR, VR & Game Dev",
+  "tagline": "Building Immersive Worlds, XR Experiences, and Interactive Games",
+  "description": "Explores game engines, 3D graphics pipelines, virtual reality, augmented reality, and spatial computing experiences.",
+  "color": "purple",
+  "topics": [
+    "Unity",
+    "Unreal Engine",
+    "Godot 4",
+    "WebXR",
+    "Shaders & 3D Math"
+  ],
+  "lead": {
+    "name": "AR/VR & Game Dev Lead",
+    "role": "Vertical Head",
+    "github": "ssn-coding-club"
+  }
+}

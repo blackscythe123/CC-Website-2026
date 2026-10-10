@@ -1,0 +1,19 @@
+{
+  "slug": "open-source",
+  "name": "Open Source (OSS)",
+  "tagline": "Public Repositories, Git Workflows, and Community Collaboration",
+  "description": "Empowering students to contribute to major open-source projects, understand licensing, maintain club software libraries, and prepare for GSoC.",
+  "color": "teal",
+  "topics": [
+    "Git & GitHub Workflows",
+    "GSoC & LFX Mentorship",
+    "Open-Source Licensing",
+    "Code Reviews",
+    "Community Tooling"
+  ],
+  "lead": {
+    "name": "Open Source Lead",
+    "role": "Vertical Head",
+    "github": "ssn-coding-club"
+  }
+}

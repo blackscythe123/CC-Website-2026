@@ -40,16 +40,18 @@ export async function GET(request: NextRequest) {
     }
     const prs = await listPendingReviewPRs(token);
 
-    // Filter PRs by user permissions
+    // Filter PRs by user permissions (Authors always see their own submitted articles)
     const visiblePRs = prs.filter((pr) => {
+      if (pr.author.toLowerCase() === userData.login.toLowerCase()) {
+        return true;
+      }
       if (roleInfo.role === "superadmin") {
         return true;
       }
       if (roleInfo.role === "vertical_head" || roleInfo.role === "deputy") {
         return roleInfo.verticals.includes(pr.vertical);
       }
-      // Members only see PRs authored by themselves
-      return pr.author.toLowerCase() === userData.login.toLowerCase();
+      return false;
     });
 
     return NextResponse.json({

@@ -4,19 +4,41 @@ const DB_VERSION = 1;
 const STORE_NAME = "canvas_drafts";
 const DRAFT_KEY = "active_draft";
 
+export interface PendingDraftImage {
+  filename: string;
+  base64: string;
+  mimeType?: string;
+  placeholderUrl: string;
+}
+
 export interface StoredDraft {
   title: string;
   content: string;
   coverImage: string;
+  coverImageBase64?: string;
+  coverImageMime?: string;
   selectedVertical: string;
   summary: string;
   tags: string[];
-  pendingImages: {
-    filename: string;
-    base64: string;
-    placeholderUrl: string;
-  }[];
+  pendingImages: PendingDraftImage[];
   updatedAt: number;
+}
+
+export function base64ToBlobUrl(base64: string, mimeType: string = "image/png"): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: mimeType });
+    return URL.createObjectURL(blob);
+  } catch (e) {
+    console.error("Failed to convert base64 to Blob URL, falling back to data URI", e);
+    return `data:${mimeType};base64,${base64}`;
+  }
 }
 
 function openDB(): Promise<IDBDatabase> {
@@ -54,7 +76,7 @@ export async function saveLocalDraft(draft: Omit<StoredDraft, "updatedAt">): Pro
       req.onerror = () => reject(req.error);
     });
   } catch (err) {
-    console.warn("Failed to auto-save draft to IndexedDB:", err);
+    console.warn("Failed to save draft to IndexedDB:", err);
   }
 }
 

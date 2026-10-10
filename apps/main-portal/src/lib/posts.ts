@@ -33,16 +33,17 @@ export function isPostVisibleOnPortal(
 }
 
 function resolveContentDir(): string {
-  const candidate1 = path.resolve(process.cwd(), "../../content");
-  if (fs.existsSync(candidate1)) return candidate1;
-
-  const candidate2 = path.resolve(process.cwd(), "content");
-  if (fs.existsSync(candidate2)) return candidate2;
-
-  const candidate3 = path.resolve(__dirname, "../../../../../content");
-  if (fs.existsSync(candidate3)) return candidate3;
-
-  return candidate1;
+  const candidates = [
+    path.resolve(process.cwd(), "../../content"),
+    path.resolve(process.cwd(), "content"),
+    path.resolve(process.cwd(), "../content"),
+    path.resolve(__dirname, "../../../../../content"),
+    path.resolve(__dirname, "../../../../content"),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return candidates[0];
 }
 
 export function getAllPosts(portalId: string = "main-portal"): PostSummary[] {
@@ -107,6 +108,7 @@ export function getAllPosts(portalId: string = "main-portal"): PostSummary[] {
           date: data.date ? String(data.date).split("T")[0] : "",
           author: data.author || "Coding Club Core",
           summary: data.summary || "",
+          coverImage: data.coverImage || "",
           targetPortals: Array.isArray(data.targetPortals) ? data.targetPortals : ["main-portal"],
           tags: Array.isArray(data.tags) ? data.tags : [],
         });

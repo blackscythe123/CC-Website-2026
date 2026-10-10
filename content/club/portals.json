@@ -1,11 +1,92 @@
 [
   {
     "id": "main-portal",
-    "name": "Main Coding Club Portal",
+    "name": "🌐 Main Coding Club Portal",
     "slug": "main",
     "domain": "codingclub.tech",
     "appDir": "apps/main-portal",
+    "vertical": "all",
     "isDefault": true,
     "description": "Central portal for SSN Coding Club community, verticals, and showcase."
+  },
+  {
+    "id": "ai-ml-portal",
+    "name": "🤖 AI / ML Portal",
+    "slug": "ai-ml",
+    "domain": "ai.codingclub.tech",
+    "vertical": "ai-ml",
+    "appDir": "apps/ai-ml-portal",
+    "isDefault": false,
+    "description": "Subdomain portal for AI & Machine Learning articles, projects, and research."
+  },
+  {
+    "id": "ar-vr-portal",
+    "name": "🎮 AR, VR & Game Dev Portal",
+    "slug": "ar-vr-game-dev",
+    "domain": "arvr.codingclub.tech",
+    "vertical": "ar-vr-game-dev",
+    "appDir": "apps/ar-vr-portal",
+    "isDefault": false,
+    "description": "Subdomain portal for 3D graphics, virtual reality, game dev, and interactive experiences."
+  },
+  {
+    "id": "cp-portal",
+    "name": "🏆 Competitive Programming Portal",
+    "slug": "competitive-programming",
+    "domain": "cp.codingclub.tech",
+    "vertical": "competitive-programming",
+    "appDir": "apps/cp-portal",
+    "isDefault": false,
+    "description": "Subdomain portal for DSA patterns, contest recaps, and editorial solutions."
+  },
+  {
+    "id": "cybersecurity-portal",
+    "name": "🛡️ Cyber Security Portal",
+    "slug": "cybersecurity",
+    "domain": "cybersecurity.codingclub.tech",
+    "vertical": "cybersecurity",
+    "appDir": "apps/cybersecurity-portal",
+    "isDefault": false,
+    "description": "Subdomain portal for Cybersecurity write-ups, CTF events, and security tools."
+  },
+  {
+    "id": "ssnhacks-portal",
+    "name": "⚡ SSN Hacks Portal",
+    "slug": "ssnhacks",
+    "domain": "hacks.codingclub.tech",
+    "vertical": "ssnhacks",
+    "appDir": "apps/ssnhacks-portal",
+    "isDefault": false,
+    "description": "Subdomain portal for hackathon organizing, 24-hour sprints, and rapid prototyping."
+  },
+  {
+    "id": "design-portal",
+    "name": "🎨 Design & UI/UX Portal",
+    "slug": "design-ui-ux",
+    "domain": "design.codingclub.tech",
+    "vertical": "design-ui-ux",
+    "appDir": "apps/design-portal",
+    "isDefault": false,
+    "description": "Subdomain portal for UI/UX case studies, design systems, and Figma prototypes."
+  },
+  {
+    "id": "full-stack-portal",
+    "name": "🌐 Full Stack Portal",
+    "slug": "full-stack",
+    "domain": "web.codingclub.tech",
+    "vertical": "full-stack",
+    "appDir": "apps/full-stack-portal",
+    "isDefault": false,
+    "description": "Subdomain portal for Full Stack web platforms, APIs, and modern web architecture."
+  },
+  {
+    "id": "oss-portal",
+    "name": "💻 Open Source (OSS) Portal",
+    "slug": "open-source",
+    "domain": "oss.codingclub.tech",
+    "vertical": "open-source",
+    "appDir": "apps/oss-portal",
+    "isDefault": false,
+    "description": "Subdomain portal for Open Source contributions, Git workflows, and community software."
   }
 ]

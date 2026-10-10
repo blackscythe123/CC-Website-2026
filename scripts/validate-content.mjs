@@ -39,15 +39,13 @@ validPortalIds.add("all");
 
 const VALID_VERTICALS = [
   "ai-ml",
-  "web-dev",
-  "cybersecurity",
-  "cloud-devops",
+  "ar-vr-game-dev",
   "competitive-programming",
-  "mobile-dev",
-  "ui-ux",
-  "blockchain",
-  "iot-embedded",
-  "game-dev",
+  "cybersecurity",
+  "ssnhacks",
+  "design-ui-ux",
+  "full-stack",
+  "open-source",
   "club",
 ];
 

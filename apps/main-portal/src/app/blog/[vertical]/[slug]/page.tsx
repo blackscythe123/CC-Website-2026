@@ -54,9 +54,13 @@ export default async function BlogPostPage({
         <span>/</span>
         <Link href="/blog" className="hover:text-stone-900 transition">blog</Link>
         <span>/</span>
-        <Link href={`/verticals/${verticalSlug}`} className="text-[#F43F5E] hover:underline font-semibold">
-          {vertical ? vertical.name : verticalSlug}
-        </Link>
+        {verticalSlug === "club" ? (
+          <span className="text-amber-700 font-semibold">📢 Club Announcements</span>
+        ) : (
+          <Link href={`/verticals/${verticalSlug}`} className="text-[#F43F5E] hover:underline font-semibold">
+            {vertical ? vertical.name : verticalSlug}
+          </Link>
+        )}
       </nav>
 
       {/* Article Header Card */}
@@ -65,12 +69,18 @@ export default async function BlogPostPage({
         <div className="absolute -top-3 left-14 w-16 h-5 bg-white/80 border border-stone-400/20 shadow-2xs backdrop-blur-2xs rounded-xs pointer-events-none rotate-[-2deg]" />
 
         <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
-          <Link
-            href={`/verticals/${verticalSlug}`}
-            className="rounded bg-rose-50 px-2.5 py-0.5 font-bold text-[#F43F5E] border border-rose-100 hover:bg-rose-100 transition"
-          >
-            {vertical ? vertical.name : verticalSlug}
-          </Link>
+          {verticalSlug === "club" ? (
+            <span className="rounded bg-amber-50 px-2.5 py-0.5 font-bold text-amber-800 border border-amber-200">
+              📢 Coding Club Announcement
+            </span>
+          ) : (
+            <Link
+              href={`/verticals/${verticalSlug}`}
+              className="rounded bg-rose-50 px-2.5 py-0.5 font-bold text-[#F43F5E] border border-rose-100 hover:bg-rose-100 transition"
+            >
+              {vertical ? vertical.name : verticalSlug}
+            </Link>
+          )}
           <span className="text-stone-400">•</span>
           <span className="text-stone-500">{readingTime} min read</span>
           <span className="text-stone-400">•</span>
@@ -97,7 +107,7 @@ export default async function BlogPostPage({
               {post.author}
             </div>
             <div className="font-mono text-xs text-stone-500">
-              Editorial Pipeline • {vertical ? vertical.name : "Wing"} Contributor
+              Editorial Pipeline • {verticalSlug === "club" ? "Coding Club Official" : `${vertical ? vertical.name : "Wing"} Contributor`}
             </div>
           </div>
         </div>
@@ -148,12 +158,18 @@ export default async function BlogPostPage({
         )}
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-stone-200">
-          <Link
-            href={`/verticals/${verticalSlug}`}
-            className="font-bold text-[#F43F5E] hover:underline"
-          >
-            &larr; More from {vertical ? vertical.name : verticalSlug}
-          </Link>
+          {verticalSlug === "club" ? (
+            <Link href="/blog" className="font-bold text-amber-700 hover:underline">
+              &larr; More Club Announcements &amp; Articles
+            </Link>
+          ) : (
+            <Link
+              href={`/verticals/${verticalSlug}`}
+              className="font-bold text-[#F43F5E] hover:underline"
+            >
+              &larr; More from {vertical ? vertical.name : verticalSlug}
+            </Link>
+          )}
           <a
             href="https://ssn-coding-club-cms.vercel.app/admin"
             target="_blank"

@@ -1,18 +1,19 @@
 {
-    "slug":  "ai-ml",
-    "color":  "indigo",
-    "description":  "The AI/ML vertical conducts workshops on deep learning, computer vision, natural language processing, and modern agentic AI systems.",
-    "tagline":  "Exploring Neural Networks, Generative AI, and RAG architectures",
-    "name":  "Artificial Intelligence \u0026 ML",
-    "topics":  [
-                   "PyTorch",
-                   "Hugging Face",
-                   "RAG \u0026 LLMs",
-                   "Computer Vision"
-               ],
-    "lead":  {
-                 "github":  "aiden-vance",
-                 "name":  "Aiden Vance",
-                 "role":  "AI/ML Vertical Head"
-             }
+  "slug": "ai-ml",
+  "name": "AI / ML",
+  "tagline": "Exploring Neural Networks, Generative AI, and Intelligent Systems",
+  "description": "The AI/ML vertical conducts workshops, research, and project sprints on machine learning, deep learning, computer vision, and modern LLM systems.",
+  "color": "indigo",
+  "topics": [
+    "PyTorch",
+    "Generative AI",
+    "RAG & LLMs",
+    "Computer Vision",
+    "Reinforcement Learning"
+  ],
+  "lead": {
+    "name": "AI/ML Lead",
+    "role": "Vertical Head",
+    "github": "ssn-coding-club"
+  }
 }

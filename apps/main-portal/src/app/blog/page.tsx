@@ -49,6 +49,9 @@ export default function BlogIndexPage() {
         {/* Vertical Filter Pills (Sticky Notes style) */}
         <div className="mt-6 flex flex-wrap items-center gap-2">
           <span className="font-mono text-xs font-bold text-stone-500 mr-1">Filter by Wing:</span>
+          <span className="rounded-lg border border-amber-300 bg-amber-50/80 px-3 py-1 font-mono text-xs font-semibold text-amber-800 shadow-2xs">
+            #📢 Club Announcements
+          </span>
           {verticals.map((v) => (
             <Link
               key={v.slug}
@@ -75,12 +78,18 @@ export default function BlogIndexPage() {
 
             <div>
               <div className="flex items-center justify-between font-mono text-xs">
-                <Link
-                  href={`/verticals/${post.vertical}`}
-                  className="rounded bg-rose-50 px-2 py-0.5 font-bold text-[#F43F5E] border border-rose-100 hover:bg-rose-100 transition"
-                >
-                  {post.vertical}
-                </Link>
+                {post.vertical === "club" ? (
+                  <span className="rounded bg-amber-50 px-2 py-0.5 font-bold text-amber-800 border border-amber-200">
+                    📢 Club Announcement
+                  </span>
+                ) : (
+                  <Link
+                    href={`/verticals/${post.vertical}`}
+                    className="rounded bg-rose-50 px-2 py-0.5 font-bold text-[#F43F5E] border border-rose-100 hover:bg-rose-100 transition"
+                  >
+                    {post.vertical}
+                  </Link>
+                )}
                 <span className="text-stone-400">{post.date}</span>
               </div>
 

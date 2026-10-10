@@ -1,24 +1,27 @@
-# 🚀 Coding Club Monorepo (10 Verticals & Centralized CMS)
+# 🚀 SSN Coding Club Monorepo (8 Technical Verticals & Centralized CMS)
 
-A modern, **zero-database**, multi-tenant content management system and community portal for **Coding Club (CC)**.
+A modern, **zero-database**, multi-tenant content management system and community portal ecosystem for **SSN Coding Club (CC)**.
 
-Structured as a **pnpm Monorepo** containing two decoupled Next.js projects:
-1. **`apps/main-portal`**: The consumer-facing website with the main Coding Club homepage, an interactive 10-vertical showcase, a single reusable dynamic vertical UI page (`/verticals/[slug]`), and cross-vertical blog feeds.
-2. **`apps/cms-studio`**: The centralized editorial studio powered by **Decap CMS** with a **role-based GitHub Approval Workflow** (`publish_mode: editorial_workflow`).
+Structured as a **pnpm Monorepo** containing decoupled Next.js projects:
+1. **`apps/main-portal`**: The central community portal (`codingclub.tech`) with retro-notebook UI, interactive vertical showcase, and cross-vertical blog feeds.
+2. **`apps/cms-studio`**: The centralized editorial studio (`ssn-coding-club-cms.vercel.app`) with Medium-style canvas editor, IndexedDB power-loss crash recovery, and multi-tier GitHub PR approval workflows.
+3. **`apps/vertical-portal-template`**: Standardized, high-contrast monochrome (Black & White) Next.js starter template for vertical subdomain project websites.
 
 ---
 
 ## 🏛️ System Architecture
 
 ```
-                                  [ Non-Technical Club Member ]
-                                                │
-                                                │ (Writes article in /admin)
-                                                ▼
+                                  [ Technical Club Member ]
+                                              │
+                                              │ (Writes article in /admin Canvas Editor)
+                                              ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │  apps/cms-studio (cms.domain.com)                                                      │
-│  - Decap CMS Editorial Workflow (Draft ➔ In Review ➔ Ready to Publish)                 │
-│  - Built-in Next.js OAuth Bridge (/api/auth & /api/callback)                           │
+│  - Medium-Style Live Canvas Editor with Instant Split-Screen Preview                   │
+│  - Native IndexedDB Auto-Save & Manual Save (Zero-Database Power-Loss Recovery)        │
+│  - Deferred Media Staging (Images committed only to Draft Branches, never to main)    │
+│  - In-App Editorial Notifications & Changes Requested Feedback Loops                   │
 └───────────────────────────────────────┬────────────────────────────────────────────────┘
                                         │ (Creates Git PR / Merges on Approval)
                                         ▼
@@ -26,129 +29,58 @@ Structured as a **pnpm Monorepo** containing two decoupled Next.js projects:
 │  GitHub Repository (Single Source of Truth)                                            │
 │  content/                                                                              │
 │  ├── club/                  (Club-wide announcements & core events)                    │
-│  └── verticals/             (10 autonomous technical verticals)                        │
-│      ├── ai-ml/             ├── competitive-programming/  ├── blockchain/              │
-│      ├── web-dev/           ├── mobile-dev/               ├── iot-embedded/            │
-│      ├── cybersecurity/     ├── ui-ux/                    └── game-dev/                │
-│      └── cloud-devops/                                                                 │
+│  └── verticals/             (8 autonomous technical engineering verticals)             │
+│      ├── ai-ml/                  ├── ssnhacks/                                         │
+│      ├── ar-vr-game-dev/         ├── design-ui-ux/                                     │
+│      ├── competitive-programming/├── full-stack/                                       │
+│      └── cybersecurity/          └── open-source/                                      │
 └───────────────────────────────────────┬────────────────────────────────────────────────┘
-                                        │ (Merge triggers automated Vercel rebuild)
+                                        │ (Triggers Vercel Deployments)
                                         ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│  apps/main-portal (domain.com)                                                         │
-│  - Club Homepage: 10 Verticals Showcase Grid + Cross-Vertical Blog Feed                │
-│  - Single Dynamic Page Template: /verticals/[slug] (Renders ANY of the 10 verticals!)  │
-│  - Dynamic Article Reader: /blog/[vertical]/[slug]                                     │
-└────────────────────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────┬────────────────────────────────────────────────┐
+│  apps/main-portal (codingclub.tech)   │  Subdomain Projects (e.g. hacks.codingclub.tech)│
+│  - Dynamic /verticals/[slug] Showcase │  - Inherits apps/vertical-portal-template      │
+│  - Cross-Vertical Blog Feed (/blog)   │  - Monochrome high-contrast reading experience │
+│  - Official Club Announcements        │  - Consumes targeted vertical posts directly   │
+└───────────────────────────────────────┴────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🚀 Step-by-Step Vercel Deployment Guide
+## 🎯 Official Technical Verticals (8 Wings)
 
-Because this is a monorepo, you will deploy **two projects** from your single GitHub repository into Vercel.
+| Slug | Display Name | Subdomain Portal | Description |
+|---|---|---|---|
+| `ai-ml` | **AI / ML** | `ai.codingclub.tech` | Neural networks, generative models, and agentic workflows. |
+| `ar-vr-game-dev` | **AR, VR & Game Dev** | `arvr.codingclub.tech` | Godot, Unity, spatial computing, and interactive 3D engines. |
+| `competitive-programming` | **Competitive Programming** | `cp.codingclub.tech` | ICPC prep, DP patterns, graph theory, and contest algorithms. |
+| `cybersecurity` | **Cyber Security** | `cybersecurity.codingclub.tech` | CTFs, reverse engineering, web security, and binary exploitation. |
+| `ssnhacks` | **SSN Hacks** | `hacks.codingclub.tech` | Flagship hackathons, rapid prototyping, and 24-hour sprints. |
+| `design-ui-ux` | **Design & UI/UX** | `design.codingclub.tech` | User research, interaction design, and scalable Figma systems. |
+| `full-stack` | **Full Stack** | `web.codingclub.tech` | Modern web platforms, distributed systems, APIs, and Next.js. |
+| `open-source` | **Open Source (OSS)** | `oss.codingclub.tech` | Git workflows, public repositories, and GSoC preparation. |
 
-### Step 1: Push Code to GitHub
+> **Note on Administrative Wings:** `Office Bearers` and `PR` are management/admin units and do not maintain technical vertical feeds. Root announcements live in `content/club/posts`.
+
+---
+
+## 🌐 Subdomain Portals & Production Transition Guide
+
+All temporary subdomains in `content/club/portals.json` map to autonomous vertical web projects.
+
+### How to Deploy a Vertical Subdomain Website:
+1. Clone or copy `apps/vertical-portal-template` to `apps/[vertical-name]-portal`.
+2. Update `portal.config.json` with the vertical's assigned slug, name, and domain.
+3. Deploy to Vercel with Root Directory set to `apps/[vertical-name]-portal`.
+4. Point DNS CNAME to Vercel for that subdomain (e.g., `hacks.codingclub.tech`).
+5. Update `content/club/portals.json` with final production DNS endpoints.
+
+---
+
+## 🛠️ Content Validation Suite
+
+Verify all content files, kebab-case slugs, portal routes, and frontmatter schemas:
 
 ```bash
-git add .
-git commit -m "feat: complete 10 verticals monorepo with editorial workflow"
-git push origin main
-```
-
-### Step 2: Create Your GitHub OAuth App
-
-1. Go to [GitHub Developer Settings](https://github.com/settings/developers) ➔ **OAuth Apps** ➔ **[New OAuth App](https://github.com/settings/applications/new)**.
-2. Fill in:
-   - **Application name:** `SSN Coding Club CMS`
-   - **Homepage URL:** `https://<YOUR-CMS-VERCEL-DOMAIN>.vercel.app`
-   - **Authorization callback URL:** `https://<YOUR-CMS-VERCEL-DOMAIN>.vercel.app/api/callback`
-   - **Allow wildcard matching:** Checked
-   - **Expire user access tokens:** ❌ **Unchecked**
-3. Click **Register application**.
-4. Click **Generate a new client secret**.
-5. Save your **Client ID** and **Client Secret**.
-
-### Step 3: Deploy Project 1 on Vercel — CMS Studio (`apps/cms-studio`)
-
-1. Go to [Vercel Dashboard](https://vercel.com/dashboard) ➔ Click **Add New...** ➔ **Project**.
-2. Select your repository `blackscythe123/CC-Website-2026`.
-3. In **Root Directory**, click **Edit** and select:
-   ```
-   apps/cms-studio
-   ```
-4. In **Environment Variables**, add:
-   - `OAUTH_GITHUB_CLIENT_ID` = `<Your GitHub Client ID>`
-   - `OAUTH_GITHUB_CLIENT_SECRET` = `<Your GitHub Client Secret>`
-5. Click **Deploy**.
-
----
-
-### Step 4: Deploy Project 2 on Vercel — Main Portal (`apps/main-portal`)
-
-1. Go back to Vercel Dashboard ➔ Click **Add New...** ➔ **Project**.
-2. Select the same repository `blackscythe123/CC-Website-2026`.
-3. In **Root Directory**, click **Edit** and select:
-   ```
-   apps/main-portal
-   ```
-4. Framework Preset will auto-detect **Next.js**. No special environment variables are needed for the public portal!
-5. Click **Deploy**.
-
----
-
-## 👥 How the Editorial Approval Workflow Operates
-
-1. **Member Creates Draft:**
-   - Any club member visits `https://<your-cms-domain>.vercel.app/admin`.
-   - Clicks on their vertical collection (e.g. `🤖 1. AI & Machine Learning`).
-   - Writes the title, author name, and markdown content.
-   - Clicks **Save**. Decap CMS saves this as a **Draft**, which automatically opens a Git branch and Pull Request on GitHub.
-2. **Vertical Head Reviews:**
-   - The Vertical Head goes to the **Workflow** tab at the top of the CMS Studio.
-   - They see columns: **Drafts** | **In Review** | **Ready to Publish**.
-   - They inspect the article preview, move it to "In Review", make edits if needed, and move it to "Ready".
-3. **Publishing Live:**
-   - The lead clicks **Publish**.
-   - Decap CMS automatically merges the Pull Request into `main`!
-   - Vercel detects the merge to `main`, rebuilds `apps/main-portal` in ~30 seconds, and the article is live globally!
-
----
-
-## 📁 Repository Structure
-
-```
-coding-club-cms/
-├── pnpm-workspace.yaml             # Monorepo workspace configuration
-├── package.json                    # Workspace root scripts
-│
-├── content/                        # SINGLE SOURCE OF TRUTH (Tracked in Git)
-│   ├── club/                       # Club-wide announcements & events
-│   └── verticals/                  # 10 Autonomous Verticals
-│       ├── ai-ml/                  # metadata.json + posts/
-│       ├── web-dev/                # metadata.json + posts/
-│       ├── cybersecurity/          # metadata.json + posts/
-│       ├── cloud-devops/           # metadata.json + posts/
-│       ├── competitive-programming/# metadata.json + posts/
-│       ├── mobile-dev/             # metadata.json + posts/
-│       ├── ui-ux/                  # metadata.json + posts/
-│       ├── blockchain/             # metadata.json + posts/
-│       ├── iot-embedded/           # metadata.json + posts/
-│       └── game-dev/               # metadata.json + posts/
-│
-└── apps/
-    ├── cms-studio/                 # PROJECT 1: Centralized CMS Dashboard (/admin)
-    │   ├── public/admin/
-    │   │   ├── config.yml          # Decap CMS collections + editorial_workflow
-    │   │   └── index.html          # Decap CMS SPA loader
-    │   └── src/app/api/
-    │       ├── auth/route.ts       # GitHub OAuth redirect
-    │       └── callback/route.ts   # GitHub OAuth code-to-token exchanger
-    │
-    └── main-portal/                # PROJECT 2: Public Consumer Portal
-        ├── src/app/
-        │   ├── page.tsx            # Main Homepage (10 Verticals Grid)
-        │   ├── verticals/[slug]/   # THE SINGLE DYNAMIC VERTICAL UI PAGE
-        │   └── blog/               # Cross-vertical master feed & dynamic post reader
-        └── src/lib/                # Verticals and markdown content loaders
+pnpm run test:content
 ```

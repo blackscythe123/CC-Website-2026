@@ -1,0 +1,19 @@
+{
+  "slug": "ssnhacks",
+  "name": "SSN Hacks",
+  "tagline": "Flagship Hackathons, Rapid Prototyping, and High-Impact Innovation",
+  "description": "Organizing SSN's flagship annual hackathons, internal hack days, mentorship sprints, and cultivating a maker culture of 24-hour product builds.",
+  "color": "emerald",
+  "topics": [
+    "Hackathon Organizing",
+    "Rapid Prototyping",
+    "Product Sprints",
+    "Hardware & Software Builds",
+    "Pitching & Demos"
+  ],
+  "lead": {
+    "name": "SSN Hacks Lead",
+    "role": "Vertical Head",
+    "github": "ssn-coding-club"
+  }
+}

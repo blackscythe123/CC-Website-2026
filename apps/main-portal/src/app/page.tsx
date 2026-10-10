@@ -68,9 +68,15 @@ export default function HomePage() {
 
                 <div>
                   <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="rounded bg-rose-50 px-2.5 py-0.5 font-bold text-[#F43F5E] border border-rose-100">
-                      {post.vertical}
-                    </span>
+                    {post.vertical === "club" ? (
+                      <span className="rounded bg-amber-50 px-2.5 py-0.5 font-bold text-amber-800 border border-amber-200">
+                        📢 Club Announcement
+                      </span>
+                    ) : (
+                      <span className="rounded bg-rose-50 px-2.5 py-0.5 font-bold text-[#F43F5E] border border-rose-100">
+                        {post.vertical}
+                      </span>
+                    )}
                     <span className="text-stone-400">{post.date}</span>
                   </div>
 

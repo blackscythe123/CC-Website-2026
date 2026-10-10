@@ -1,0 +1,19 @@
+{
+  "slug": "full-stack",
+  "name": "Full Stack",
+  "tagline": "Modern Web Platforms, Distributed Backends, and Scalable APIs",
+  "description": "Building full-stack web applications, microservices, databases, GraphQL & REST APIs, Next.js applications, and state management patterns.",
+  "color": "sky",
+  "topics": [
+    "Next.js & React",
+    "Node.js & Go",
+    "PostgreSQL & Redis",
+    "REST & GraphQL",
+    "Modern Web Architecture"
+  ],
+  "lead": {
+    "name": "Full Stack Lead",
+    "role": "Vertical Head",
+    "github": "ssn-coding-club"
+  }
+}

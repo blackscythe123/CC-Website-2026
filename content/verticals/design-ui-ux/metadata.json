@@ -1,0 +1,19 @@
+{
+  "slug": "design-ui-ux",
+  "name": "Design & UI/UX",
+  "tagline": "User Research, Interactive Prototyping, and Scalable Design Systems",
+  "description": "Crafting intuitive user experiences, wireframes, user testing cycles, typography systems, and high-fidelity prototypes in Figma.",
+  "color": "pink",
+  "topics": [
+    "Figma",
+    "Design Systems",
+    "User Research",
+    "Interaction Design",
+    "Micro-animations"
+  ],
+  "lead": {
+    "name": "Design & UI/UX Lead",
+    "role": "Vertical Head",
+    "github": "ssn-coding-club"
+  }
+}

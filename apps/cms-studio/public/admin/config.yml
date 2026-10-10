@@ -1,6 +1,6 @@
 backend:
   name: github
-  repo: your-username/coding-club-cms # Set this to your GitHub user/org and repo name
+  repo: blackscythe123/CC-Website-2026
   branch: main
   auth_endpoint: api/auth
 
@@ -16,21 +16,21 @@ local_backend: false
 media_folder: apps/main-portal/public/uploads
 public_folder: /uploads
 
-site_url: https://cms.codingclub.example
-display_url: https://codingclub.example
+site_url: https://ssn-coding-club-cms.vercel.app
+display_url: https://ssn-coding-club.vercel.app
 
 collections:
-  - name: apex_posts
-    label: "📢 Apex Club Announcements"
-    folder: content/apex/posts
+  - name: club_posts
+    label: "📢 Coding Club Announcements"
+    folder: content/club/posts
     create: true
     slug: "{{slug}}"
     fields:
       - { label: "Title", name: "title", widget: "string" }
       - { label: "Publish Date", name: "date", widget: "datetime", format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false }
-      - { label: "Author", name: "author", widget: "string", default: "Apex Club Core" }
+      - { label: "Author", name: "author", widget: "string", default: "Coding Club Core" }
       - { label: "Summary", name: "summary", widget: "text" }
-      - { label: "Tags", name: "tags", widget: "list", default: ["Apex", "Announcement"] }
+      - { label: "Tags", name: "tags", widget: "list", default: ["Club", "Announcement"] }
       - { label: "Body", name: "body", widget: "markdown" }
 
   - name: ai_ml

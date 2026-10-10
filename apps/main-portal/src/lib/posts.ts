@@ -65,23 +65,23 @@ export function getAllPosts(): PostSummary[] {
     }
   }
 
-  // Also check apex posts
-  const apexPostsDir = path.join(contentDir, "apex", "posts");
-  if (fs.existsSync(apexPostsDir)) {
-    const fileNames = fs.readdirSync(apexPostsDir);
+  // Also check club-wide posts
+  const clubPostsDir = path.join(contentDir, "club", "posts");
+  if (fs.existsSync(clubPostsDir)) {
+    const fileNames = fs.readdirSync(clubPostsDir);
     for (const file of fileNames) {
       if (file.endsWith(".md")) {
-        const filePath = path.join(apexPostsDir, file);
+        const filePath = path.join(clubPostsDir, file);
         const content = fs.readFileSync(filePath, "utf8");
         const { data } = matter(content);
         const slug = file.replace(/\.md$/, "");
 
         posts.push({
           slug,
-          vertical: "apex",
+          vertical: "club",
           title: data.title || slug,
           date: data.date ? String(data.date).split("T")[0] : "",
-          author: data.author || "Apex Core",
+          author: data.author || "Coding Club Core",
           summary: data.summary || "",
           tags: Array.isArray(data.tags) ? data.tags : [],
         });
@@ -103,8 +103,8 @@ export async function getPost(
   const contentDir = resolveContentDir();
   let filePath = path.join(contentDir, "verticals", verticalSlug, "posts", `${postSlug}.md`);
 
-  if (verticalSlug === "apex") {
-    filePath = path.join(contentDir, "apex", "posts", `${postSlug}.md`);
+  if (verticalSlug === "club") {
+    filePath = path.join(contentDir, "club", "posts", `${postSlug}.md`);
   }
 
   if (!fs.existsSync(filePath)) {

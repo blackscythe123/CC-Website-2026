@@ -10,7 +10,7 @@ export default function Footer() {
               &lt;/&gt;
             </span>
             <span className="text-sm font-semibold text-gray-900 dark:text-white">
-              Apex Coding Club
+              Coding Club (CC)
             </span>
             <span className="text-sm text-gray-500">
               — 10 Specialized Verticals, 1 Monorepo Architecture

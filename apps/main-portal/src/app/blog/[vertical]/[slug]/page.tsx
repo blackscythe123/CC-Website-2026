@@ -22,7 +22,7 @@ export async function generateMetadata({
   if (!post) return { title: "Article Not Found" };
 
   return {
-    title: `${post.title} | Apex Coding Club`,
+    title: `${post.title} | Coding Club`,
     description: post.summary,
   };
 }

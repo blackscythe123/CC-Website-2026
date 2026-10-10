@@ -4,8 +4,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
-  title: "Apex Coding Club | 10 Engineering Verticals",
-  description: "Official portal of Apex Coding Club showcasing our 10 autonomous technical verticals and engineering articles.",
+  title: "Coding Club (CC) | 10 Engineering Verticals",
+  description: "Official portal of Coding Club showcasing our 10 autonomous technical verticals and engineering articles.",
 };
 
 export default function RootLayout({

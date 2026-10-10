@@ -1,9 +1,9 @@
-# 🚀 Apex Club Monorepo (10 Verticals & Centralized CMS)
+# 🚀 Coding Club Monorepo (10 Verticals & Centralized CMS)
 
-A modern, **zero-database**, multi-tenant content management system and community portal for **Apex Coding Club**.
+A modern, **zero-database**, multi-tenant content management system and community portal for **Coding Club (CC)**.
 
 Structured as a **pnpm Monorepo** containing two decoupled Next.js projects:
-1. **`apps/main-portal`**: The consumer-facing website with the main Apex homepage, an interactive 10-vertical showcase, a single reusable dynamic vertical UI page (`/verticals/[slug]`), and cross-vertical blog feeds.
+1. **`apps/main-portal`**: The consumer-facing website with the main Coding Club homepage, an interactive 10-vertical showcase, a single reusable dynamic vertical UI page (`/verticals/[slug]`), and cross-vertical blog feeds.
 2. **`apps/cms-studio`**: The centralized editorial studio powered by **Decap CMS** with a **role-based GitHub Approval Workflow** (`publish_mode: editorial_workflow`).
 
 ---
@@ -25,7 +25,7 @@ Structured as a **pnpm Monorepo** containing two decoupled Next.js projects:
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │  GitHub Repository (Single Source of Truth)                                            │
 │  content/                                                                              │
-│  ├── apex/                  (Club-wide announcements & core events)                    │
+│  ├── club/                  (Club-wide announcements & core events)                    │
 │  └── verticals/             (10 autonomous technical verticals)                        │
 │      ├── ai-ml/             ├── competitive-programming/  ├── blockchain/              │
 │      ├── web-dev/           ├── mobile-dev/               ├── iot-embedded/            │
@@ -36,7 +36,7 @@ Structured as a **pnpm Monorepo** containing two decoupled Next.js projects:
                                         ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │  apps/main-portal (domain.com)                                                         │
-│  - Apex Homepage: 10 Verticals Showcase Grid + Cross-Vertical Blog Feed                │
+│  - Club Homepage: 10 Verticals Showcase Grid + Cross-Vertical Blog Feed                │
 │  - Single Dynamic Page Template: /verticals/[slug] (Renders ANY of the 10 verticals!)  │
 │  - Dynamic Article Reader: /blog/[vertical]/[slug]                                     │
 └────────────────────────────────────────────────────────────────────────────────────────┘
@@ -53,40 +53,26 @@ Because this is a monorepo, you will deploy **two projects** from your single Gi
 ```bash
 git add .
 git commit -m "feat: complete 10 verticals monorepo with editorial workflow"
-git remote add origin https://github.com/<YOUR-USERNAME>/<YOUR-REPO-NAME>.git
-git branch -M main
-git push -u origin main
+git push origin main
 ```
 
 ### Step 2: Create Your GitHub OAuth App
 
 1. Go to [GitHub Developer Settings](https://github.com/settings/developers) ➔ **OAuth Apps** ➔ **[New OAuth App](https://github.com/settings/applications/new)**.
 2. Fill in:
-   - **Application name:** `Apex Club CMS Studio`
-   - **Homepage URL:** `https://<YOUR-CMS-VERCEL-DOMAIN>.vercel.app` (or your custom domain)
+   - **Application name:** `SSN Coding Club CMS`
+   - **Homepage URL:** `https://<YOUR-CMS-VERCEL-DOMAIN>.vercel.app`
    - **Authorization callback URL:** `https://<YOUR-CMS-VERCEL-DOMAIN>.vercel.app/api/callback`
+   - **Allow wildcard matching:** Checked
+   - **Expire user access tokens:** ❌ **Unchecked**
 3. Click **Register application**.
 4. Click **Generate a new client secret**.
 5. Save your **Client ID** and **Client Secret**.
 
-### Step 3: Update `apps/cms-studio/public/admin/config.yml`
-
-In [`apps/cms-studio/public/admin/config.yml`](file:///C:/projects/coding-club-cms/apps/cms-studio/public/admin/config.yml#L3), update your GitHub repository:
-```yaml
-backend:
-  name: github
-  repo: <YOUR-USERNAME>/<YOUR-REPO-NAME> # e.g. "my-club/apex-club"
-  branch: main
-  auth_endpoint: api/auth
-```
-Commit and push this change to GitHub.
-
----
-
-### Step 4: Deploy Project 1 on Vercel — CMS Studio (`apps/cms-studio`)
+### Step 3: Deploy Project 1 on Vercel — CMS Studio (`apps/cms-studio`)
 
 1. Go to [Vercel Dashboard](https://vercel.com/dashboard) ➔ Click **Add New...** ➔ **Project**.
-2. Select your repository.
+2. Select your repository `blackscythe123/CC-Website-2026`.
 3. In **Root Directory**, click **Edit** and select:
    ```
    apps/cms-studio
@@ -98,10 +84,10 @@ Commit and push this change to GitHub.
 
 ---
 
-### Step 5: Deploy Project 2 on Vercel — Main Portal (`apps/main-portal`)
+### Step 4: Deploy Project 2 on Vercel — Main Portal (`apps/main-portal`)
 
 1. Go back to Vercel Dashboard ➔ Click **Add New...** ➔ **Project**.
-2. Select the same repository.
+2. Select the same repository `blackscythe123/CC-Website-2026`.
 3. In **Root Directory**, click **Edit** and select:
    ```
    apps/main-portal
@@ -137,7 +123,7 @@ coding-club-cms/
 ├── package.json                    # Workspace root scripts
 │
 ├── content/                        # SINGLE SOURCE OF TRUTH (Tracked in Git)
-│   ├── apex/                       # Club-wide announcements & events
+│   ├── club/                       # Club-wide announcements & events
 │   └── verticals/                  # 10 Autonomous Verticals
 │       ├── ai-ml/                  # metadata.json + posts/
 │       ├── web-dev/                # metadata.json + posts/
@@ -161,17 +147,8 @@ coding-club-cms/
     │
     └── main-portal/                # PROJECT 2: Public Consumer Portal
         ├── src/app/
-        │   ├── page.tsx            # Main Apex Homepage (10 Verticals Grid)
+        │   ├── page.tsx            # Main Homepage (10 Verticals Grid)
         │   ├── verticals/[slug]/   # THE SINGLE DYNAMIC VERTICAL UI PAGE
         │   └── blog/               # Cross-vertical master feed & dynamic post reader
         └── src/lib/                # Verticals and markdown content loaders
 ```
-
----
-
-## 🛠️ Local Commands (If Ever Needed)
-
-- `pnpm --filter cms-studio dev` — Run CMS Studio at `http://localhost:3001`
-- `pnpm --filter main-portal dev` — Run Main Portal at `http://localhost:3000`
-- `pnpm build:cms` — Production build for CMS Studio
-- `pnpm build:portal` — Production build for Main Portal

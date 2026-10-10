@@ -18,12 +18,12 @@ export default function HomePage() {
             </div>
 
             <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl dark:text-white">
-              The Apex Engineering Hub,{" "}
+              The Coding Club Hub,{" "}
               <span className="text-blue-600 dark:text-blue-400">10 Specialized Wings</span>
             </h1>
 
             <p className="mt-6 text-lg leading-relaxed text-gray-600 dark:text-gray-300">
-              Welcome to the central portal of Apex Coding Club. Each technical vertical operates autonomously with its own leadership, editorial pipeline, and Git-backed content stream.
+              Welcome to the central portal of Coding Club (CC). Each technical vertical operates autonomously with its own leadership, editorial pipeline, and Git-backed content stream.
             </p>
 
             <div className="mt-10 flex flex-wrap items-center justify-center gap-4">

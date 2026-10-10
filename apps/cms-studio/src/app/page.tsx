@@ -10,7 +10,7 @@ export default function CmsStudioHome() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-              Apex Club Centralized CMS Studio
+              Coding Club Centralized CMS Studio
             </h1>
             <p className="text-sm text-gray-500">
               Decentralized publishing across 10 verticals with GitHub Approval Workflow

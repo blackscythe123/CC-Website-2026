@@ -3,7 +3,7 @@ import { getAllPosts } from "@/lib/posts";
 import { getAllVerticals } from "@/lib/verticals";
 
 export const metadata = {
-  title: "Cross-Vertical Blog Feed | Apex Coding Club",
+  title: "Cross-Vertical Blog Feed | Coding Club",
   description: "Browse articles, tutorials, and research notes from all 10 engineering verticals.",
 };
 

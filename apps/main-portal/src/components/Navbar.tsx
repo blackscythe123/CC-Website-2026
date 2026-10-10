@@ -11,7 +11,7 @@ export default function Navbar() {
             </span>
             <div>
               <span className="text-lg font-bold tracking-tight text-gray-900 dark:text-white">
-                Apex Club
+                Coding Club
               </span>
               <span className="hidden sm:inline-block ml-2 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                 10 Verticals

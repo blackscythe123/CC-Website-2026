@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        "User-Agent": "apex-club-cms-studio",
+        "User-Agent": "coding-club-cms-studio",
       },
       body: JSON.stringify({
         client_id: clientId,

@@ -18,7 +18,7 @@ export async function generateMetadata({
   if (!vertical) return { title: "Vertical Not Found" };
 
   return {
-    title: `${vertical.name} | Apex Coding Club`,
+    title: `${vertical.name} | Coding Club`,
     description: vertical.tagline,
   };
 }

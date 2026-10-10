@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Apex Club CMS Portal",
+  title: "Coding Club CMS Portal",
   description: "Centralized CMS Studio with role-based Git approval workflow.",
 };
 

@@ -63,17 +63,20 @@ export default function StudioNav({ user, roleInfo }: StudioNavProps) {
             }
           } else {
             // Check if current user has reviewer authority over this vertical
-            const isSuperadmin = roleInfo?.role === "superadmin";
-            const isVerticalLead =
-              (roleInfo?.role === "vertical_head" || roleInfo?.role === "deputy") &&
-              roleInfo?.verticals.includes(pr.vertical);
-            if (isSuperadmin || isVerticalLead) {
-              notifs.push({
-                number: pr.number,
-                title: pr.title,
-                vertical: pr.vertical,
-                type: "needs_approval",
-              });
+            // (Only notify if NOT changes_requested, because it's currently with the author to revise)
+            if (!pr.changesRequested) {
+              const isSuperadmin = roleInfo?.role === "superadmin";
+              const isVerticalLead =
+                (roleInfo?.role === "vertical_head" || roleInfo?.role === "deputy") &&
+                roleInfo?.verticals.includes(pr.vertical);
+              if (isSuperadmin || isVerticalLead) {
+                notifs.push({
+                  number: pr.number,
+                  title: pr.title,
+                  vertical: pr.vertical,
+                  type: "needs_approval",
+                });
+              }
             }
           }
         });

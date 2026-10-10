@@ -239,6 +239,33 @@ export async function listPendingReviewPRs(token: string): Promise<PendingPR[]> 
           changesRequested = true;
           latestFeedback = changeReqs[changeReqs.length - 1].body || "";
         }
+
+        // Also check PR comments for editorial feedback comments (e.g. self-rejection or comment fallback)
+        try {
+          const { data: comments } = await octokit.issues.listComments({
+            owner: REPO_OWNER,
+            repo: REPO_NAME,
+            issue_number: pr.number,
+            per_page: 50,
+          });
+
+          const feedbackComments = comments.filter((c) =>
+            c.body && c.body.includes("Editorial Feedback & Rejection")
+          );
+
+          if (feedbackComments.length > 0) {
+            changesRequested = true;
+            const lastComment = feedbackComments[feedbackComments.length - 1];
+            // Extract the actual feedback text from markdown body
+            const cleaned = (lastComment.body || "")
+              .replace(/###\s*📝\s*Editorial Feedback & Rejection/i, "")
+              .replace(/\*\*Reviewer:\*\*\s*@\w+/i, "")
+              .trim();
+            latestFeedback = cleaned || latestFeedback || "Revisions requested by editorial reviewer.";
+          }
+        } catch (commentErr) {
+          console.warn(`Could not fetch comments for PR #${pr.number}:`, commentErr);
+        }
       } catch (err) {
         console.warn(`Could not fetch reviews for PR #${pr.number}:`, err);
       }

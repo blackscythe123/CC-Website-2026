@@ -205,7 +205,8 @@ export default function AdminEditorPage() {
                   data.roleInfo?.role === "deputy"
                 ) {
                   const forReviewer = rData.prs.filter(
-                    (p: { author: string; vertical: string }) => {
+                    (p: { author: string; vertical: string; changesRequested?: boolean }) => {
+                      if (p.changesRequested) return false; // Waiting on author to revise
                       const isSelf = p.author.toLowerCase() === data.user.login.toLowerCase();
                       if (isSelf) return false;
                       if (data.roleInfo.role === "superadmin") return true;
@@ -217,6 +218,13 @@ export default function AdminEditorPage() {
               }
             })
             .catch(() => {});
+
+          // Auto-load PR if requested via URL param (e.g. /admin?revise=6)
+          const urlParams = new URLSearchParams(window.location.search);
+          const revisePrNum = urlParams.get("revise");
+          if (revisePrNum) {
+            handleLoadFeedbackPR(parseInt(revisePrNum, 10));
+          }
         }
         setLoading(false);
       })

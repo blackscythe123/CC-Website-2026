@@ -18,6 +18,7 @@ import {
   Eye,
   FileText,
   Sparkles,
+  Edit3,
 } from "lucide-react";
 
 interface PendingPR {
@@ -311,6 +312,17 @@ export default function EditorialReviewsPage() {
                         <span>GitHub Diff</span>
                         <ExternalLink className="h-3.5 w-3.5" />
                       </a>
+
+                      {/* Author revision action when changes are requested */}
+                      {user && pr.author.toLowerCase() === user.login.toLowerCase() && pr.changesRequested && (
+                        <a
+                          href={`/admin?revise=${pr.number}`}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-red-700 transition"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                          <span>Load &amp; Revise Article</span>
+                        </a>
+                      )}
 
                       {canReview && (
                         <>

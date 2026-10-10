@@ -2,6 +2,7 @@ backend:
   name: github
   repo: blackscythe123/CC-Website-2026
   branch: main
+  base_url: https://ssn-coding-club-cms.vercel.app
   auth_endpoint: api/auth
 
 # EDITORIAL APPROVAL WORKFLOW:

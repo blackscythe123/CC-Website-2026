@@ -4,7 +4,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SSN Coding Club CMS Studio</title>
-    <link rel="cms-config-url" type="text/yaml" href="/admin/config.yml" />
     <style>
       body {
         margin: 0;
@@ -33,6 +32,8 @@
         to { transform: rotate(360deg); }
       }
     </style>
+    <!-- js-yaml to parse config.yml dynamically -->
+    <script src="https://unpkg.com/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
   </head>
   <body>
     <div id="loader">
@@ -41,17 +42,35 @@
       <p>Decentralized multi-vertical editorial workflow with Git approvals.</p>
     </div>
 
-    <!-- Official Decap CMS CDN -->
+    <script>
+      // Instruct Decap CMS to wait for our dynamic configuration
+      window.CMS_MANUAL_INIT = true;
+    </script>
     <script src="https://unpkg.com/decap-cms@^3.1.2/dist/decap-cms.js"></script>
     <script>
-      window.addEventListener("DOMContentLoaded", function() {
-        setTimeout(function() {
+      fetch('/admin/config.yml')
+        .then(function(res) { return res.text(); })
+        .then(function(yamlText) {
+          var config = jsyaml.load(yamlText);
+          // Dynamically route OAuth to the current domain (e.g. Vercel or custom domain)
+          config.backend = config.backend || {};
+          config.backend.base_url = window.location.origin;
+          config.backend.auth_endpoint = "api/auth";
+
+          window.CMS.init({ config: config });
+
           var loader = document.getElementById("loader");
-          if (loader && window.CMS) {
+          if (loader) {
             loader.style.display = "none";
           }
-        }, 1200);
-      });
+        })
+        .catch(function(err) {
+          console.error("Failed to load /admin/config.yml:", err);
+          var loader = document.getElementById("loader");
+          if (loader) {
+            loader.innerHTML = "<h3 style='color:red;'>Failed to load CMS configuration</h3><p>" + err.message + "</p>";
+          }
+        });
     </script>
   </body>
 </html>

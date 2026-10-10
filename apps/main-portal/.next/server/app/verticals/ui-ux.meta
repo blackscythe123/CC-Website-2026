@@ -1,0 +1,39 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/verticals/layout,_N_T_/verticals/[slug]/layout,_N_T_/verticals/[slug]/page,_N_T_/verticals/ui-ux"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/verticals/$d$slug/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 64,
+    "slots": {
+      "children": {
+        "hints": 96,
+        "slots": {
+          "children": {
+            "hints": 96,
+            "slots": {
+              "children": {
+                "hints": 160,
+                "slots": null
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/8b70698c67b8f28e7637cac029e24ac2f7f8b00005b69c02701e148ef36bbd6c/$/verticals/ui-ux",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/verticals/[slug]/page"
+    },
+    "isFallback": false
+  }
+}

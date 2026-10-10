@@ -1,0 +1,164 @@
+backend:
+  name: github
+  repo: your-username/coding-club-cms # Set this to your GitHub user/org and repo name
+  branch: main
+  auth_endpoint: api/auth
+
+# EDITORIAL APPROVAL WORKFLOW:
+# Enables Draft -> In Review -> Ready to Publish pipeline!
+# When a club member creates a post, Decap CMS creates a Git branch & Pull Request.
+# When the Vertical Head approves and clicks "Publish", Decap merges the PR into main!
+publish_mode: editorial_workflow
+
+# Local development fallback
+local_backend: false
+
+media_folder: apps/main-portal/public/uploads
+public_folder: /uploads
+
+site_url: https://cms.codingclub.example
+display_url: https://codingclub.example
+
+collections:
+  - name: apex_posts
+    label: "📢 Apex Club Announcements"
+    folder: content/apex/posts
+    create: true
+    slug: "{{slug}}"
+    fields:
+      - { label: "Title", name: "title", widget: "string" }
+      - { label: "Publish Date", name: "date", widget: "datetime", format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false }
+      - { label: "Author", name: "author", widget: "string", default: "Apex Club Core" }
+      - { label: "Summary", name: "summary", widget: "text" }
+      - { label: "Tags", name: "tags", widget: "list", default: ["Apex", "Announcement"] }
+      - { label: "Body", name: "body", widget: "markdown" }
+
+  - name: ai_ml
+    label: "🤖 1. AI & Machine Learning"
+    folder: content/verticals/ai-ml/posts
+    create: true
+    slug: "{{slug}}"
+    fields:
+      - { label: "Title", name: "title", widget: "string" }
+      - { label: "Publish Date", name: "date", widget: "datetime", format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false }
+      - { label: "Author", name: "author", widget: "string" }
+      - { label: "Summary", name: "summary", widget: "text" }
+      - { label: "Tags", name: "tags", widget: "list", default: ["AI", "PyTorch"] }
+      - { label: "Body", name: "body", widget: "markdown" }
+
+  - name: web_dev
+    label: "🌐 2. Web Development"
+    folder: content/verticals/web-dev/posts
+    create: true
+    slug: "{{slug}}"
+    fields:
+      - { label: "Title", name: "title", widget: "string" }
+      - { label: "Publish Date", name: "date", widget: "datetime", format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false }
+      - { label: "Author", name: "author", widget: "string" }
+      - { label: "Summary", name: "summary", widget: "text" }
+      - { label: "Tags", name: "tags", widget: "list", default: ["Next.js", "TypeScript"] }
+      - { label: "Body", name: "body", widget: "markdown" }
+
+  - name: cybersecurity
+    label: "🛡️ 3. Cybersecurity & CTF"
+    folder: content/verticals/cybersecurity/posts
+    create: true
+    slug: "{{slug}}"
+    fields:
+      - { label: "Title", name: "title", widget: "string" }
+      - { label: "Publish Date", name: "date", widget: "datetime", format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false }
+      - { label: "Author", name: "author", widget: "string" }
+      - { label: "Summary", name: "summary", widget: "text" }
+      - { label: "Tags", name: "tags", widget: "list", default: ["Security", "CTF"] }
+      - { label: "Body", name: "body", widget: "markdown" }
+
+  - name: cloud_devops
+    label: "☁️ 4. Cloud & DevOps"
+    folder: content/verticals/cloud-devops/posts
+    create: true
+    slug: "{{slug}}"
+    fields:
+      - { label: "Title", name: "title", widget: "string" }
+      - { label: "Publish Date", name: "date", widget: "datetime", format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false }
+      - { label: "Author", name: "author", widget: "string" }
+      - { label: "Summary", name: "summary", widget: "text" }
+      - { label: "Tags", name: "tags", widget: "list", default: ["DevOps", "Docker"] }
+      - { label: "Body", name: "body", widget: "markdown" }
+
+  - name: competitive_programming
+    label: "🏆 5. Competitive Programming"
+    folder: content/verticals/competitive-programming/posts
+    create: true
+    slug: "{{slug}}"
+    fields:
+      - { label: "Title", name: "title", widget: "string" }
+      - { label: "Publish Date", name: "date", widget: "datetime", format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false }
+      - { label: "Author", name: "author", widget: "string" }
+      - { label: "Summary", name: "summary", widget: "text" }
+      - { label: "Tags", name: "tags", widget: "list", default: ["Algorithms", "DP"] }
+      - { label: "Body", name: "body", widget: "markdown" }
+
+  - name: mobile_dev
+    label: "📱 6. Mobile Development"
+    folder: content/verticals/mobile-dev/posts
+    create: true
+    slug: "{{slug}}"
+    fields:
+      - { label: "Title", name: "title", widget: "string" }
+      - { label: "Publish Date", name: "date", widget: "datetime", format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false }
+      - { label: "Author", name: "author", widget: "string" }
+      - { label: "Summary", name: "summary", widget: "text" }
+      - { label: "Tags", name: "tags", widget: "list", default: ["Mobile", "Flutter"] }
+      - { label: "Body", name: "body", widget: "markdown" }
+
+  - name: ui_ux
+    label: "🎨 7. UI / UX Design"
+    folder: content/verticals/ui-ux/posts
+    create: true
+    slug: "{{slug}}"
+    fields:
+      - { label: "Title", name: "title", widget: "string" }
+      - { label: "Publish Date", name: "date", widget: "datetime", format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false }
+      - { label: "Author", name: "author", widget: "string" }
+      - { label: "Summary", name: "summary", widget: "text" }
+      - { label: "Tags", name: "tags", widget: "list", default: ["Design", "Figma"] }
+      - { label: "Body", name: "body", widget: "markdown" }
+
+  - name: blockchain
+    label: "⛓️ 8. Blockchain & Web3"
+    folder: content/verticals/blockchain/posts
+    create: true
+    slug: "{{slug}}"
+    fields:
+      - { label: "Title", name: "title", widget: "string" }
+      - { label: "Publish Date", name: "date", widget: "datetime", format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false }
+      - { label: "Author", name: "author", widget: "string" }
+      - { label: "Summary", name: "summary", widget: "text" }
+      - { label: "Tags", name: "tags", widget: "list", default: ["Web3", "Solidity"] }
+      - { label: "Body", name: "body", widget: "markdown" }
+
+  - name: iot_embedded
+    label: "⚡ 9. IoT & Embedded Systems"
+    folder: content/verticals/iot-embedded/posts
+    create: true
+    slug: "{{slug}}"
+    fields:
+      - { label: "Title", name: "title", widget: "string" }
+      - { label: "Publish Date", name: "date", widget: "datetime", format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false }
+      - { label: "Author", name: "author", widget: "string" }
+      - { label: "Summary", name: "summary", widget: "text" }
+      - { label: "Tags", name: "tags", widget: "list", default: ["Hardware", "ESP32"] }
+      - { label: "Body", name: "body", widget: "markdown" }
+
+  - name: game_dev
+    label: "🎮 10. Game Dev & XR"
+    folder: content/verticals/game-dev/posts
+    create: true
+    slug: "{{slug}}"
+    fields:
+      - { label: "Title", name: "title", widget: "string" }
+      - { label: "Publish Date", name: "date", widget: "datetime", format: "YYYY-MM-DD", date_format: "YYYY-MM-DD", time_format: false }
+      - { label: "Author", name: "author", widget: "string" }
+      - { label: "Summary", name: "summary", widget: "text" }
+      - { label: "Tags", name: "tags", widget: "list", default: ["GameDev", "Godot"] }
+      - { label: "Body", name: "body", widget: "markdown" }

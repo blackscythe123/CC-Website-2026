@@ -1,0 +1,18 @@
+{
+    "slug":  "ui-ux",
+    "color":  "pink",
+    "description":  "Bridging human behavior and intuitive digital interfaces through Figma, user testing, and accessibility.",
+    "tagline":  "Design systems, user research, wireframing, and interactive prototypes",
+    "name":  "UI / UX \u0026 Product Design",
+    "topics":  [
+                   "Figma Systems",
+                   "Design Tokens",
+                   "Accessibility (a11y)",
+                   "User Research"
+               ],
+    "lead":  {
+                 "github":  "chloe-design",
+                 "name":  "Chloe Dubois",
+                 "role":  "Design Head"
+             }
+}

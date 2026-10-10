@@ -1,0 +1,3 @@
+module.exports=[[45070,a=>{var b=a.i(91039);a.s(["default",0,function({children:a}){return(0,b.jsx)("html",{lang:"en",children:(0,b.jsx)("body",{className:"min-h-screen bg-gray-50 antialiased font-sans",children:a})})},"metadata",0,{title:"Apex Club CMS Portal",description:"Centralized CMS Studio with role-based Git approval workflow."}])},23352,(a,b,c)=>{b.exports=a.r(18622)},91039,(a,b,c)=>{b.exports=a.r(23352).vendored["react-rsc"].ReactJsxRuntime}],18622,(a,b,c)=>{b.exports=a.x("next/dist/compiled/next-server/app-page-turbo.runtime.prod.js",()=>require("next/dist/compiled/next-server/app-page-turbo.runtime.prod.js"))},32425,function(a){a.n(a.i(45070))}];
+
+//# sourceMappingURL=%5Broot-of-the-server%5D__1mm8eso4ow236._.js.map

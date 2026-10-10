@@ -1,0 +1,18 @@
+{
+    "slug":  "competitive-programming",
+    "color":  "amber",
+    "description":  "Weekly contests, Codeforces/LeetCode mock interviews, and advanced algorithmic problem breakdowns.",
+    "tagline":  "Mastering algorithms, data structures, and contest problem solving",
+    "name":  "Competitive Programming \u0026 DSA",
+    "topics":  [
+                   "Dynamic Programming",
+                   "Graph Theory",
+                   "Segment Trees",
+                   "Number Theory"
+               ],
+    "lead":  {
+                 "github":  "rohan-algo",
+                 "name":  "Rohan Mehta",
+                 "role":  "CP Vertical Head"
+             }
+}

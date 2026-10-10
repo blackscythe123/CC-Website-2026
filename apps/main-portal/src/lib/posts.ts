@@ -12,11 +12,24 @@ export interface PostSummary {
   author: string;
   summary: string;
   coverImage?: string;
+  targetPortals?: string[];
   tags: string[];
 }
 
 export interface PostDetail extends PostSummary {
   contentHtml: string;
+}
+
+export function isPostVisibleOnPortal(
+  targetPortals: string[] | undefined,
+  portalId: string = "main-portal"
+): boolean {
+  if (!targetPortals || targetPortals.length === 0) return true;
+  return (
+    targetPortals.includes(portalId) ||
+    targetPortals.includes("*") ||
+    targetPortals.includes("all")
+  );
 }
 
 function resolveContentDir(): string {
@@ -32,7 +45,7 @@ function resolveContentDir(): string {
   return candidate1;
 }
 
-export function getAllPosts(): PostSummary[] {
+export function getAllPosts(portalId: string = "main-portal"): PostSummary[] {
   const contentDir = resolveContentDir();
   const verticalsDir = path.join(contentDir, "verticals");
   const posts: PostSummary[] = [];
@@ -51,6 +64,10 @@ export function getAllPosts(): PostSummary[] {
             const { data } = matter(content);
             const slug = file.replace(/\.md$/, "");
 
+            if (!isPostVisibleOnPortal(data.targetPortals, portalId)) {
+              continue;
+            }
+
             posts.push({
               slug,
               vertical: vFolder,
@@ -59,6 +76,7 @@ export function getAllPosts(): PostSummary[] {
               author: data.author || "Club Member",
               summary: data.summary || "",
               coverImage: data.coverImage || "",
+              targetPortals: Array.isArray(data.targetPortals) ? data.targetPortals : ["main-portal"],
               tags: Array.isArray(data.tags) ? data.tags : [],
             });
           }
@@ -78,6 +96,10 @@ export function getAllPosts(): PostSummary[] {
         const { data } = matter(content);
         const slug = file.replace(/\.md$/, "");
 
+        if (!isPostVisibleOnPortal(data.targetPortals, portalId)) {
+          continue;
+        }
+
         posts.push({
           slug,
           vertical: "club",
@@ -85,6 +107,7 @@ export function getAllPosts(): PostSummary[] {
           date: data.date ? String(data.date).split("T")[0] : "",
           author: data.author || "Coding Club Core",
           summary: data.summary || "",
+          targetPortals: Array.isArray(data.targetPortals) ? data.targetPortals : ["main-portal"],
           tags: Array.isArray(data.tags) ? data.tags : [],
         });
       }

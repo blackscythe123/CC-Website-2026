@@ -43,6 +43,13 @@ const ALL_VERTICALS = [
   { slug: "game-dev", name: "🎮 Game Dev & XR" },
 ];
 
+const ALL_PORTALS = [
+  { id: "main-portal", name: "🌐 Main Coding Club Portal", domain: "codingclub.tech" },
+  { id: "design-portal", name: "🎨 Designing & Creative Wing", domain: "design.codingclub.tech" },
+  { id: "cybersec-portal", name: "🛡️ Cybersecurity & CTF Arena", domain: "cybersec.codingclub.tech" },
+  { id: "ai-portal", name: "🤖 AI & Intelligence Hub", domain: "ai.codingclub.tech" },
+];
+
 export default function AdminEditorPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [roleInfo, setRoleInfo] = useState<UserRoleInfo | null>(null);
@@ -80,9 +87,10 @@ export default function AdminEditorPage() {
     return Math.max(1, Math.ceil(wordCount / 200));
   }, [wordCount]);
 
-  // Publishing Drawer State
+  // Publishing Drawer State & Multi-Portal Targets
   const [showDrawer, setShowDrawer] = useState(false);
   const [selectedVertical, setSelectedVertical] = useState("ai-ml");
+  const [selectedPortals, setSelectedPortals] = useState<string[]>(["main-portal"]);
   const [summary, setSummary] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -220,6 +228,16 @@ export default function AdminEditorPage() {
     setTags(tags.filter((item) => item !== t));
   };
 
+  const togglePortalSelection = (portalId: string) => {
+    if (selectedPortals.includes(portalId)) {
+      if (selectedPortals.length > 1) {
+        setSelectedPortals(selectedPortals.filter((p) => p !== portalId));
+      }
+    } else {
+      setSelectedPortals([...selectedPortals, portalId]);
+    }
+  };
+
   const handleSubmitDraft = async () => {
     if (!title.trim()) {
       setErrorMessage("Please enter an article title.");
@@ -244,6 +262,7 @@ export default function AdminEditorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           vertical: selectedVertical,
+          targetPortals: selectedPortals,
           title: title.trim(),
           summary: summary.trim(),
           coverImage,
@@ -623,7 +642,7 @@ export default function AdminEditorPage() {
                 <div>
                   <div className="text-sm font-semibold text-gray-900">{user.name || user.login}</div>
                   <div className="text-xs text-gray-500">
-                    @{user.login} • {roleInfo?.role ? roleInfo.role.replace("_", " ").toUpperCase() : "AUTHOR"}
+                    @{user.login}
                   </div>
                 </div>
               </div>
@@ -738,6 +757,57 @@ export default function AdminEditorPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Target Subdomain Portals / Multi-Website Destinations */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
+                    Publish To Portal(s)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedPortals.length === ALL_PORTALS.length) {
+                        setSelectedPortals(["main-portal"]);
+                      } else {
+                        setSelectedPortals(ALL_PORTALS.map((p) => p.id));
+                      }
+                    }}
+                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-800"
+                  >
+                    {selectedPortals.length === ALL_PORTALS.length ? "Reset to Main" : "Select All"}
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-400 mb-2.5">
+                  Route to main portal or specific subdomain project websites.
+                </p>
+                <div className="space-y-1.5">
+                  {ALL_PORTALS.map((portal) => {
+                    const isChecked = selectedPortals.includes(portal.id);
+                    return (
+                      <label
+                        key={portal.id}
+                        className={`flex items-center justify-between rounded-xl border p-2.5 text-xs cursor-pointer transition ${
+                          isChecked
+                            ? "border-blue-300 bg-blue-50/60 text-blue-900 font-semibold shadow-xs"
+                            : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => togglePortalSelection(portal.id)}
+                            className="rounded text-blue-600 focus:ring-blue-500"
+                          />
+                          <span>{portal.name}</span>
+                        </div>
+                        <span className="font-mono text-[10px] text-gray-400">{portal.domain}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Summary / Subtitle */}

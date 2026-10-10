@@ -24,6 +24,7 @@ export interface CreateDraftParams {
   title: string;
   summary: string;
   coverImage?: string;
+  targetPortals?: string[];
   tags: string[];
   markdownBody: string;
   pendingImages?: PendingImage[];
@@ -44,6 +45,7 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     slug,
     title,
     summary,
+    targetPortals,
     tags,
     markdownBody,
     pendingImages,
@@ -104,6 +106,8 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     date: today,
     author: authorDisplayName || authorUsername,
     summary,
+    targetPortals: targetPortals && targetPortals.length > 0 ? targetPortals : ["main-portal"],
+    vertical,
     ...(processedCoverImage ? { coverImage: processedCoverImage } : {}),
     tags: tags && tags.length > 0 ? tags : [vertical],
   };

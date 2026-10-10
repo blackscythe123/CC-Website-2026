@@ -7,6 +7,12 @@
     "dev:cms": "pnpm --filter cms-studio dev",
     "build": "pnpm -r build",
     "build:portal": "pnpm --filter main-portal build",
-    "build:cms": "pnpm --filter cms-studio build"
+    "build:cms": "pnpm --filter cms-studio build",
+    "test:content": "node scripts/validate-content.mjs",
+    "ci": "pnpm run test:content && pnpm -r build"
+  },
+  "devDependencies": {
+    "gray-matter": "^4.0.3",
+    "zod": "^3.25.76"
   }
 }

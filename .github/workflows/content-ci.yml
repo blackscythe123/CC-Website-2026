@@ -1,0 +1,42 @@
+name: "CI - Content Schema & Monorepo Build"
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-test:
+    name: "Validate Content & Build Apps"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "Setup pnpm"
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.3
+
+      - name: "Setup Node.js 24"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: "Install Dependencies"
+        run: pnpm install --frozen-lockfile=false
+
+      - name: "Run Content CI Validation Test"
+        run: pnpm run test:content
+
+      - name: "Run Monorepo Build Smoke Test"
+        run: pnpm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"

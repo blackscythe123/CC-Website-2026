@@ -30,10 +30,10 @@ export async function GET(request: NextRequest) {
 
     // Filter PRs by user permissions
     const visiblePRs = prs.filter((pr) => {
-      if (roleInfo.role === "superadmin" || roleInfo.role === "core_admin") {
+      if (roleInfo.role === "superadmin") {
         return true;
       }
-      if (roleInfo.role === "vertical_head") {
+      if (roleInfo.role === "vertical_head" || roleInfo.role === "deputy") {
         return roleInfo.verticals.includes(pr.vertical);
       }
       // Members only see PRs authored by themselves
@@ -73,17 +73,34 @@ export async function POST(request: NextRequest) {
 
     const userData = await userRes.json();
     const body = await request.json();
-    const { pullNumber, vertical } = body;
+    const { pullNumber } = body;
 
     if (!pullNumber) {
       return NextResponse.json({ error: "pullNumber is required" }, { status: 400 });
     }
 
-    // Verify permission to approve
-    if (!canUserApproveVertical(userData.login, vertical)) {
+    // Anti-IDOR: Fetch actual PR from GitHub to verify true target vertical
+    const { getPRDetails } = await import("@/lib/github");
+    const prData = await getPRDetails(token, pullNumber);
+
+    // Parse true vertical from PR title or branch name
+    let actualVertical = "general";
+    const titleMatch =
+      prData.title.match(/\[(?:Draft:\s*)?([a-zA-Z0-9_-]+)\]/i) ||
+      prData.title.match(/feat\(([a-zA-Z0-9_-]+)\)/i);
+    const branchMatch = prData.head.ref.match(/^(?:draft|cms)\/([a-zA-Z0-9_-]+)\//i);
+
+    if (titleMatch && titleMatch[1]) {
+      actualVertical = titleMatch[1].toLowerCase();
+    } else if (branchMatch && branchMatch[1]) {
+      actualVertical = branchMatch[1].toLowerCase();
+    }
+
+    // Verify permission to approve against true vertical
+    if (!canUserApproveVertical(userData.login, actualVertical)) {
       return NextResponse.json(
         {
-          error: `You are not authorized to approve articles for ${vertical}. Only designated Vertical Heads or Superadmins can approve.`,
+          error: `Access Denied: You are not authorized to approve articles for '${actualVertical}'. Only designated Vertical Heads, Deputies, or Superadmins can approve.`,
         },
         { status: 403 }
       );

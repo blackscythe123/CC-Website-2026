@@ -83,15 +83,14 @@ export async function POST(request: NextRequest) {
 
     const cleanUser = targetUsername.replace(/^@/, "").trim().toLowerCase();
     const roles = readRoles();
+    roles.superadmins = roles.superadmins || [];
+    roles.vertical_heads = roles.vertical_heads || {};
+    roles.deputies = roles.deputies || {};
 
     if (action === "assign") {
       if (role === "superadmin") {
         if (!roles.superadmins.map((u) => u.toLowerCase()).includes(cleanUser)) {
           roles.superadmins.push(cleanUser);
-        }
-      } else if (role === "core_admin") {
-        if (!roles.core_admins.map((u) => u.toLowerCase()).includes(cleanUser)) {
-          roles.core_admins.push(cleanUser);
         }
       } else if (role === "vertical_head") {
         if (!vertical) {
@@ -101,26 +100,47 @@ export async function POST(request: NextRequest) {
         if (!roles.vertical_heads[vertical].map((u) => u.toLowerCase()).includes(cleanUser)) {
           roles.vertical_heads[vertical].push(cleanUser);
         }
+        // Remove from deputy of that vertical if being promoted
+        if (roles.deputies[vertical]) {
+          roles.deputies[vertical] = roles.deputies[vertical].filter((u) => u.toLowerCase() !== cleanUser);
+        }
+      } else if (role === "deputy") {
+        if (!vertical) {
+          return NextResponse.json({ error: "Vertical is required for Deputy" }, { status: 400 });
+        }
+        roles.deputies[vertical] = roles.deputies[vertical] || [];
+        if (!roles.deputies[vertical].map((u) => u.toLowerCase()).includes(cleanUser)) {
+          roles.deputies[vertical].push(cleanUser);
+        }
+        // Remove from head of that vertical if being demoted
+        if (roles.vertical_heads[vertical]) {
+          roles.vertical_heads[vertical] = roles.vertical_heads[vertical].filter((u) => u.toLowerCase() !== cleanUser);
+        }
       }
     } else if (action === "remove") {
       if (role === "superadmin") {
         roles.superadmins = roles.superadmins.filter((u) => u.toLowerCase() !== cleanUser);
-      } else if (role === "core_admin") {
-        roles.core_admins = roles.core_admins.filter((u) => u.toLowerCase() !== cleanUser);
       } else if (role === "vertical_head" && vertical) {
         if (roles.vertical_heads[vertical]) {
           roles.vertical_heads[vertical] = roles.vertical_heads[vertical].filter(
             (u) => u.toLowerCase() !== cleanUser
           );
         }
+      } else if (role === "deputy" && vertical) {
+        if (roles.deputies[vertical]) {
+          roles.deputies[vertical] = roles.deputies[vertical].filter(
+            (u) => u.toLowerCase() !== cleanUser
+          );
+        }
       }
     }
 
-    writeRolesAndSyncCodeowners(roles);
+    // Serverless-safe commit with GitHub Token
+    await writeRolesAndSyncCodeowners(roles, token);
 
     return NextResponse.json({
       success: true,
-      message: `Role updated for @${cleanUser}`,
+      message: `Role hierarchy updated for @${cleanUser}`,
       roles,
     });
   } catch (err: unknown) {

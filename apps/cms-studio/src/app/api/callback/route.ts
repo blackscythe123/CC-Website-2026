@@ -64,53 +64,28 @@ export async function GET(request: NextRequest) {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Authorized</title>
+          <title>SSN Coding Club Studio Authorization</title>
           <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              height: 100vh;
-              margin: 0;
-              background-color: #f8fafc;
-            }
-            .card {
-              background: #ffffff;
-              padding: 2rem 2.5rem;
-              border-radius: 12px;
-              box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-              text-align: center;
-            }
+            body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f8fafc; }
+            .card { background: #fff; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; }
           </style>
         </head>
         <body>
           <div class="card">
-            <h3>Authentication Successful</h3>
-            <p>Connecting to CMS Studio and closing...</p>
+            <h3>Authorization Successful</h3>
+            <p>Redirecting to SSN Coding Club Studio...</p>
           </div>
           <script>
-            (function() {
-              const token = ${JSON.stringify(token)};
-              const message = 'authorization:github:success:' + JSON.stringify({
-                token: token,
-                provider: 'github'
-              });
-
-              function receiveMessage(e) {
-                window.opener.postMessage(message, e ? e.origin : '*');
-                setTimeout(function() { window.close(); }, 250);
+            try {
+              if (window.opener && window.opener !== window) {
+                window.opener.location.href = "/admin";
+                setTimeout(function() { window.close(); }, 300);
+              } else {
+                window.location.href = "/admin";
               }
-
-              window.addEventListener("message", receiveMessage, false);
-              window.opener.postMessage("authorizing:github", "*");
-
-              setTimeout(function() {
-                window.opener.postMessage(message, "*");
-                setTimeout(function() { window.close(); }, 350);
-              }, 600);
-            })();
+            } catch(e) {
+              window.location.href = "/admin";
+            }
           </script>
         </body>
       </html>

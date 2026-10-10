@@ -168,6 +168,16 @@ export async function listPendingReviewPRs(token: string): Promise<PendingPR[]> 
   });
 }
 
+export async function getPRDetails(token: string, pullNumber: number) {
+  const octokit = getOctokit(token);
+  const { data: prData } = await octokit.pulls.get({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    pull_number: pullNumber,
+  });
+  return prData;
+}
+
 export async function approveAndMergePR(
   token: string,
   pullNumber: number,
@@ -176,7 +186,15 @@ export async function approveAndMergePR(
   const octokit = getOctokit(token);
 
   try {
-    // Submit an approving review
+    // 1. Fetch PR to get head branch name for cleanup
+    const { data: prData } = await octokit.pulls.get({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      pull_number: pullNumber,
+    });
+    const headBranch = prData.head.ref;
+
+    // 2. Submit an approving review
     try {
       await octokit.pulls.createReview({
         owner: REPO_OWNER,
@@ -186,10 +204,10 @@ export async function approveAndMergePR(
         body: `Approved by @${reviewerUsername} via SSN Coding Club CMS Studio`,
       });
     } catch {
-      // If author is same as reviewer, self-review is not allowed on GitHub, continue to merge
+      // If author is same as reviewer, self-review is not permitted by GitHub API, continue to merge
     }
 
-    // Merge PR
+    // 3. Merge PR
     const { data: mergeResult } = await octokit.pulls.merge({
       owner: REPO_OWNER,
       repo: REPO_NAME,
@@ -198,9 +216,22 @@ export async function approveAndMergePR(
       commit_title: `feat: merge editorial PR #${pullNumber} into main`,
     });
 
+    // 4. Automatically delete the head branch so no draft branches are left behind!
+    if (mergeResult.merged && headBranch && (headBranch.startsWith("draft/") || headBranch.startsWith("cms/"))) {
+      try {
+        await octokit.git.deleteRef({
+          owner: REPO_OWNER,
+          repo: REPO_NAME,
+          ref: `heads/${headBranch}`,
+        });
+      } catch (deleteErr) {
+        console.warn(`Could not delete branch ${headBranch}:`, deleteErr);
+      }
+    }
+
     return {
       success: mergeResult.merged,
-      message: mergeResult.message || "Successfully merged and published to main!",
+      message: mergeResult.message || `Successfully merged PR #${pullNumber} and deleted branch ${headBranch}!`,
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Merge failed";

@@ -2,19 +2,28 @@
   "superadmins": [
     "blackscythe123"
   ],
-  "core_admins": [
-    "blackscythe123"
-  ],
   "vertical_heads": {
     "ai-ml": ["blackscythe123"],
-    "web-dev": ["sarah-j"],
-    "cybersecurity": ["m-thorne"],
-    "cloud-devops": ["elena-cloud"],
-    "competitive-programming": ["rohan-algo"],
-    "mobile-dev": ["maya-apps"],
-    "ui-ux": ["chloe-design"],
-    "blockchain": ["tariq-chain"],
-    "iot-embedded": ["vikram-iot"],
-    "game-dev": ["lucas-games"]
+    "web-dev": [],
+    "cybersecurity": [],
+    "cloud-devops": [],
+    "competitive-programming": [],
+    "mobile-dev": [],
+    "ui-ux": [],
+    "blockchain": [],
+    "iot-embedded": [],
+    "game-dev": []
+  },
+  "deputies": {
+    "ai-ml": [],
+    "web-dev": [],
+    "cybersecurity": [],
+    "cloud-devops": [],
+    "competitive-programming": [],
+    "mobile-dev": [],
+    "ui-ux": [],
+    "blockchain": [],
+    "iot-embedded": [],
+    "game-dev": []
   }
 }

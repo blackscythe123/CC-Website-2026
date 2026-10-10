@@ -13,9 +13,12 @@ interface StudioNavProps {
 export default function StudioNav({ user, roleInfo }: StudioNavProps) {
   const pathname = usePathname();
 
-  const handleLogout = () => {
-    // Clear cookies
-    document.cookie = "cc_token=; path=/; max-age=0";
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // ignore
+    }
     window.location.href = "/";
   };
 
@@ -98,7 +101,9 @@ export default function StudioNav({ user, roleInfo }: StudioNavProps) {
                     {roleInfo?.role === "superadmin"
                       ? "👑 Superadmin"
                       : roleInfo?.role === "vertical_head"
-                      ? `Head: ${roleInfo.verticals[0] || "Vertical"}`
+                      ? `⚡ Head: ${roleInfo.verticals[0] || "Vertical"}`
+                      : roleInfo?.role === "deputy"
+                      ? `🛡️ Deputy: ${roleInfo.verticals[0] || "Vertical"}`
                       : "Club Member"}
                   </span>
                 </div>

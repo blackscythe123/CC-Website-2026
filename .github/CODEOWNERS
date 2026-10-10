@@ -1,10 +1,9 @@
 # SSN Coding Club CMS - Code Owners & Editorial Approval Mapping
-# Learn more: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+# Auto-generated from content/club/roles.json
 
-# Default reviewer across the repository
 * @blackscythe123
 
-# Announcements & Core Club Posts
+# Announcements & Club Core
 content/club/** @blackscythe123
 
 # 1. AI & Machine Learning Vertical

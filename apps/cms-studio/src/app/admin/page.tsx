@@ -229,9 +229,9 @@ export default function AdminEditorPage() {
 
   // Filter selectable verticals according to role
   const availableVerticals =
-    roleInfo?.role === "superadmin" || roleInfo?.role === "core_admin"
+    roleInfo?.role === "superadmin"
       ? [{ slug: "club", name: "📢 Coding Club Announcements" }, ...ALL_VERTICALS]
-      : roleInfo?.role === "vertical_head"
+      : roleInfo?.role === "vertical_head" || roleInfo?.role === "deputy"
       ? ALL_VERTICALS.filter((v) => roleInfo.verticals.includes(v.slug))
       : ALL_VERTICALS;
 

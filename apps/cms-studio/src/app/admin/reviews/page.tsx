@@ -166,8 +166,8 @@ export default function EditorialReviewsPage() {
             {prs.map((pr) => {
               const canApprove =
                 roleInfo?.role === "superadmin" ||
-                roleInfo?.role === "core_admin" ||
-                (roleInfo?.role === "vertical_head" && roleInfo.verticals.includes(pr.vertical));
+                ((roleInfo?.role === "vertical_head" || roleInfo?.role === "deputy") &&
+                  roleInfo.verticals.includes(pr.vertical));
 
               return (
                 <div

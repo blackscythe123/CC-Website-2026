@@ -38,23 +38,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Role check for club-wide announcements
-    if (vertical === "club" && roleInfo.role !== "superadmin" && roleInfo.role !== "core_admin") {
+    if (vertical === "club" && roleInfo.role !== "superadmin") {
       return NextResponse.json(
-        { error: "Only Superadmins and Core Admins can publish Club Announcements." },
+        { error: "Only Superadmins can publish Club Announcements." },
         { status: 403 }
       );
     }
 
-    // Role check for vertical heads
+    // Role check for vertical heads and deputies
     if (
-      roleInfo.role === "vertical_head" &&
+      (roleInfo.role === "vertical_head" || roleInfo.role === "deputy") &&
       !roleInfo.verticals.includes(vertical)
     ) {
       return NextResponse.json(
         {
-          error: `As a Vertical Head, you are authorized to draft articles for: ${roleInfo.verticals.join(
-            ", "
-          )}`,
+          error: `As a ${
+            roleInfo.role === "vertical_head" ? "Vertical Head" : "Deputy"
+          }, you are authorized to draft articles for: ${roleInfo.verticals.join(", ")}`,
         },
         { status: 403 }
       );

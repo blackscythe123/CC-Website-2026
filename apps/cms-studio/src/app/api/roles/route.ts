@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Octokit } from "@octokit/rest";
 import {
   readRoles,
   writeRolesAndSyncCodeowners,
@@ -42,7 +43,74 @@ export async function GET(request: NextRequest) {
     }
 
     const roles = readRoles();
-    return NextResponse.json({ roles, currentRole: roleInfo });
+
+    // Collect all candidate users
+    const candidateMap = new Map<string, { login: string; name?: string; avatar_url?: string; status?: string }>();
+
+    // 1. Superadmins
+    roles.superadmins.forEach((u) => {
+      candidateMap.set(u.toLowerCase(), { login: u, status: "Super Admin" });
+    });
+
+    // 2. Heads, deputies, members
+    Object.values(roles.vertical_heads).flat().forEach((u) => {
+      if (!candidateMap.has(u.toLowerCase())) candidateMap.set(u.toLowerCase(), { login: u, status: "Vertical Head" });
+    });
+    Object.values(roles.deputies).flat().forEach((u) => {
+      if (!candidateMap.has(u.toLowerCase())) candidateMap.set(u.toLowerCase(), { login: u, status: "Deputy" });
+    });
+    Object.values(roles.members).flat().forEach((u) => {
+      if (!candidateMap.has(u.toLowerCase())) candidateMap.set(u.toLowerCase(), { login: u, status: "Member" });
+    });
+
+    // 3. Pending requests
+    (roles.pending_requests || []).forEach((req) => {
+      candidateMap.set(req.username.toLowerCase(), {
+        login: req.username,
+        name: req.displayName || req.username,
+        avatar_url: req.avatarUrl,
+        status: `Applicant (${req.requestedRole})`,
+      });
+    });
+
+    // 4. GitHub Collaborators & Invitations
+    try {
+      const ghOctokit = new Octokit({ auth: token || process.env.GITHUB_PAT || process.env.GITHUB_TOKEN });
+      const [collabsRes, invsRes] = await Promise.allSettled([
+        ghOctokit.repos.listCollaborators({ owner: "blackscythe123", repo: "CC-Website-2026" }),
+        ghOctokit.repos.listInvitations({ owner: "blackscythe123", repo: "CC-Website-2026" }),
+      ]);
+
+      if (collabsRes.status === "fulfilled" && collabsRes.value.data) {
+        collabsRes.value.data.forEach((c) => {
+          if (!candidateMap.has(c.login.toLowerCase())) {
+            candidateMap.set(c.login.toLowerCase(), {
+              login: c.login,
+              avatar_url: c.avatar_url,
+              status: "Collaborator",
+            });
+          }
+        });
+      }
+
+      if (invsRes.status === "fulfilled" && invsRes.value.data) {
+        invsRes.value.data.forEach((inv) => {
+          if (inv.invitee && !candidateMap.has(inv.invitee.login.toLowerCase())) {
+            candidateMap.set(inv.invitee.login.toLowerCase(), {
+              login: inv.invitee.login,
+              avatar_url: inv.invitee.avatar_url,
+              status: "Invited Contributor",
+            });
+          }
+        });
+      }
+    } catch {
+      // Non-critical fallback
+    }
+
+    const candidates = Array.from(candidateMap.values());
+
+    return NextResponse.json({ roles, currentRole: roleInfo, candidates });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Failed to load roles";
     return NextResponse.json({ error: errorMsg }, { status: 500 });

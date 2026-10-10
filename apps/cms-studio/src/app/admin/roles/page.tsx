@@ -24,19 +24,25 @@ interface VerifiedGitHubUser {
   login: string;
   name: string;
   avatar_url: string;
+  bio?: string;
+}
+
+interface CandidateUser {
+  login: string;
+  name?: string;
+  avatar_url?: string;
+  status?: string;
 }
 
 const ALL_VERTICALS = [
-  { slug: "ai-ml", name: "🤖 AI & Machine Learning" },
-  { slug: "web-dev", name: "🌐 Web Development" },
-  { slug: "cybersecurity", name: "🛡️ Cybersecurity & CTF" },
-  { slug: "cloud-devops", name: "☁️ Cloud & DevOps" },
+  { slug: "ai-ml", name: "🤖 AI / ML" },
+  { slug: "ar-vr-game-dev", name: "🎮 AR, VR & Game Dev" },
   { slug: "competitive-programming", name: "🏆 Competitive Programming" },
-  { slug: "mobile-dev", name: "📱 Mobile Development" },
-  { slug: "ui-ux", name: "🎨 UI / UX Design" },
-  { slug: "blockchain", name: "⛓️ Blockchain & Web3" },
-  { slug: "iot-embedded", name: "⚡ IoT & Embedded Systems" },
-  { slug: "game-dev", name: "🎮 Game Dev & XR" },
+  { slug: "cybersecurity", name: "🛡️ Cyber Security" },
+  { slug: "ssnhacks", name: "⚡ SSN Hacks" },
+  { slug: "design-ui-ux", name: "🎨 Design & UI/UX" },
+  { slug: "full-stack", name: "🌐 Full Stack" },
+  { slug: "open-source", name: "💻 Open Source (OSS)" },
 ];
 
 export default function AdminRolesPage() {
@@ -46,6 +52,7 @@ export default function AdminRolesPage() {
   const [roleInfo, setRoleInfo] = useState<UserRoleInfo | null>(null);
   const [roles, setRoles] = useState<ClubRoles | null>(null);
   const [requests, setRequests] = useState<RoleRequest[]>([]);
+  const [candidates, setCandidates] = useState<CandidateUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"hierarchy" | "requests">("hierarchy");
 
@@ -77,6 +84,7 @@ export default function AdminRolesPage() {
       .then((res) => res.json())
       .then((data) => {
         if (data.roles) setRoles(data.roles);
+        if (data.candidates) setCandidates(data.candidates);
       })
       .catch(() => {});
 
@@ -504,18 +512,18 @@ export default function AdminRolesPage() {
 
               <form onSubmit={handleAssignRole} className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-4">
-                  <div className="sm:col-span-2">
+                  <div className="sm:col-span-2 space-y-2">
                     <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
                       GitHub Username
                     </label>
-                    <div className="relative flex rounded-xl border border-gray-200 shadow-xs focus-within:border-purple-600">
+                    <div className="relative flex rounded-xl border border-gray-200 shadow-xs focus-within:border-purple-600 bg-white">
                       <span className="inline-flex items-center px-3 text-sm text-gray-400 bg-gray-50 rounded-l-xl border-r border-gray-200">
                         @
                       </span>
                       <input
                         type="text"
                         required
-                        placeholder="e.g. blackscythe123"
+                        placeholder="e.g. Isha666 or blackscythe123"
                         value={targetUsername}
                         onChange={(e) => setTargetUsername(e.target.value)}
                         className="w-full rounded-r-xl p-2.5 text-sm text-gray-800 focus:outline-hidden"
@@ -526,6 +534,45 @@ export default function AdminRolesPage() {
                         </span>
                       )}
                     </div>
+
+                    {/* Active & Candidate Users Quick-Pill Tray */}
+                    {candidates.length > 0 && (
+                      <div className="pt-1">
+                        <div className="flex items-center justify-between text-[11px] text-gray-500 font-semibold mb-1.5">
+                          <span>👥 Active / Known Contributors ({candidates.length})</span>
+                          <span className="text-[10px] text-gray-400">Click to select</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1.5 border border-gray-100 rounded-xl bg-gray-50/70">
+                          {candidates.map((cand) => (
+                            <button
+                              key={cand.login}
+                              type="button"
+                              onClick={() => {
+                                setTargetUsername(cand.login);
+                                setDebouncedQuery(cand.login);
+                              }}
+                              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs transition border ${
+                                targetUsername.toLowerCase().replace(/^@/, "") === cand.login.toLowerCase()
+                                  ? "bg-purple-100 border-purple-300 text-purple-900 font-bold"
+                                  : "bg-white border-gray-200 text-gray-700 hover:border-purple-300 hover:bg-purple-50/50"
+                              }`}
+                            >
+                              <img
+                                src={cand.avatar_url || `https://github.com/${cand.login}.png`}
+                                alt={cand.login}
+                                className="h-4 w-4 rounded-full border border-gray-200"
+                              />
+                              <span className="font-mono">@{cand.login}</span>
+                              {cand.status && (
+                                <span className="text-[10px] text-gray-400 font-sans">
+                                  ({cand.status})
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -581,35 +628,66 @@ export default function AdminRolesPage() {
 
                 {/* Debounced User Status & Existing Role Warning */}
                 {debouncedQuery && (
-                  <div className="rounded-2xl border p-3.5 text-xs space-y-2">
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4 text-xs space-y-3 shadow-2xs">
+                    {/* GitHub Profile Verification Card */}
+                    {checkingUser ? (
+                      <div className="flex items-center gap-2 text-gray-500 py-1">
+                        <Loader2 className="h-4 w-4 animate-spin text-purple-600" />
+                        <span>Verifying GitHub profile for @{debouncedQuery}...</span>
+                      </div>
+                    ) : verifiedUser ? (
+                      <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+                        <img
+                          src={verifiedUser.avatar_url}
+                          alt={verifiedUser.login}
+                          className="h-10 w-10 rounded-full border border-emerald-300 shadow-2xs shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-gray-900 text-sm">
+                              {verifiedUser.name}
+                            </span>
+                            <a
+                              href={`https://github.com/${verifiedUser.login}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-mono text-purple-700 hover:underline text-xs"
+                            >
+                              @{verifiedUser.login} ↗
+                            </a>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                              <Check className="h-3 w-3" /> Verified GitHub
+                            </span>
+                          </div>
+                          {verifiedUser.bio && (
+                            <p className="mt-1 text-[11px] text-gray-600 line-clamp-2">
+                              {verifiedUser.bio}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-amber-800 bg-amber-50 rounded-xl p-2.5 border border-amber-200">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                        <span>GitHub user <strong>@{debouncedQuery}</strong> not found. Make sure the username is spelled correctly.</span>
+                      </div>
+                    )}
+
+                    {/* Current Assignment Status */}
                     {existingAssignment ? (
                       <div className="flex items-center gap-2 text-amber-800 bg-amber-50 rounded-xl p-2.5 border border-amber-200">
                         <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
                         <span>
-                          <strong>Notice:</strong> @{debouncedQuery} is currently assigned as{" "}
-                          <strong>{existingAssignment}</strong>.
+                          <strong>Current Role:</strong> @{debouncedQuery} is already assigned as{" "}
+                          <strong>{existingAssignment}</strong>. Assigning a new role will update their jurisdiction.
                         </span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 text-emerald-800 bg-emerald-50 rounded-xl p-2.5 border border-emerald-200">
                         <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
                         <span>
-                          @{debouncedQuery} has no current assignment.
+                          @{debouncedQuery} has no current assignment. Ready to assign!
                         </span>
-                      </div>
-                    )}
-
-                    {verifiedUser && (
-                      <div className="flex items-center gap-2.5 pt-1">
-                        <img
-                          src={verifiedUser.avatar_url}
-                          alt={verifiedUser.login}
-                          className="h-6 w-6 rounded-full border border-gray-200"
-                        />
-                        <span className="font-semibold text-gray-800">
-                          {verifiedUser.name} (@{verifiedUser.login})
-                        </span>
-                        <span className="text-gray-400 text-[10px]">Verified GitHub Profile</span>
                       </div>
                     )}
                   </div>

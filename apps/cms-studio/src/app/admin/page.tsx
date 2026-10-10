@@ -29,6 +29,9 @@ import {
   Cloud,
   CloudUpload,
   FolderOpen,
+  Mail,
+  ShieldAlert,
+  AlertTriangle,
 } from "lucide-react";
 
 import {
@@ -143,6 +146,13 @@ export default function AdminEditorPage() {
     originalTitle: string;
   } | null>(null);
 
+  // Repository Collaborator Access State (Internal Tool Enforcement)
+  const [collaboratorStatus, setCollaboratorStatus] = useState<{
+    isCollaborator: boolean;
+    hasPendingInvite: boolean;
+    inviteUrl: string;
+  } | null>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -163,6 +173,9 @@ export default function AdminEditorPage() {
         if (data.authenticated) {
           setUser(data.user);
           setRoleInfo(data.roleInfo);
+          if (data.collaboratorStatus) {
+            setCollaboratorStatus(data.collaboratorStatus);
+          }
           // Auto-select allowed vertical
           if (data.roleInfo?.verticals?.length > 0) {
             setSelectedVertical(data.roleInfo.verticals[0]);
@@ -647,14 +660,103 @@ export default function AdminEditorPage() {
     );
   }
 
-  // Filter selectable verticals according to role
-  const availableVerticals =
-    roleInfo?.role === "superadmin"
-      ? [{ slug: "club", name: "📢 Coding Club Announcements" }, ...ALL_VERTICALS]
-      : roleInfo?.role === "vertical_head" || roleInfo?.role === "deputy"
-      ? ALL_VERTICALS.filter((v) => roleInfo.verticals.includes(v.slug))
-      : ALL_VERTICALS;
+  // Internal Tool Security Gate: Strictly verify repository collaborator status
+  if (collaboratorStatus && !collaboratorStatus.isCollaborator) {
+    if (collaboratorStatus.hasPendingInvite) {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-amber-200 bg-white p-8 text-center shadow-lg space-y-6">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 shadow-xs">
+              <Mail className="h-8 w-8" />
+            </div>
+            <div>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                ⏳ Pending Invitation
+              </span>
+              <h1 className="mt-3 text-2xl font-extrabold text-gray-900">Accept Repository Invite</h1>
+              <p className="mt-2 text-sm text-gray-600 leading-relaxed">
+                You are signed in as <strong>@{user.login}</strong>. You have an invitation to join <strong>blackscythe123/CC-Website-2026</strong>, but you haven&apos;t accepted it yet!
+              </p>
+            </div>
+            <div className="space-y-3">
+              <a
+                href={collaboratorStatus.inviteUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-3 text-sm font-bold text-white shadow-xs hover:bg-amber-700 transition"
+              >
+                <span>Accept Invitation on GitHub ↗</span>
+              </a>
+              <button
+                onClick={() => window.location.reload()}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition"
+              >
+                <span>I have accepted, check again</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-md rounded-2xl border border-red-200 bg-white p-8 text-center shadow-lg space-y-6">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-red-100 text-red-600 shadow-xs">
+            <ShieldAlert className="h-8 w-8" />
+          </div>
+          <div>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-800">
+              🔒 Internal Tool Only
+            </span>
+            <h1 className="mt-3 text-2xl font-extrabold text-gray-900">Repository Access Required</h1>
+            <p className="mt-2 text-sm text-gray-600 leading-relaxed">
+              SSN Coding Club Studio is strictly an internal tool for repository collaborators.
+            </p>
+            <div className="mt-4 rounded-xl border border-red-100 bg-red-50/70 p-3.5 text-xs text-red-900 text-left">
+              <p>
+                You are signed in as <strong>@{user.login}</strong>, but you are not a collaborator on <strong>blackscythe123/CC-Website-2026</strong>.
+              </p>
+              <p className="mt-2 font-semibold text-red-800">
+                👉 Please ask @blackscythe123 for repo collaborator access first.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3 pt-2">
+            <a
+              href="/api/auth/logout"
+              className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition text-center"
+            >
+              Sign Out
+            </a>
+            <button
+              onClick={() => window.location.reload()}
+              className="flex-1 rounded-xl bg-gray-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-black transition"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Filter selectable verticals according to role
+  const isSuperadmin = roleInfo?.role === "superadmin";
+  const userVerticals = roleInfo?.verticals || [];
+  const availableVerticals = isSuperadmin
+    ? [{ slug: "club", name: "📢 Coding Club Announcements" }, ...ALL_VERTICALS]
+    : roleInfo?.role === "vertical_head" || roleInfo?.role === "deputy"
+    ? ALL_VERTICALS.filter((v) => userVerticals.includes(v.slug))
+    : ALL_VERTICALS.filter((v) => userVerticals.includes(v.slug));
+
+  const isUnassignedMember = !isSuperadmin && availableVerticals.length === 0;
+
+  useEffect(() => {
+    if (availableVerticals.length > 0 && !availableVerticals.some((v) => v.slug === selectedVertical)) {
+      setSelectedVertical(availableVerticals[0].slug);
+    }
+  }, [availableVerticals, selectedVertical]);
 
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans">
@@ -665,17 +767,24 @@ export default function AdminEditorPage() {
         <div className={`mx-auto flex ${viewMode === "split" ? "max-w-7xl" : "max-w-4xl"} items-center justify-between gap-4 transition-all duration-200`}>
           <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
             <span className="font-semibold text-gray-700">Vertical:</span>
-            <select
-              value={selectedVertical}
-              onChange={(e) => setSelectedVertical(e.target.value)}
-              className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-800 shadow-2xs focus:border-blue-500 focus:bg-white focus:outline-hidden"
-            >
-              {availableVerticals.map((v) => (
-                <option key={v.slug} value={v.slug}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
+            {isUnassignedMember ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                Unassigned (Draft Only)
+              </span>
+            ) : (
+              <select
+                value={selectedVertical}
+                onChange={(e) => setSelectedVertical(e.target.value)}
+                className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-800 shadow-2xs focus:border-blue-500 focus:bg-white focus:outline-hidden"
+              >
+                {availableVerticals.map((v) => (
+                  <option key={v.slug} value={v.slug}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <span>•</span>
             <span className="text-amber-600 font-medium hidden sm:inline">Requires Approval</span>
             {pendingImages.length > 0 && (
@@ -764,7 +873,16 @@ export default function AdminEditorPage() {
               </button>
             </div>
 
-            {activeRevisionPr ? (
+            {isUnassignedMember ? (
+              <a
+                href="/admin/roles"
+                className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-300 px-3.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-500/25 transition"
+                title="You must be assigned to a vertical in Governance & Roles before submitting articles"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                <span>Request Role to Publish</span>
+              </a>
+            ) : activeRevisionPr ? (
               <button
                 onClick={() => setShowDrawer(true)}
                 className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-red-700 transition"
@@ -931,6 +1049,33 @@ export default function AdminEditorPage() {
                 Review Articles ({reviewerPendingCount}) &rarr;
               </a>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unassigned Member Notice Banner */}
+      {isUnassignedMember && (
+        <div className="mx-auto max-w-4xl px-4 pt-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 shadow-xs text-xs text-amber-900">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500 text-white font-bold shrink-0">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <span className="font-bold text-amber-950 text-sm">
+                  Role Assignment Required
+                </span>
+                <p className="text-amber-800 mt-0.5">
+                  You are signed in as <strong>@{user?.login}</strong>, but have not been assigned to any of the 8 technical verticals yet. You can write and save drafts locally, but you must be assigned a role before submitting posts.
+                </p>
+              </div>
+            </div>
+            <a
+              href="/admin/roles"
+              className="rounded-xl bg-amber-600 px-3.5 py-2 font-bold text-white shadow-xs hover:bg-amber-700 transition shrink-0"
+            >
+              Request Role ↗
+            </a>
           </div>
         </div>
       )}

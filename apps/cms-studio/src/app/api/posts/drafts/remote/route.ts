@@ -66,6 +66,29 @@ export async function POST(request: NextRequest) {
     }
 
     const userData = await userRes.json();
+
+    // Verify repo collaborator status
+    const repoRes = await fetch("https://api.github.com/repos/blackscythe123/CC-Website-2026", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "User-Agent": "coding-club-cms-studio",
+      },
+    });
+    if (repoRes.ok) {
+      const repoData = await repoRes.json();
+      if (!repoData.permissions?.push && !repoData.permissions?.admin) {
+        return NextResponse.json(
+          { error: "Access Denied: Internal tool only. Repo collaborator permission required." },
+          { status: 403 }
+        );
+      }
+    } else {
+      return NextResponse.json(
+        { error: "Access Denied: Repository collaborator access required." },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const { vertical, slug, title, summary, coverImage, tags, markdownBody, pendingImages, targetPortals } = body;
 

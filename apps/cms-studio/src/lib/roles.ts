@@ -323,20 +323,7 @@ export async function writeRolesAndSyncCodeowners(
   codeownersContent += `* ${superowner}\n\n`;
   codeownersContent += `# Announcements & Club Core\ncontent/club/** ${superowner}\n\n`;
 
-  const allVerticalSlugs = [
-    "ai-ml",
-    "web-dev",
-    "cybersecurity",
-    "cloud-devops",
-    "competitive-programming",
-    "mobile-dev",
-    "ui-ux",
-    "blockchain",
-    "iot-embedded",
-    "game-dev",
-  ];
-
-  for (const vertical of allVerticalSlugs) {
+  for (const vertical of ALL_VERTICAL_SLUGS) {
     const heads = roles.vertical_heads[vertical] || [];
     const deps = roles.deputies[vertical] || [];
     const allApprovers = [...heads, ...deps];

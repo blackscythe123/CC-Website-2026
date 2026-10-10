@@ -26,6 +26,35 @@ export async function POST(request: NextRequest) {
     const userData = await userRes.json();
     const roleInfo = getUserRoleInfo(userData.login);
 
+    // Strictly enforce repository collaborator permission (Internal Tool)
+    const repoRes = await fetch("https://api.github.com/repos/blackscythe123/CC-Website-2026", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "User-Agent": "coding-club-cms-studio",
+      },
+    });
+
+    if (repoRes.ok) {
+      const repoData = await repoRes.json();
+      if (!repoData.permissions?.push && !repoData.permissions?.admin) {
+        return NextResponse.json(
+          {
+            error:
+              "Access Denied: SSN Coding Club Studio is an internal tool. You are not a collaborator on 'blackscythe123/CC-Website-2026'. Please ask @blackscythe123 for repo collaborator access first.",
+          },
+          { status: 403 }
+        );
+      }
+    } else {
+      return NextResponse.json(
+        {
+          error:
+            "Access Denied: You do not have collaborator access to 'blackscythe123/CC-Website-2026'. Please ask @blackscythe123 for repo collaborator access first.",
+        },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const {
       vertical,
@@ -68,6 +97,27 @@ export async function POST(request: NextRequest) {
         },
         { status: 403 }
       );
+    }
+
+    // Role check for members
+    if (roleInfo.role === "member") {
+      if (!roleInfo.verticals || roleInfo.verticals.length === 0) {
+        return NextResponse.json(
+          {
+            error:
+              "You have not been assigned to any technical vertical yet. Please request a role assignment in Governance & Roles before submitting articles.",
+          },
+          { status: 403 }
+        );
+      }
+      if (!roleInfo.verticals.includes(vertical)) {
+        return NextResponse.json(
+          {
+            error: `As a Member, you are only authorized to draft articles for: ${roleInfo.verticals.join(", ")}`,
+          },
+          { status: 403 }
+        );
+      }
     }
 
     const cleanSlug =

@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserRoleInfo } from "@/lib/roles";
+import { getSessionToken } from "@/lib/session";
 
 export async function GET(request: NextRequest) {
-  const token =
-    request.cookies.get("cc_token")?.value ||
-    request.headers.get("authorization")?.replace("Bearer ", "");
-
-  if (!token) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const token = getSessionToken(request) || process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
 
   const { searchParams } = new URL(request.url);
   const username = searchParams.get("username")?.replace(/^@/, "").trim();
@@ -18,11 +13,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const headers: Record<string, string> = {
+      "User-Agent": "coding-club-cms-studio",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const res = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "User-Agent": "coding-club-cms-studio",
-      },
+      headers,
     });
 
     if (!res.ok) {
@@ -38,6 +37,7 @@ export async function GET(request: NextRequest) {
         login: ghUser.login,
         name: ghUser.name || ghUser.login,
         avatar_url: ghUser.avatar_url,
+        bio: ghUser.bio || "",
       },
       currentRole,
     });

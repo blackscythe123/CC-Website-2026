@@ -39,7 +39,8 @@ export interface DraftResult {
 }
 
 export async function createDraftAndPullRequest(params: CreateDraftParams): Promise<DraftResult> {
-  const octokit = getOctokit(params.token);
+  const fallbackToken = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
+  let octokit = getOctokit(params.token);
   const {
     authorUsername,
     authorDisplayName,
@@ -72,12 +73,31 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
     branchName = `draft/${vertical}/${cleanSlug}-${timestamp}`;
 
-    await octokit.git.createRef({
-      owner: REPO_OWNER,
-      repo: REPO_NAME,
-      ref: `refs/heads/${branchName}`,
-      sha: mainSha,
-    });
+    try {
+      await octokit.git.createRef({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        ref: `refs/heads/${branchName}`,
+        sha: mainSha,
+      });
+    } catch (refErr: unknown) {
+      const err = refErr as { status?: number; message?: string };
+      if ((err.status === 404 || err.status === 403) && fallbackToken) {
+        octokit = getOctokit(fallbackToken);
+        await octokit.git.createRef({
+          owner: REPO_OWNER,
+          repo: REPO_NAME,
+          ref: `refs/heads/${branchName}`,
+          sha: mainSha,
+        });
+      } else {
+        throw new Error(
+          err.status === 404 || err.status === 403
+            ? `Repository write permission required on ${REPO_OWNER}/${REPO_NAME}. Please accept the GitHub collaborator invitation sent to @${authorUsername} or ask an admin to assign you.`
+            : (err.message || "Failed to create draft branch on GitHub.")
+        );
+      }
+    }
   }
 
   // 3. Process and upload pending images ON THE DRAFT BRANCH

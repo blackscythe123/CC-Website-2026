@@ -873,7 +873,7 @@ export default function AdminRolesPage() {
               <div>
                 <h2 className="text-lg font-bold text-gray-900">Membership &amp; Promotion Applications</h2>
                 <p className="text-xs text-gray-500 mt-1">
-                  Deputy approves Member; Head approves Deputy; Super Admin approves Vertical Head.
+                  Super Admin can approve applications at all levels. Hierarchical delegation: Deputy approves Member; Head approves Deputy; Super Admin approves Vertical Head.
                 </p>
               </div>
 

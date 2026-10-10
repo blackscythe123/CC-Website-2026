@@ -23,7 +23,9 @@ export default function BlogIndexPage() {
           </p>
         </div>
         <a
-          href="/admin"
+          href="https://ssn-coding-club-cms.vercel.app/admin"
+          target="_blank"
+          rel="noopener noreferrer"
           className="inline-flex items-center gap-2 self-start rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700"
         >
           <span>Write a Post</span>

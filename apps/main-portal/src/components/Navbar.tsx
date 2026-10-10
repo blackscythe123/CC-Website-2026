@@ -34,7 +34,7 @@ export default function Navbar() {
 
         <div className="flex items-center gap-3">
           <a
-            href="https://github.com"
+            href="https://github.com/blackscythe123/CC-Website-2026"
             target="_blank"
             rel="noopener noreferrer"
             className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 dark:text-gray-400"
@@ -42,7 +42,9 @@ export default function Navbar() {
             GitHub
           </a>
           <a
-            href="/admin"
+            href="https://ssn-coding-club-cms.vercel.app/admin"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition"
           >
             <span>CMS Studio</span>

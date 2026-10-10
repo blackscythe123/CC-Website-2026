@@ -11,6 +11,7 @@ export interface PostSummary {
   date: string;
   author: string;
   summary: string;
+  coverImage?: string;
   tags: string[];
 }
 
@@ -57,6 +58,7 @@ export function getAllPosts(): PostSummary[] {
               date: data.date ? String(data.date).split("T")[0] : "",
               author: data.author || "Club Member",
               summary: data.summary || "",
+              coverImage: data.coverImage || "",
               tags: Array.isArray(data.tags) ? data.tags : [],
             });
           }
@@ -122,6 +124,7 @@ export async function getPost(
     date: data.date ? String(data.date).split("T")[0] : "",
     author: data.author || "Club Member",
     summary: data.summary || "",
+    coverImage: data.coverImage || "",
     tags: Array.isArray(data.tags) ? data.tags : [],
     contentHtml: processed.toString(),
   };

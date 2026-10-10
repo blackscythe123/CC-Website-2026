@@ -123,7 +123,9 @@ export default async function VerticalDynamicPage({
           </div>
 
           <a
-            href="/admin"
+            href="https://ssn-coding-club-cms.vercel.app/admin"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-2 self-start rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition"
           >
             <span>Write for this Vertical</span>
@@ -133,7 +135,16 @@ export default async function VerticalDynamicPage({
 
         {posts.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-300 p-12 text-center text-sm text-gray-500">
-            No posts published in this vertical yet. Use <a href="/admin" className="text-blue-600 underline">CMS Studio</a> to write the first post!
+            No posts published in this vertical yet. Use{" "}
+            <a
+              href="https://ssn-coding-club-cms.vercel.app/admin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 underline"
+            >
+              CMS Studio
+            </a>{" "}
+            to write the first post!
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2">

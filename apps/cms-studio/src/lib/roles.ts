@@ -2,10 +2,25 @@ import fs from "fs";
 import path from "path";
 import { Octokit } from "@octokit/rest";
 
+export interface RoleRequest {
+  id: string;
+  username: string;
+  displayName?: string;
+  avatarUrl?: string;
+  requestedRole: "member" | "deputy" | "vertical_head";
+  vertical: string;
+  note?: string;
+  createdAt: string;
+  status: "pending" | "approved" | "rejected";
+  reviewedBy?: string;
+}
+
 export interface ClubRoles {
   superadmins: string[];
   vertical_heads: Record<string, string[]>;
   deputies: Record<string, string[]>;
+  members: Record<string, string[]>;
+  pending_requests?: RoleRequest[];
 }
 
 export type UserRoleType = "superadmin" | "vertical_head" | "deputy" | "member";
@@ -21,6 +36,19 @@ const ALT_ROLES_FILE_PATH = path.resolve(process.cwd(), "content/club/roles.json
 const CODEOWNERS_PATH = path.resolve(process.cwd(), "../../.github/CODEOWNERS");
 const ALT_CODEOWNERS_PATH = path.resolve(process.cwd(), ".github/CODEOWNERS");
 
+const ALL_VERTICAL_SLUGS = [
+  "ai-ml",
+  "web-dev",
+  "cybersecurity",
+  "cloud-devops",
+  "competitive-programming",
+  "mobile-dev",
+  "ui-ux",
+  "blockchain",
+  "iot-embedded",
+  "game-dev",
+];
+
 function getRolesFilePath(): string {
   if (fs.existsSync(ROLES_FILE_PATH)) return ROLES_FILE_PATH;
   if (fs.existsSync(ALT_ROLES_FILE_PATH)) return ALT_ROLES_FILE_PATH;
@@ -34,6 +62,9 @@ function getCodeownersPath(): string {
 }
 
 export function readRoles(): ClubRoles {
+  const initVerticalMap = () =>
+    ALL_VERTICAL_SLUGS.reduce((acc, v) => ({ ...acc, [v]: [] }), {} as Record<string, string[]>);
+
   try {
     const filePath = getRolesFilePath();
     if (fs.existsSync(filePath)) {
@@ -41,8 +72,10 @@ export function readRoles(): ClubRoles {
       const parsed = JSON.parse(data);
       return {
         superadmins: parsed.superadmins || ["blackscythe123"],
-        vertical_heads: parsed.vertical_heads || { "ai-ml": ["blackscythe123"] },
-        deputies: parsed.deputies || {},
+        vertical_heads: { ...initVerticalMap(), ...(parsed.vertical_heads || {}) },
+        deputies: { ...initVerticalMap(), ...(parsed.deputies || {}) },
+        members: { ...initVerticalMap(), ...(parsed.members || {}) },
+        pending_requests: parsed.pending_requests || [],
       };
     }
   } catch (err) {
@@ -52,30 +85,10 @@ export function readRoles(): ClubRoles {
   // Fallback defaults
   return {
     superadmins: ["blackscythe123"],
-    vertical_heads: {
-      "ai-ml": ["blackscythe123"],
-      "web-dev": [],
-      "cybersecurity": [],
-      "cloud-devops": [],
-      "competitive-programming": [],
-      "mobile-dev": [],
-      "ui-ux": [],
-      "blockchain": [],
-      "iot-embedded": [],
-      "game-dev": [],
-    },
-    deputies: {
-      "ai-ml": [],
-      "web-dev": [],
-      "cybersecurity": [],
-      "cloud-devops": [],
-      "competitive-programming": [],
-      "mobile-dev": [],
-      "ui-ux": [],
-      "blockchain": [],
-      "iot-embedded": [],
-      "game-dev": [],
-    },
+    vertical_heads: { ...initVerticalMap(), "ai-ml": ["blackscythe123"] },
+    deputies: initVerticalMap(),
+    members: initVerticalMap(),
+    pending_requests: [],
   };
 }
 
@@ -91,21 +104,12 @@ export function getUserRoleInfo(username: string): UserRoleInfo {
       role: "superadmin",
       verticals: [
         "club",
-        "ai-ml",
-        "web-dev",
-        "cybersecurity",
-        "cloud-devops",
-        "competitive-programming",
-        "mobile-dev",
-        "ui-ux",
-        "blockchain",
-        "iot-embedded",
-        "game-dev",
+        ...ALL_VERTICAL_SLUGS,
       ],
     };
   }
 
-  // Tier 2: Vertical Head (Admin for that vertical)
+  // Tier 2: Vertical Head (Admin for that vertical - strictly 1 per vertical)
   const headVerticals: string[] = [];
   for (const [vertical, heads] of Object.entries(roles.vertical_heads || {})) {
     if (Array.isArray(heads) && heads.some((u) => u.toLowerCase() === normalized)) {
@@ -137,11 +141,18 @@ export function getUserRoleInfo(username: string): UserRoleInfo {
     };
   }
 
-  // Tier 4: Member (Writes drafts, PRs required)
+  // Tier 4: Member (Assigned to specific vertical(s))
+  const memberVerticals: string[] = [];
+  for (const [vertical, mems] of Object.entries(roles.members || {})) {
+    if (Array.isArray(mems) && mems.some((u) => u.toLowerCase() === normalized)) {
+      memberVerticals.push(vertical);
+    }
+  }
+
   return {
     username,
     role: "member",
-    verticals: [],
+    verticals: memberVerticals,
   };
 }
 
@@ -155,6 +166,151 @@ export function canUserApproveVertical(username: string, vertical: string): bool
     return true;
   }
   return false;
+}
+
+export function canDeletePost(username: string, vertical: string): boolean {
+  const info = getUserRoleInfo(username);
+  if (info.role === "superadmin") return true;
+  if (info.role === "vertical_head" && info.verticals.includes(vertical)) return true;
+  return false;
+}
+
+export function canApproveRoleRequest(
+  reviewerUsername: string,
+  requestedRole: "member" | "deputy" | "vertical_head",
+  vertical: string
+): boolean {
+  const info = getUserRoleInfo(reviewerUsername);
+  if (info.role === "superadmin") return true;
+
+  if (requestedRole === "vertical_head") {
+    // Only Super Admin can approve a Vertical Head
+    return false;
+  }
+
+  if (requestedRole === "deputy") {
+    // Vertical Head of that vertical or Super Admin
+    return info.role === "vertical_head" && info.verticals.includes(vertical);
+  }
+
+  if (requestedRole === "member") {
+    // Deputy of that vertical, Vertical Head of that vertical, or Super Admin
+    return (
+      (info.role === "vertical_head" || info.role === "deputy") &&
+      info.verticals.includes(vertical)
+    );
+  }
+
+  return false;
+}
+
+export function assignRole(
+  roles: ClubRoles,
+  targetUsername: string,
+  role: UserRoleType,
+  vertical?: string
+): ClubRoles {
+  const cleanUser = targetUsername.toLowerCase().trim().replace(/^@/, "");
+  const updated: ClubRoles = {
+    superadmins: [...(roles.superadmins || [])],
+    vertical_heads: { ...(roles.vertical_heads || {}) },
+    deputies: { ...(roles.deputies || {}) },
+    members: { ...(roles.members || {}) },
+    pending_requests: [...(roles.pending_requests || [])],
+  };
+
+  if (role === "superadmin") {
+    if (!updated.superadmins.some((u) => u.toLowerCase() === cleanUser)) {
+      updated.superadmins.push(cleanUser);
+    }
+    return updated;
+  }
+
+  if (!vertical) return updated;
+
+  // Enforce: STRICTLY ONE HEAD PER VERTICAL
+  if (role === "vertical_head") {
+    updated.vertical_heads[vertical] = [cleanUser];
+    if (updated.deputies[vertical]) {
+      updated.deputies[vertical] = updated.deputies[vertical].filter(
+        (u) => u.toLowerCase() !== cleanUser
+      );
+    }
+    if (updated.members[vertical]) {
+      updated.members[vertical] = updated.members[vertical].filter(
+        (u) => u.toLowerCase() !== cleanUser
+      );
+    }
+    return updated;
+  }
+
+  if (role === "deputy") {
+    if (!updated.deputies[vertical]) updated.deputies[vertical] = [];
+    if (!updated.deputies[vertical].some((u) => u.toLowerCase() === cleanUser)) {
+      updated.deputies[vertical].push(cleanUser);
+    }
+    if (updated.members[vertical]) {
+      updated.members[vertical] = updated.members[vertical].filter(
+        (u) => u.toLowerCase() !== cleanUser
+      );
+    }
+    return updated;
+  }
+
+  if (role === "member") {
+    if (!updated.members[vertical]) updated.members[vertical] = [];
+    if (!updated.members[vertical].some((u) => u.toLowerCase() === cleanUser)) {
+      updated.members[vertical].push(cleanUser);
+    }
+    return updated;
+  }
+
+  return updated;
+}
+
+export function removeRole(
+  roles: ClubRoles,
+  targetUsername: string,
+  role: UserRoleType,
+  vertical?: string
+): ClubRoles {
+  const cleanUser = targetUsername.toLowerCase().trim().replace(/^@/, "");
+  const updated: ClubRoles = {
+    superadmins: [...(roles.superadmins || [])],
+    vertical_heads: { ...(roles.vertical_heads || {}) },
+    deputies: { ...(roles.deputies || {}) },
+    members: { ...(roles.members || {}) },
+    pending_requests: [...(roles.pending_requests || [])],
+  };
+
+  if (role === "superadmin") {
+    updated.superadmins = updated.superadmins.filter(
+      (u) => u.toLowerCase() !== cleanUser
+    );
+    return updated;
+  }
+
+  if (!vertical) return updated;
+
+  if (role === "vertical_head" && updated.vertical_heads[vertical]) {
+    updated.vertical_heads[vertical] = updated.vertical_heads[vertical].filter(
+      (u) => u.toLowerCase() !== cleanUser
+    );
+  }
+
+  if (role === "deputy" && updated.deputies[vertical]) {
+    updated.deputies[vertical] = updated.deputies[vertical].filter(
+      (u) => u.toLowerCase() !== cleanUser
+    );
+  }
+
+  if (role === "member" && updated.members[vertical]) {
+    updated.members[vertical] = updated.members[vertical].filter(
+      (u) => u.toLowerCase() !== cleanUser
+    );
+  }
+
+  return updated;
 }
 
 export async function writeRolesAndSyncCodeowners(

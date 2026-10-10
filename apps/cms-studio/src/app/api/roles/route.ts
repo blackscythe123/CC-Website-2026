@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readRoles, writeRolesAndSyncCodeowners, getUserRoleInfo } from "@/lib/roles";
+import {
+  readRoles,
+  writeRolesAndSyncCodeowners,
+  getUserRoleInfo,
+  assignRole,
+  removeRole,
+} from "@/lib/roles";
 
 export async function GET(request: NextRequest) {
   const token =
@@ -25,15 +31,19 @@ export async function GET(request: NextRequest) {
     const userData = await userRes.json();
     const roleInfo = getUserRoleInfo(userData.login);
 
-    if (roleInfo.role !== "superadmin") {
+    if (
+      roleInfo.role !== "superadmin" &&
+      roleInfo.role !== "vertical_head" &&
+      roleInfo.role !== "deputy"
+    ) {
       return NextResponse.json(
-        { error: "Access Denied. Only Superadmins can view and manage roles." },
+        { error: "Access Denied. You do not have permission to view roles." },
         { status: 403 }
       );
     }
 
     const roles = readRoles();
-    return NextResponse.json({ roles });
+    return NextResponse.json({ roles, currentRole: roleInfo });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Failed to load roles";
     return NextResponse.json({ error: errorMsg }, { status: 500 });
@@ -64,13 +74,6 @@ export async function POST(request: NextRequest) {
     const userData = await userRes.json();
     const roleInfo = getUserRoleInfo(userData.login);
 
-    if (roleInfo.role !== "superadmin") {
-      return NextResponse.json(
-        { error: "Access Denied. Only Superadmins can modify role assignments." },
-        { status: 403 }
-      );
-    }
-
     const body = await request.json();
     const { action, targetUsername, role, vertical } = body;
 
@@ -81,66 +84,59 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const cleanUser = targetUsername.replace(/^@/, "").trim().toLowerCase();
-    const roles = readRoles();
-    roles.superadmins = roles.superadmins || [];
-    roles.vertical_heads = roles.vertical_heads || {};
-    roles.deputies = roles.deputies || {};
-
-    if (action === "assign") {
-      if (role === "superadmin") {
-        if (!roles.superadmins.map((u) => u.toLowerCase()).includes(cleanUser)) {
-          roles.superadmins.push(cleanUser);
-        }
-      } else if (role === "vertical_head") {
-        if (!vertical) {
-          return NextResponse.json({ error: "Vertical is required for Vertical Head" }, { status: 400 });
-        }
-        roles.vertical_heads[vertical] = roles.vertical_heads[vertical] || [];
-        if (!roles.vertical_heads[vertical].map((u) => u.toLowerCase()).includes(cleanUser)) {
-          roles.vertical_heads[vertical].push(cleanUser);
-        }
-        // Remove from deputy of that vertical if being promoted
-        if (roles.deputies[vertical]) {
-          roles.deputies[vertical] = roles.deputies[vertical].filter((u) => u.toLowerCase() !== cleanUser);
-        }
-      } else if (role === "deputy") {
-        if (!vertical) {
-          return NextResponse.json({ error: "Vertical is required for Deputy" }, { status: 400 });
-        }
-        roles.deputies[vertical] = roles.deputies[vertical] || [];
-        if (!roles.deputies[vertical].map((u) => u.toLowerCase()).includes(cleanUser)) {
-          roles.deputies[vertical].push(cleanUser);
-        }
-        // Remove from head of that vertical if being demoted
-        if (roles.vertical_heads[vertical]) {
-          roles.vertical_heads[vertical] = roles.vertical_heads[vertical].filter((u) => u.toLowerCase() !== cleanUser);
-        }
+    // Role Allocation Governance Check:
+    if (role === "superadmin") {
+      if (roleInfo.role !== "superadmin") {
+        return NextResponse.json(
+          { error: "Only existing Superadmins can allocate the Super Admin role." },
+          { status: 403 }
+        );
       }
-    } else if (action === "remove") {
-      if (role === "superadmin") {
-        roles.superadmins = roles.superadmins.filter((u) => u.toLowerCase() !== cleanUser);
-      } else if (role === "vertical_head" && vertical) {
-        if (roles.vertical_heads[vertical]) {
-          roles.vertical_heads[vertical] = roles.vertical_heads[vertical].filter(
-            (u) => u.toLowerCase() !== cleanUser
-          );
-        }
-      } else if (role === "deputy" && vertical) {
-        if (roles.deputies[vertical]) {
-          roles.deputies[vertical] = roles.deputies[vertical].filter(
-            (u) => u.toLowerCase() !== cleanUser
-          );
-        }
+    } else if (role === "vertical_head") {
+      if (roleInfo.role !== "superadmin") {
+        return NextResponse.json(
+          { error: "Only Superadmins can appoint a Vertical Head." },
+          { status: 403 }
+        );
+      }
+    } else if (role === "deputy") {
+      const isAuthorized =
+        roleInfo.role === "superadmin" ||
+        (roleInfo.role === "vertical_head" && vertical && roleInfo.verticals.includes(vertical));
+      if (!isAuthorized) {
+        return NextResponse.json(
+          { error: `Only the Vertical Head or a Superadmin can assign Deputies for '${vertical}'.` },
+          { status: 403 }
+        );
+      }
+    } else if (role === "member") {
+      const isAuthorized =
+        roleInfo.role === "superadmin" ||
+        ((roleInfo.role === "vertical_head" || roleInfo.role === "deputy") &&
+          vertical &&
+          roleInfo.verticals.includes(vertical));
+      if (!isAuthorized) {
+        return NextResponse.json(
+          { error: `Only Deputies, Vertical Heads, or Superadmins can manage members for '${vertical}'.` },
+          { status: 403 }
+        );
       }
     }
 
-    // Serverless-safe commit with GitHub Token
+    let roles = readRoles();
+
+    if (action === "assign") {
+      roles = assignRole(roles, targetUsername, role, vertical);
+    } else if (action === "remove") {
+      roles = removeRole(roles, targetUsername, role, vertical);
+    }
+
+    // Serverless-safe commit with GitHub Token to main
     await writeRolesAndSyncCodeowners(roles, token);
 
     return NextResponse.json({
       success: true,
-      message: `Role hierarchy updated for @${cleanUser}`,
+      message: `${action === "assign" ? "Assigned" : "Removed"} ${role} successfully.`,
       roles,
     });
   } catch (err: unknown) {

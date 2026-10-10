@@ -124,6 +124,14 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     message: `feat(${vertical}): add ${cleanSlug} article`,
     content: contentBase64,
     branch: branchName,
+    author: {
+      name: authorDisplayName || authorUsername,
+      email: `${authorUsername}@users.noreply.github.com`,
+    },
+    committer: {
+      name: "SSN Coding Club Studio",
+      email: "bot@ssncodingclub.org",
+    },
   });
 
   // 5. Create Pull Request
@@ -181,26 +189,73 @@ export async function listPendingReviewPRs(token: string): Promise<PendingPR[]> 
     direction: "desc",
   });
 
-  return pulls.map((pr) => {
-    // Parse vertical from title "[Draft: <vertical>] ..."
-    let vertical = "general";
-    const match = pr.title.match(/\[(?:Draft:\s*)?([a-zA-Z0-9_-]+)\]/i);
-    if (match && match[1]) {
-      vertical = match[1].toLowerCase();
-    }
+  // Fetch reviews for each PR to check approval quorum and feedback
+  const prsWithReviews = await Promise.all(
+    pulls.map(async (pr) => {
+      let vertical = "general";
+      const match =
+        pr.title.match(/\[(?:Draft:\s*)?([a-zA-Z0-9_-]+)\]/i) ||
+        pr.title.match(/feat\(([a-zA-Z0-9_-]+)\)/i);
+      if (match && match[1]) {
+        vertical = match[1].toLowerCase();
+      }
 
-    return {
-      number: pr.number,
-      title: pr.title.replace(/^\[.*?\]\s*/, ""),
-      author: pr.user?.login || "unknown",
-      authorAvatar: pr.user?.avatar_url || "",
-      vertical,
-      createdAt: pr.created_at,
-      htmlUrl: pr.html_url,
-      body: pr.body || "",
-      branch: pr.head.ref,
-    };
-  });
+      let reviewsList: { user: string; state: string; body: string; date: string }[] = [];
+      let approvers: string[] = [];
+      let changesRequested = false;
+      let latestFeedback = "";
+
+      try {
+        const { data: reviews } = await octokit.pulls.listReviews({
+          owner: REPO_OWNER,
+          repo: REPO_NAME,
+          pull_number: pr.number,
+        });
+
+        reviewsList = reviews.map((r) => ({
+          user: r.user?.login || "unknown",
+          state: r.state,
+          body: r.body || "",
+          date: r.submitted_at || "",
+        }));
+
+        approvers = Array.from(
+          new Set(
+            reviews
+              .filter((r) => r.state === "APPROVED")
+              .map((r) => r.user?.login?.toLowerCase())
+              .filter(Boolean) as string[]
+          )
+        );
+
+        const changeReqs = reviews.filter((r) => r.state === "CHANGES_REQUESTED");
+        if (changeReqs.length > 0) {
+          changesRequested = true;
+          latestFeedback = changeReqs[changeReqs.length - 1].body || "";
+        }
+      } catch (err) {
+        console.warn(`Could not fetch reviews for PR #${pr.number}:`, err);
+      }
+
+      return {
+        number: pr.number,
+        title: pr.title.replace(/^\[.*?\]\s*/, ""),
+        author: pr.user?.login || "unknown",
+        authorAvatar: pr.user?.avatar_url || "",
+        vertical,
+        createdAt: pr.created_at,
+        htmlUrl: pr.html_url,
+        body: pr.body || "",
+        branch: pr.head.ref,
+        approvers,
+        changesRequested,
+        latestFeedback,
+        reviews: reviewsList,
+      };
+    })
+  );
+
+  return prsWithReviews;
 }
 
 export async function getPRDetails(token: string, pullNumber: number) {
@@ -213,45 +268,162 @@ export async function getPRDetails(token: string, pullNumber: number) {
   return prData;
 }
 
-export async function approveAndMergePR(
+export async function rejectPR(
   token: string,
   pullNumber: number,
-  reviewerUsername: string
+  reviewerUsername: string,
+  reason: string
 ): Promise<{ success: boolean; message: string }> {
+  const octokit = getOctokit(token);
+  try {
+    // 1. Submit formal review requesting changes
+    try {
+      await octokit.pulls.createReview({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        pull_number: pullNumber,
+        event: "REQUEST_CHANGES",
+        body: `❌ **Editorial Feedback & Revision Requested by @${reviewerUsername}:**\n\n${reason}`,
+      });
+    } catch {
+      // In case self-review or permissions restrict event
+    }
+
+    // 2. Post comment to the PR discussion
+    await octokit.issues.createComment({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      issue_number: pullNumber,
+      body: `### 📝 Editorial Feedback & Rejection\n**Reviewer:** @${reviewerUsername}\n\n${reason}`,
+    });
+
+    return {
+      success: true,
+      message: `Changes requested on PR #${pullNumber}. Author will see your feedback comment.`,
+    };
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : "Failed to request changes on PR";
+    return { success: false, message: errorMsg };
+  }
+}
+
+export interface ApproveAndMergeOptions {
+  token: string;
+  pullNumber: number;
+  reviewerUsername: string;
+  reviewerRole: string;
+  targetVertical: string;
+  authorRole: string;
+  deputyUsernames?: string[];
+}
+
+export async function approveAndMergePR(
+  options: ApproveAndMergeOptions
+): Promise<{ success: boolean; merged: boolean; message: string }> {
+  const {
+    token,
+    pullNumber,
+    reviewerUsername,
+    reviewerRole,
+    authorRole,
+    deputyUsernames = [],
+  } = options;
   const octokit = getOctokit(token);
 
   try {
-    // 1. Fetch PR to get head branch name for cleanup
+    // 1. Fetch PR details
     const { data: prData } = await octokit.pulls.get({
       owner: REPO_OWNER,
       repo: REPO_NAME,
       pull_number: pullNumber,
     });
     const headBranch = prData.head.ref;
+    const prAuthor = prData.user?.login || "author";
 
-    // 2. Submit an approving review
+    // 2. Submit approving review for this reviewer
     try {
       await octokit.pulls.createReview({
         owner: REPO_OWNER,
         repo: REPO_NAME,
         pull_number: pullNumber,
         event: "APPROVE",
-        body: `Approved by @${reviewerUsername} via SSN Coding Club CMS Studio`,
+        body: `Approved by @${reviewerUsername} (${reviewerRole}) via SSN Coding Club CMS Studio`,
       });
     } catch {
-      // If author is same as reviewer, self-review is not permitted by GitHub API, continue to merge
+      // Self-review not permitted by GitHub API, continue to evaluation
     }
 
-    // 3. Merge PR
+    // 3. Evaluate Quorum Requirements:
+    // If author is Member:
+    //   - Requires 2 Deputy approvals OR 1 Vertical Head OR 1 Superadmin
+    let isQuorumReached = false;
+
+    if (reviewerRole === "superadmin" || reviewerRole === "vertical_head") {
+      isQuorumReached = true;
+    } else if (reviewerRole === "deputy") {
+      if (authorRole === "member") {
+        // Fetch all current approvals on PR
+        const { data: allReviews } = await octokit.pulls.listReviews({
+          owner: REPO_OWNER,
+          repo: REPO_NAME,
+          pull_number: pullNumber,
+        });
+
+        const distinctApprovers = Array.from(
+          new Set(
+            allReviews
+              .filter((r) => r.state === "APPROVED")
+              .map((r) => r.user?.login?.toLowerCase())
+              .filter(Boolean) as string[]
+          )
+        );
+
+        // Include current reviewer if not yet in distinctApprovers
+        if (!distinctApprovers.includes(reviewerUsername.toLowerCase())) {
+          distinctApprovers.push(reviewerUsername.toLowerCase());
+        }
+
+        const deputyApproverCount = distinctApprovers.filter((u) =>
+          deputyUsernames.map((d) => d.toLowerCase()).includes(u)
+        ).length;
+
+        if (deputyApproverCount >= 2) {
+          isQuorumReached = true;
+        } else {
+          return {
+            success: true,
+            merged: false,
+            message: `Deputy approval recorded! (1/2 Deputy Approvals). Awaiting second Deputy or Vertical Head approval.`,
+          };
+        }
+      } else {
+        return {
+          success: false,
+          merged: false,
+          message: `Articles by ${authorRole}s must be approved by the Vertical Head or a Superadmin.`,
+        };
+      }
+    }
+
+    if (!isQuorumReached) {
+      return {
+        success: false,
+        merged: false,
+        message: "Approval quorum not met.",
+      };
+    }
+
+    // 4. Merge PR with Crystal-Clear Commit Provenance in git log
     const { data: mergeResult } = await octokit.pulls.merge({
       owner: REPO_OWNER,
       repo: REPO_NAME,
       pull_number: pullNumber,
       merge_method: "squash",
-      commit_title: `feat: merge editorial PR #${pullNumber} into main`,
+      commit_title: `${prData.title} (#${pullNumber})`,
+      commit_message: `Authored-by: @${prAuthor} <${prAuthor}@users.noreply.github.com>\nApproved-by: @${reviewerUsername} <${reviewerUsername}@users.noreply.github.com> (${reviewerRole})`,
     });
 
-    // 4. Automatically delete the head branch so no draft branches are left behind!
+    // 5. Delete head branch to prevent branch clutter
     if (mergeResult.merged && headBranch && (headBranch.startsWith("draft/") || headBranch.startsWith("cms/"))) {
       try {
         await octokit.git.deleteRef({
@@ -266,10 +438,58 @@ export async function approveAndMergePR(
 
     return {
       success: mergeResult.merged,
-      message: mergeResult.message || `Successfully merged PR #${pullNumber} and deleted branch ${headBranch}!`,
+      merged: true,
+      message: `Successfully approved & merged PR #${pullNumber} into main! Branch ${headBranch} deleted.`,
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Merge failed";
+    return { success: false, merged: false, message: errorMsg };
+  }
+}
+
+export async function deletePublishedPost(
+  token: string,
+  vertical: string,
+  slug: string,
+  removerUsername: string
+): Promise<{ success: boolean; message: string }> {
+  const octokit = getOctokit(token);
+  const filePath =
+    vertical === "club"
+      ? `content/club/posts/${slug}.md`
+      : `content/verticals/${vertical}/posts/${slug}.md`;
+
+  try {
+    const { data } = await octokit.repos.getContent({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: filePath,
+      ref: MAIN_BRANCH,
+    });
+
+    if (Array.isArray(data) || !data.sha) {
+      return { success: false, message: "Article file not found or is a directory." };
+    }
+
+    await octokit.repos.deleteFile({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: filePath,
+      message: `chore(unpublish): remove ${slug} in ${vertical} by @${removerUsername}`,
+      sha: data.sha,
+      branch: MAIN_BRANCH,
+      committer: {
+        name: removerUsername,
+        email: `${removerUsername}@users.noreply.github.com`,
+      },
+    });
+
+    return {
+      success: true,
+      message: `Article '${slug}' in ${vertical} has been successfully unpublished from main.`,
+    };
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : "Failed to unpublish article";
     return { success: false, message: errorMsg };
   }
 }

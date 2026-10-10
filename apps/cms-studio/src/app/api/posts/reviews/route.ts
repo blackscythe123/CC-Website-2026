@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listPendingReviewPRs, approveAndMergePR } from "@/lib/github";
-import { getUserRoleInfo, canUserApproveVertical } from "@/lib/roles";
+import {
+  listPendingReviewPRs,
+  approveAndMergePR,
+  rejectPR,
+  getPRDetails,
+} from "@/lib/github";
+import { getUserRoleInfo, canUserApproveVertical, readRoles } from "@/lib/roles";
 
 export async function GET(request: NextRequest) {
   const token =
@@ -25,7 +30,6 @@ export async function GET(request: NextRequest) {
 
     const userData = await userRes.json();
     const roleInfo = getUserRoleInfo(userData.login);
-
     const prs = await listPendingReviewPRs(token);
 
     // Filter PRs by user permissions
@@ -72,15 +76,15 @@ export async function POST(request: NextRequest) {
     }
 
     const userData = await userRes.json();
+    const reviewerRoleInfo = getUserRoleInfo(userData.login);
     const body = await request.json();
-    const { pullNumber } = body;
+    const { pullNumber, action = "approve", reason } = body;
 
     if (!pullNumber) {
       return NextResponse.json({ error: "pullNumber is required" }, { status: 400 });
     }
 
     // Anti-IDOR: Fetch actual PR from GitHub to verify true target vertical
-    const { getPRDetails } = await import("@/lib/github");
     const prData = await getPRDetails(token, pullNumber);
 
     // Parse true vertical from PR title or branch name
@@ -96,17 +100,51 @@ export async function POST(request: NextRequest) {
       actualVertical = branchMatch[1].toLowerCase();
     }
 
-    // Verify permission to approve against true vertical
+    // Verify reviewer authority
     if (!canUserApproveVertical(userData.login, actualVertical)) {
       return NextResponse.json(
         {
-          error: `Access Denied: You are not authorized to approve articles for '${actualVertical}'. Only designated Vertical Heads, Deputies, or Superadmins can approve.`,
+          error: `Access Denied: You are not authorized to review articles for '${actualVertical}'. Only designated Vertical Heads, Deputies, or Superadmins can review.`,
         },
         { status: 403 }
       );
     }
 
-    const result = await approveAndMergePR(token, pullNumber, userData.login);
+    // Handling Rejection with Reason
+    if (action === "reject") {
+      if (!reason || !reason.trim()) {
+        return NextResponse.json(
+          { error: "A feedback reason is required when requesting changes or rejecting." },
+          { status: 400 }
+        );
+      }
+
+      const rejectResult = await rejectPR(token, pullNumber, userData.login, reason.trim());
+      if (!rejectResult.success) {
+        return NextResponse.json({ error: rejectResult.message }, { status: 400 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: rejectResult.message,
+      });
+    }
+
+    // Handling Approval (Multi-Deputy Quorum check)
+    const authorUsername = prData.user?.login || "unknown";
+    const authorRoleInfo = getUserRoleInfo(authorUsername);
+    const allRoles = readRoles();
+    const deputiesInVertical = allRoles.deputies[actualVertical] || [];
+
+    const result = await approveAndMergePR({
+      token,
+      pullNumber,
+      reviewerUsername: userData.login,
+      reviewerRole: reviewerRoleInfo.role,
+      targetVertical: actualVertical,
+      authorRole: authorRoleInfo.role,
+      deputyUsernames: deputiesInVertical,
+    });
 
     if (!result.success) {
       return NextResponse.json({ error: result.message }, { status: 400 });
@@ -114,10 +152,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `PR #${pullNumber} approved and merged into main! The post is now live.`,
+      merged: result.merged,
+      message: result.message,
     });
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : "Failed to approve PR";
+    const errorMsg = err instanceof Error ? err.message : "Failed to process review";
     return NextResponse.json({ error: errorMsg }, { status: 500 });
   }
 }

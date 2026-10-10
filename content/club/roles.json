@@ -25,5 +25,18 @@
     "blockchain": [],
     "iot-embedded": [],
     "game-dev": []
-  }
+  },
+  "members": {
+    "ai-ml": [],
+    "web-dev": [],
+    "cybersecurity": [],
+    "cloud-devops": [],
+    "competitive-programming": [],
+    "mobile-dev": [],
+    "ui-ux": [],
+    "blockchain": [],
+    "iot-embedded": [],
+    "game-dev": []
+  },
+  "pending_requests": []
 }

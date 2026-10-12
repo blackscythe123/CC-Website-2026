@@ -16,7 +16,7 @@ tags:
 
 ![Students collaborating on code](https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1400&q=85)
 
-Every great idea starts somewhere. Sometimes, it begins with a simple question, a challenging problem, or a few lines of code that refuse to work. Over time, those small beginnings can turn into meaningful projects, new friendships, and ideas that make a difference.
+Every great idea starts somewhere. Sometimes, it begins with a simple question, a challenging problem, or a few lines of code that refuse to work. Over time, those small beginnings can turn into meaningful projects, new friendships, and ideas that make a difference. 
 
 Today, we’re taking a step forward in that journey with the launch of the **Coding Club website at SSN College of Engineering**.
 

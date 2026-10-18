@@ -64,7 +64,7 @@ This document serves as the single source of truth for all human developers, ver
 
 ## 💻 4. Code & Commit Standards
 
-- **Commit Messages**: Single-line format `<tag>: <short message>` under 25 words (enforced by `commit-guard.ps1`). Zero AI trailers or attribution.
+- **Commit Messages**: Single-line format `<tag>: <short message>` under 25 words. Real human co-authors permitted via `Co-authored-by: Name <actual_email>` (real personal/institutional emails only; no-reply and bot emails forbidden). Zero AI trailers or attribution.
 - **Naming Convention**: Strictly "Coding Club", "SSN Coding Club", or "CC". Never use "Apex".
 - **CI Validation**: Always run `pnpm run test:content` to verify schema, kebab-case slugs, portal mappings, and frontmatter.
 - **Monorepo Build Integrity**: Always verify with `pnpm -r build` before pushing structural changes.

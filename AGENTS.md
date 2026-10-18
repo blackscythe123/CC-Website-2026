@@ -45,10 +45,14 @@ All AI assistants (Antigravity, Claude, Copilot, Cursor, etc.) and human contrib
     - `feat(portal): add interactive terminal hero canvas`
     - `fix(governance): enforce anti-self-approval on pull requests`
     - `docs(agents): update vertical template and pnpm instructions`
-  - **Zero AI Trailers**: NEVER include `Co-Authored-By`, `Signed-off-by`, or AI assistant trailers (`Claude`, `ChatGPT`, `Antigravity`, `Copilot`, etc.).
+- **Co-Authoring Policy (Real Humans Only)**:
+  - Genuine human collaboration is supported via standard Git trailers:
+    `Co-authored-by: Real Name <actual_email@domain.com>`
+  - **Real Email Requirement**: Co-author emails MUST be actual personal or institutional email addresses (e.g. `@gmail.com`, `@ssn.edu.in`). No-reply addresses (`noreply`, `users.noreply.github.com`, `bot@...`) are strictly forbidden.
+  - **Zero AI Trailers**: NEVER include AI assistant trailers (`Claude`, `ChatGPT`, `Antigravity`, `Copilot`, `Gemini`, etc.).
 - **Enforcement Mechanism**:
-  - **Local Hook**: Configured via Git's `core.hooksPath` pointing to `.githooks/commit-msg`, which runs `node scripts/verify-commit.mjs`.
-  - **Auto-Installation**: Running `pnpm install` automatically activates this hook via the `"prepare": "git config core.hooksPath .githooks"` script.
+  - **Local Hook**: Configured via Git's `core.hooksPath` pointing to `.githooks/commit-msg` (with fallback in `.git/hooks/commit-msg`), which runs `node scripts/verify-commit.mjs`.
+  - **Auto-Installation**: Running `pnpm install` automatically activates this hook via the `"prepare": "node scripts/install-hooks.mjs"` script.
   - **CI Gate**: Enforced in GitHub Actions (`.github/workflows/content-ci.yml`) on every push and Pull Request. Violations immediately fail the build.
 
 ---

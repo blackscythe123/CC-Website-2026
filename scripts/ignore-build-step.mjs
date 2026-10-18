@@ -73,11 +73,16 @@ if (targetApp === "main-portal") {
 }
 
 if (targetApp === "cms-studio") {
-  // cms-studio only cares about apps/cms-studio/
-  const hasAppChange = relevantDiff.some((f) => f.startsWith("apps/cms-studio/"));
+  // cms-studio cares about apps/cms-studio/ as well as governance files in content/club/ and .github/CODEOWNERS
+  const hasAppChange = relevantDiff.some(
+    (f) =>
+      f.startsWith("apps/cms-studio/") ||
+      f.startsWith("content/club/") ||
+      f === ".github/CODEOWNERS"
+  );
 
   if (hasAppChange) {
-    console.log("[ignore-build] Changes detected in apps/cms-studio/. Proceeding with build.");
+    console.log("[ignore-build] Changes detected in apps/cms-studio or governance files. Proceeding with build.");
     process.exit(1);
   } else {
     console.log("[ignore-build] No relevant changes for cms-studio. Skipping build.");

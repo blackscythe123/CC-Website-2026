@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { Octokit } from "@octokit/rest";
 import {
   readRoles,
+  getLiveClubRoles,
+  getLiveUserRoleInfo,
   writeRolesAndSyncCodeowners,
   getUserRoleInfo,
   canApproveRoleRequest,
@@ -56,7 +58,8 @@ function parseRoleRequestIssue(issue: GitHubIssueItem): RoleRequest {
   // SECURITY FIX: Strictly bind applicant username to authenticated GitHub issue author
   // Never trust user-mutable JSON metadata in the issue body for identity
   const username = issue.user?.login || (titleMatch ? titleMatch[1] : "unknown");
-  const vertical = metadata.vertical || (titleMatch ? titleMatch[2] : "ai-ml");
+  const rawVertical = metadata.vertical || (titleMatch ? titleMatch[2] : "ai-ml");
+  const vertical = ALL_VERTICAL_SLUGS.includes(rawVertical) ? rawVertical : "ai-ml";
   const rawRole = metadata.requestedRole || (titleMatch ? titleMatch[3].toLowerCase() : "member");
   const requestedRole: "member" | "deputy" | "vertical_head" =
     rawRole === "vertical_head" ? "vertical_head" : rawRole === "deputy" ? "deputy" : "member";
@@ -100,7 +103,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const roleInfo = getUserRoleInfo(userData.login);
+    const roleInfo = await getLiveUserRoleInfo(userData.login);
     const activeToken = process.env.GITHUB_ADMIN_TOKEN || token;
     const octokit = new Octokit({ auth: activeToken });
 
@@ -340,9 +343,9 @@ export async function PATCH(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const reviewerRoleInfo = getUserRoleInfo(userData.login);
+    const reviewerRoleInfo = await getLiveUserRoleInfo(userData.login, true);
     const body = await request.json();
-    const { requestId, action } = body;
+    const { requestId, action, assignedRole } = body;
 
     if (!requestId || !action || !["approve", "reject"].includes(action)) {
       return NextResponse.json(
@@ -368,7 +371,7 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    let roles = readRoles();
+    let roles = await getLiveClubRoles(true);
     if (!targetReq) {
       targetReq = roles.pending_requests?.find((r) => r.id === requestId) || null;
     }
@@ -385,10 +388,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Strictly enforce anti-self-approval: Applicants cannot approve or reject their own role requests
-    if (
-      userData.login.toLowerCase() === targetReq.username.toLowerCase() &&
-      reviewerRoleInfo.role !== "superadmin"
-    ) {
+    if (userData.login.toLowerCase() === targetReq.username.toLowerCase()) {
       return NextResponse.json(
         {
           error:
@@ -398,31 +398,78 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Verify reviewer authority
-    const canApprove = canApproveRoleRequest(
+    // Ensure vertical is valid
+    if (!ALL_VERTICAL_SLUGS.includes(targetReq.vertical)) {
+      return NextResponse.json(
+        { error: `Invalid vertical '${targetReq.vertical}' specified in request.` },
+        { status: 400 }
+      );
+    }
+
+    // Step 1: Reviewer MUST have clearance to evaluate this requested role in this vertical
+    const canEvaluate = canApproveRoleRequest(
       userData.login,
       targetReq.requestedRole,
       targetReq.vertical
     );
 
-    if (!canApprove) {
+    if (!canEvaluate) {
       return NextResponse.json(
         {
-          error: `Access Denied: You do not possess the required hierarchy level to ${action} this request.`,
+          error: `Access Denied: You do not possess the required hierarchy level to evaluate a '${targetReq.requestedRole}' application in '${targetReq.vertical}'.`,
         },
         { status: 403 }
       );
     }
 
+    const ALLOWED_ASSIGNABLE_ROLES: ("member" | "deputy" | "vertical_head")[] = [
+      "member",
+      "deputy",
+      "vertical_head",
+    ];
+
+    if (assignedRole && !ALLOWED_ASSIGNABLE_ROLES.includes(assignedRole)) {
+      return NextResponse.json(
+        {
+          error: `Invalid assignedRole '${assignedRole}'. Allowed roles: ${ALLOWED_ASSIGNABLE_ROLES.join(", ")}`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const effectiveRole: "member" | "deputy" | "vertical_head" =
+      action === "approve" && assignedRole
+        ? assignedRole
+        : targetReq.requestedRole;
+
+    // Step 2: If approving, reviewer MUST ALSO have clearance to grant the effective role
     if (action === "approve") {
-      roles = assignRole(roles, targetReq.username, targetReq.requestedRole, targetReq.vertical);
+      const canAssign = canApproveRoleRequest(
+        userData.login,
+        effectiveRole,
+        targetReq.vertical
+      );
+
+      if (!canAssign) {
+        return NextResponse.json(
+          {
+            error: `Access Denied: You do not possess the required hierarchy level to assign '${effectiveRole}' in '${targetReq.vertical}'.`,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    if (action === "approve") {
+      roles = assignRole(roles, targetReq.username, effectiveRole, targetReq.vertical);
       if (roles.pending_requests) {
         roles.pending_requests = roles.pending_requests.filter((r) => r.id !== targetReq.id);
       }
 
+      const isRoleAdjusted = effectiveRole !== targetReq.requestedRole;
       const reviewerDisplayName = userData.name || userData.login;
       const reviewerEmail = `${userData.login}@users.noreply.github.com`;
-      const commitMessage = `chore(governance): @${userData.login} approved & invited @${targetReq.username} as ${targetReq.requestedRole} (${targetReq.vertical})`;
+      const commitMessage = `chore(governance): @${userData.login} approved & invited @${targetReq.username} as ${effectiveRole} (${targetReq.vertical})${isRoleAdjusted ? ` [adjusted from ${targetReq.requestedRole}]` : ""}`;
 
       // Layer 1: Cryptographic Git author attestation with fallback to GITHUB_ADMIN_TOKEN
       await writeRolesAndSyncCodeowners(roles, token, {
@@ -454,7 +501,9 @@ export async function PATCH(request: NextRequest) {
           const auditComment = [
             `🔒 **Official Governance Audit Log**`,
             `• **Applicant:** @${targetReq.username}`,
-            `• **Assigned Role:** \`${targetReq.requestedRole}\` (\`${targetReq.vertical}\`)`,
+            `• **Requested Role:** \`${targetReq.requestedRole}\``,
+            `• **Assigned Role:** \`${effectiveRole}\`${isRoleAdjusted ? ` *(adjusted from \`${targetReq.requestedRole}\` by reviewer)*` : ""}`,
+            `• **Vertical:** \`${targetReq.vertical}\``,
             `• **Approved By:** @${userData.login} (Role: \`${reviewerRoleInfo.role}\`)`,
             `• **Action:** ${
               inviteDispatched

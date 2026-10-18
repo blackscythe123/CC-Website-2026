@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserRoleInfo } from "@/lib/roles";
+import { getLiveUserRoleInfo } from "@/lib/roles";
 import { getSessionToken } from "@/lib/session";
 
 const REPO_OWNER = "blackscythe123";
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userData = await res.json();
-    const roleInfo = getUserRoleInfo(userData.login);
+    const roleInfo = await getLiveUserRoleInfo(userData.login, true);
 
     // Check collaborator permissions on the repository
     let isCollaborator = false;

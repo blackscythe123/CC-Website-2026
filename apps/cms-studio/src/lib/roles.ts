@@ -62,40 +62,111 @@ function getCodeownersPath(): string {
   return CODEOWNERS_PATH;
 }
 
-export function readRoles(): ClubRoles {
+let inMemoryRoles: ClubRoles | null = null;
+let lastRolesFetchTime = 0;
+const CACHE_TTL_MS = 5000; // 5-second short cache to prevent GitHub rate limits while staying real-time
+
+export function getCachedRoles(): ClubRoles | null {
+  return inMemoryRoles;
+}
+
+export function setCachedRoles(roles: ClubRoles) {
+  inMemoryRoles = roles;
+  lastRolesFetchTime = Date.now();
+}
+
+export function normalizeClubRoles(raw: any): ClubRoles {
   const initVerticalMap = () =>
     ALL_VERTICAL_SLUGS.reduce((acc, v) => ({ ...acc, [v]: [] }), {} as Record<string, string[]>);
+
+  return {
+    superadmins: Array.isArray(raw?.superadmins) ? raw.superadmins : ["blackscythe123"],
+    vertical_heads: { ...initVerticalMap(), ...(raw?.vertical_heads || {}) },
+    deputies: { ...initVerticalMap(), ...(raw?.deputies || {}) },
+    members: { ...initVerticalMap(), ...(raw?.members || {}) },
+    pending_requests: Array.isArray(raw?.pending_requests) ? raw.pending_requests : [],
+  };
+}
+
+export async function getLiveClubRoles(forceFresh = false): Promise<ClubRoles> {
+  const now = Date.now();
+  if (!forceFresh && inMemoryRoles && now - lastRolesFetchTime < CACHE_TTL_MS) {
+    return inMemoryRoles;
+  }
+
+  // 1. Attempt unauthenticated public fetch directly from raw GitHub
+  const rawUrl = "https://raw.githubusercontent.com/blackscythe123/CC-Website-2026/main/content/club/roles.json";
+  try {
+    const publicRes = await fetch(rawUrl, {
+      cache: "no-store",
+      headers: { "User-Agent": "coding-club-cms-studio" },
+    });
+
+    if (publicRes.ok) {
+      const data = await publicRes.json();
+      const normalized = normalizeClubRoles(data);
+      setCachedRoles(normalized);
+      return normalized;
+    }
+  } catch (publicErr) {
+    console.warn("Public raw fetch failed, trying authenticated fallback:", publicErr);
+  }
+
+  // 2. Fallback: Authenticated fetch using GITHUB_ADMIN_TOKEN (e.g. if repo is private or rate-limited)
+  const adminToken = process.env.GITHUB_ADMIN_TOKEN;
+  if (adminToken) {
+    try {
+      const authRes = await fetch(rawUrl, {
+        cache: "no-store",
+        headers: {
+          Authorization: `token ${adminToken}`,
+          "User-Agent": "coding-club-cms-studio",
+        },
+      });
+
+      if (authRes.ok) {
+        const data = await authRes.json();
+        const normalized = normalizeClubRoles(data);
+        setCachedRoles(normalized);
+        return normalized;
+      }
+    } catch (authErr) {
+      console.warn("Authenticated GitHub fetch failed:", authErr);
+    }
+  }
+
+  // Fallback to local file read
+  const diskRoles = readRoles();
+  setCachedRoles(diskRoles);
+  return diskRoles;
+}
+
+export function readRoles(): ClubRoles {
+  if (inMemoryRoles) {
+    return inMemoryRoles;
+  }
 
   try {
     const filePath = getRolesFilePath();
     if (fs.existsSync(filePath)) {
       const data = fs.readFileSync(filePath, "utf-8");
       const parsed = JSON.parse(data);
-      return {
-        superadmins: parsed.superadmins || ["blackscythe123"],
-        vertical_heads: { ...initVerticalMap(), ...(parsed.vertical_heads || {}) },
-        deputies: { ...initVerticalMap(), ...(parsed.deputies || {}) },
-        members: { ...initVerticalMap(), ...(parsed.members || {}) },
-        pending_requests: parsed.pending_requests || [],
-      };
+      const normalized = normalizeClubRoles(parsed);
+      inMemoryRoles = normalized;
+      lastRolesFetchTime = Date.now();
+      return normalized;
     }
   } catch (err) {
-    console.error("Error reading roles.json:", err);
+    console.error("Error reading roles.json from disk:", err);
   }
 
   // Fallback defaults
-  return {
-    superadmins: ["blackscythe123"],
-    vertical_heads: { ...initVerticalMap(), "ai-ml": ["blackscythe123"] },
-    deputies: initVerticalMap(),
-    members: initVerticalMap(),
-    pending_requests: [],
-  };
+  return normalizeClubRoles({});
 }
 
-export function getUserRoleInfo(username: string): UserRoleInfo {
+export function getUserRoleInfo(username: string, rolesOverride?: ClubRoles): UserRoleInfo {
   const normalized = username.toLowerCase().trim();
-  const roles = readRoles();
+  const roles = rolesOverride || readRoles();
 
   // Tier 1: Superadmin (Controls all)
   const isSuperadmin = roles.superadmins.some((u) => u.toLowerCase() === normalized);
@@ -162,6 +233,14 @@ export function getUserRoleInfo(username: string): UserRoleInfo {
     verticals: assignedVerticals,
     rolesByVertical,
   };
+}
+
+export async function getLiveUserRoleInfo(
+  username: string,
+  forceFresh = false
+): Promise<UserRoleInfo> {
+  const roles = await getLiveClubRoles(forceFresh);
+  return getUserRoleInfo(username, roles);
 }
 
 export function canUserApproveVertical(username: string, vertical: string): boolean {
@@ -368,6 +447,9 @@ export async function writeRolesAndSyncCodeowners(
         : allSuperowners;
     codeownersContent += `content/verticals/${vertical}/** ${reviewers}\n`;
   }
+
+  // 0. Update in-memory cache immediately for real-time reads
+  setCachedRoles(roles);
 
   // 1. Try local write if filesystem is writable
   try {

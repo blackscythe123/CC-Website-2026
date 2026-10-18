@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { Octokit } from "@octokit/rest";
 import {
   readRoles,
+  getLiveClubRoles,
+  getLiveUserRoleInfo,
   writeRolesAndSyncCodeowners,
   getUserRoleInfo,
   assignRole,
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const roleInfo = getUserRoleInfo(userData.login);
+    const roleInfo = await getLiveUserRoleInfo(userData.login);
 
     if (
       roleInfo.role !== "superadmin" &&
@@ -44,7 +46,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const roles = readRoles();
+    const roles = await getLiveClubRoles();
 
     // Collect all candidate users
     const candidateMap = new Map<string, { login: string; name?: string; avatar_url?: string; status?: string }>();
@@ -139,7 +141,7 @@ export async function POST(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const roleInfo = getUserRoleInfo(userData.login);
+    const roleInfo = await getLiveUserRoleInfo(userData.login, true);
 
     const body = await request.json();
     const { action, targetUsername, role, vertical } = body;
@@ -222,7 +224,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    let roles = readRoles();
+    let roles = await getLiveClubRoles(true);
 
     if (action === "assign") {
       roles = assignRole(roles, cleanUsername, role, vertical);

@@ -79,6 +79,16 @@ export default function AdminRolesPage() {
   const [applyNote, setApplyNote] = useState("");
   const [submittingApply, setSubmittingApply] = useState(false);
 
+  // Collaborator & Role Adjustment State
+  const [collaboratorStatus, setCollaboratorStatus] = useState<{
+    isCollaborator: boolean;
+    hasPendingInvite: boolean;
+    inviteUrl: string;
+  } | null>(null);
+  const [assignedRoleMap, setAssignedRoleMap] = useState<
+    Record<string, "member" | "deputy" | "vertical_head">
+  >({});
+
   const fetchRolesData = () => {
     fetch("/api/roles")
       .then((res) => res.json())
@@ -103,6 +113,9 @@ export default function AdminRolesPage() {
         if (data.authenticated) {
           setUser(data.user);
           setRoleInfo(data.roleInfo);
+          if (data.collaboratorStatus) {
+            setCollaboratorStatus(data.collaboratorStatus);
+          }
           fetchRolesData();
         }
         setLoading(false);
@@ -248,7 +261,11 @@ export default function AdminRolesPage() {
     }
   };
 
-  const handleReviewRequest = async (requestId: string, action: "approve" | "reject") => {
+  const handleReviewRequest = async (
+    requestId: string,
+    action: "approve" | "reject",
+    assignedRole?: "member" | "deputy" | "vertical_head"
+  ) => {
     setSaving(true);
     setFeedback("");
     setErrorFeedback("");
@@ -257,7 +274,7 @@ export default function AdminRolesPage() {
       const res = await fetch("/api/roles/requests", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId, action }),
+        body: JSON.stringify({ requestId, action, assignedRole }),
       });
 
       const data = await res.json();
@@ -348,7 +365,47 @@ export default function AdminRolesPage() {
             </div>
           )}
 
-          {myPendingRequests.length > 0 ? (
+          {collaboratorStatus && !collaboratorStatus.isCollaborator && collaboratorStatus.hasPendingInvite ? (
+            <div className="rounded-3xl border border-amber-200 bg-white p-8 shadow-xs space-y-6 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 shadow-xs">
+                <Shield className="h-8 w-8" />
+              </div>
+              <div className="space-y-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                  🎉 Application Approved • Invitation Pending
+                </span>
+                <h2 className="text-xl font-extrabold text-gray-900">
+                  Accept Your GitHub Repository Invitation
+                </h2>
+                <p className="text-xs text-gray-600 leading-relaxed max-w-md mx-auto">
+                  You are assigned as{" "}
+                  <strong className="capitalize">{roleInfo?.role || "Member"}</strong>
+                  {roleInfo?.verticals && roleInfo.verticals.length > 0
+                    ? ` for ${roleInfo.verticals.map((v) => ALL_VERTICALS.find((item) => item.slug === v)?.name || v).join(", ")}`
+                    : ""}.
+                  Your role has been allocated in the club hierarchy, but GitHub requires you to accept the collaborator invitation before you can push draft branches and review posts!
+                </p>
+              </div>
+
+              <div className="space-y-2.5 pt-2 max-w-sm mx-auto">
+                <a
+                  href={collaboratorStatus.inviteUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-3 text-xs font-bold text-white shadow-xs hover:bg-amber-700 transition"
+                >
+                  <span>Accept Invitation on GitHub ↗</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition"
+                >
+                  <span>I have accepted, check again ↻</span>
+                </button>
+              </div>
+            </div>
+          ) : myPendingRequests.length > 0 ? (
             <div className="rounded-3xl border border-purple-200 bg-white p-6 shadow-xs space-y-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-100 text-purple-600">
@@ -490,6 +547,29 @@ export default function AdminRolesPage() {
       <StudioNav user={user} roleInfo={roleInfo} />
 
       <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 space-y-8">
+        {collaboratorStatus && !collaboratorStatus.isCollaborator && collaboratorStatus.hasPendingInvite && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+              <div>
+                <strong className="font-bold">Pending GitHub Invitation:</strong> You are assigned as{" "}
+                <span className="capitalize font-semibold">{roleInfo?.role}</span>
+                {roleInfo?.verticals && roleInfo.verticals.length > 0
+                  ? ` for ${roleInfo.verticals.map((v) => ALL_VERTICALS.find((item) => item.slug === v)?.name || v).join(", ")}`
+                  : ""}, but have not accepted the GitHub repository invitation yet!
+              </div>
+            </div>
+            <a
+              href={collaboratorStatus.inviteUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="shrink-0 rounded-xl bg-amber-600 px-3.5 py-1.5 font-bold text-white hover:bg-amber-700 transition"
+            >
+              Accept Invitation on GitHub ↗
+            </a>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col justify-between gap-4 border-b border-gray-200 pb-6 sm:flex-row sm:items-end">
           <div>
@@ -1000,21 +1080,80 @@ export default function AdminRolesPage() {
                       </div>
 
                       {req.status === "pending" && (
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            onClick={() => handleReviewRequest(req.id, "reject")}
-                            disabled={saving}
-                            className="rounded-xl border border-red-200 bg-red-50/50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
-                          >
-                            Reject
-                          </button>
-                          <button
-                            onClick={() => handleReviewRequest(req.id, "approve")}
-                            disabled={saving}
-                            className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 shadow-xs"
-                          >
-                            Approve &amp; Assign
-                          </button>
+                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                          {(() => {
+                            const userRoleInVert = isSuperadmin
+                              ? "superadmin"
+                              : (roleInfo?.rolesByVertical?.[req.vertical] || roleInfo?.role);
+
+                            let assignOptions: ("member" | "deputy" | "vertical_head")[] = [];
+                            if (userRoleInVert === "superadmin") {
+                              assignOptions = ["member", "deputy", "vertical_head"];
+                            } else if (userRoleInVert === "vertical_head") {
+                              assignOptions = ["member", "deputy"];
+                            } else if (userRoleInVert === "deputy") {
+                              assignOptions = ["member"];
+                            }
+
+                            const currentSelectedRole = assignedRoleMap[req.id] || req.requestedRole;
+                            const isRoleAdjusted = currentSelectedRole !== req.requestedRole;
+
+                            return (
+                              <>
+                                {assignOptions.length > 1 && (
+                                  <div className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50/80 px-2 py-1">
+                                    <span className="text-[10px] font-bold uppercase text-gray-400">
+                                      Assign:
+                                    </span>
+                                    <select
+                                      value={currentSelectedRole}
+                                      onChange={(e) =>
+                                        setAssignedRoleMap((prev) => ({
+                                          ...prev,
+                                          [req.id]: e.target.value as "member" | "deputy" | "vertical_head",
+                                        }))
+                                      }
+                                      className="bg-transparent text-xs font-semibold text-gray-800 outline-none cursor-pointer"
+                                    >
+                                      {assignOptions.map((opt) => (
+                                        <option key={opt} value={opt}>
+                                          {opt === "vertical_head"
+                                            ? "Vertical Head"
+                                            : opt === "deputy"
+                                            ? "Deputy"
+                                            : "Member"}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )}
+
+                                <button
+                                  onClick={() => handleReviewRequest(req.id, "reject")}
+                                  disabled={saving}
+                                  className="rounded-xl border border-red-200 bg-red-50/50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                                >
+                                  Reject
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleReviewRequest(req.id, "approve", currentSelectedRole)
+                                  }
+                                  disabled={saving}
+                                  className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 shadow-xs disabled:opacity-50"
+                                >
+                                  {isRoleAdjusted
+                                    ? `Approve as ${
+                                        currentSelectedRole === "vertical_head"
+                                          ? "Head"
+                                          : currentSelectedRole.charAt(0).toUpperCase() +
+                                            currentSelectedRole.slice(1)
+                                      }`
+                                    : "Approve & Assign"}
+                                </button>
+                              </>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>

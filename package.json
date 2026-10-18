@@ -2,7 +2,11 @@
   "name": "coding-club-monorepo",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.28.0",
   "scripts": {
+    "preinstall": "npx only-allow pnpm",
+    "prepare": "git config core.hooksPath .githooks",
+    "verify:commit": "node scripts/verify-commit.mjs",
     "dev:portal": "pnpm --filter main-portal dev",
     "dev:cms": "pnpm --filter cms-studio dev",
     "build": "pnpm -r build",

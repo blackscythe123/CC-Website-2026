@@ -35,27 +35,30 @@ This document serves as the single source of truth for all human developers, ver
 
 ## 🛡️ 2. Multi-Tier Governance & Editorial Pipeline
 
-| Role | Permissions & Authority |
-|---|---|
-| **Superadmin** | Apex authority. Full access to write for all wings, publish club-wide announcements, review and merge PRs across all verticals, manage roles in `roles.json`, and bypass quorum gates. Self-approval is permitted as a staging review gate. |
-| **Vertical Head** | Sovereign authority over assigned vertical(s). Authorized to draft, review, request changes, and merge PRs within their specific vertical. Cannot publish or approve outside assigned wings. |
-| **Deputy** | Second-in-command for assigned vertical(s). Authorized to review articles and manage assigned vertical content. Approval quorum rules apply. |
-| **Member** | Technical club member. Can draft articles via CMS Studio. Articles are automatically staged onto draft Git branches (`draft/[vertical]/[slug]`) and submitted as Pull Requests for editorial review. |
+| Role | Permissions & Authority | Editorial Quorum Required to Merge Post |
+|---|---|---|
+| **Superadmin** | Global club governance. Full access to write for all wings, publish club-wide announcements, review and merge PRs across all verticals, manage roles in `roles.json` / `CODEOWNERS`. Self-approval is strictly forbidden (another superadmin must review). | Another Superadmin review |
+| **Vertical Head** | Sovereign authority over assigned vertical(s). Authorized to draft, review, request changes, and merge PRs within their specific vertical. Can appoint Deputies and Members in their vertical. Strictly 1 Head per vertical. | Superadmin review |
+| **Deputy** | Second-in-command for assigned vertical(s). Authorized to review Member articles and manage assigned vertical content. Can appoint Members in their vertical. | 1 Vertical Head OR 1 Superadmin |
+| **Member** | Technical club member. Can draft articles for their assigned vertical via CMS Studio. Articles are automatically staged onto draft Git branches (`draft/[vertical]/[slug]-[id]`) and submitted as PRs for review. | 2 Deputy approvals OR 1 Vertical Head OR 1 Superadmin |
 
 ---
 
 ## 🔒 3. Anti-Bypass & Security Rules
 
 1. **No Direct Pushes to Main**:
-   - CMS Studio creates feature draft branches (`draft/[vertical]/[slug]`) and opens Pull Requests.
-   - Direct merges to `main` are strictly forbidden for article drafts.
-2. **Anti-IDOR Verification**:
-   - The review API never trusts client-supplied vertical slugs. It inspects the real PR title and branch ref from GitHub before authorizing approvals.
-3. **Restricted Portal Destinations**:
-   - Non-superadmins can only target `main-portal` and portals matching their assigned verticals. Submitting unauthorized vertical targets returns `403 Forbidden`.
-4. **Media Deferred Upload**:
-   - Images uploaded in CMS Studio remain in browser memory/IndexedDB until submission.
-   - Upon draft submission, images are committed to `apps/main-portal/public/uploads/` on the **draft branch**, never polluting `main` with unapproved media.
+   - CMS Studio creates feature draft branches (`draft/[vertical]/[slug]-[id]`) and opens Pull Requests.
+   - Direct merges or direct media uploads to `main` are strictly forbidden for content.
+2. **Strict Anti-Self-Review**:
+   - Authors can NEVER approve or merge their own articles under any role (enforced at API route level and natively blocked by GitHub on `github.com`).
+3. **Anti-IDOR Verification**:
+   - The review and draft APIs never trust client-supplied metadata. The server parses the real PR markdown file, author ownership, and branch ref directly from GitHub before authorizing revisions or approvals.
+4. **Media Deferred Upload & Draft Isolation**:
+   - Images inserted in CMS Studio remain in browser memory / IndexedDB until final submission.
+   - Upon draft submission, images are committed to `apps/main-portal/public/uploads/` on the **isolated draft branch**, never touching `main` without formal review.
+5. **Vercel Build Shielding (`ignore-build-step.mjs`)**:
+   - Documentation updates (`AGENTS.md`, `CLAUDE.md`, `README.md`, `*.md`), CI configurations, and administrative scripts are filtered by `scripts/ignore-build-step.mjs`.
+   - Modifying documentation files exits with code 0 in Vercel, consuming **0 build minutes** and skipping deployment entirely.
 
 ---
 
@@ -64,3 +67,4 @@ This document serves as the single source of truth for all human developers, ver
 - **Commit Messages**: Single-line format `<tag>: <short message>` under 25 words (enforced by `commit-guard.ps1`). Zero AI trailers or attribution.
 - **Naming Convention**: Strictly "Coding Club", "SSN Coding Club", or "CC". Never use "Apex".
 - **CI Validation**: Always run `pnpm run test:content` to verify schema, kebab-case slugs, portal mappings, and frontmatter.
+- **Monorepo Build Integrity**: Always verify with `pnpm -r build` before pushing structural changes.

@@ -18,17 +18,21 @@ jobs:
     steps:
       - name: "Checkout Repository"
         uses: actions/checkout@v4
-
-      - name: "Setup pnpm"
-        uses: pnpm/action-setup@v4
         with:
-          version: 11.1.3
+          fetch-depth: 0
 
       - name: "Setup Node.js 24"
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: "pnpm"
+
+      - name: "Verify Commit Discipline"
+        run: node scripts/verify-commit.mjs
+
+      - name: "Setup pnpm"
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.3
 
       - name: "Install Dependencies"
         run: pnpm install --frozen-lockfile=false

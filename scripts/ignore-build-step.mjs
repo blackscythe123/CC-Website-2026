@@ -23,9 +23,8 @@ try {
 
 // 4. Global ignore patterns (never trigger ANY vercel build)
 const globalIgnorePatterns = [
-  /^README\.md$/i,
-  /^AGENTS\.md$/i,
-  /^CLAUDE\.md$/i,
+  /\.md$/i,
+  /^\.githooks\//,
   /^\.github\//,
   /^scripts\//,
   /^\.env\.example$/,

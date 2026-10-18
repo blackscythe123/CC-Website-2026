@@ -1,7 +1,7 @@
 {
   "superadmins": [
     "blackscythe123",
-    "avgeeky"
+    "techierahul17"
   ],
   "vertical_heads": {
     "ai-ml": [],
@@ -10,7 +10,9 @@
     "cybersecurity": [],
     "ssnhacks": [],
     "design-ui-ux": [],
-    "full-stack": [],
+    "full-stack": [
+      "avgeeky"
+    ],
     "open-source": []
   },
   "deputies": {

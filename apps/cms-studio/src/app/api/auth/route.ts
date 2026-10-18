@@ -22,12 +22,20 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const scope = searchParams.get("scope") || "repo,user";
-  const state = Math.random().toString(36).substring(7);
+  const state = crypto.randomUUID();
 
   const authUrl = new URL("https://github.com/login/oauth/authorize");
   authUrl.searchParams.set("client_id", clientId);
   authUrl.searchParams.set("scope", scope);
   authUrl.searchParams.set("state", state);
 
-  return NextResponse.redirect(authUrl.toString());
+  const res = NextResponse.redirect(authUrl.toString());
+  res.cookies.set("oauth_state", state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 600, // 10 minutes expiry
+  });
+  return res;
 }

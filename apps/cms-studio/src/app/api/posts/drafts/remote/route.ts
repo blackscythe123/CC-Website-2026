@@ -31,9 +31,11 @@ export async function GET(request: NextRequest) {
     const userData = await userRes.json();
 
     if (branch) {
-      // Load specific personal draft branch
-      if (!branch.startsWith(`drafts/${userData.login.toLowerCase()}/`)) {
-        return NextResponse.json({ error: "Unauthorized access to draft branch" }, { status: 403 });
+      // Strictly enforce safe branch regex and user ownership
+      const userPrefix = `drafts/${userData.login.toLowerCase()}/`;
+      const isFormatSafe = /^drafts\/[a-z0-9._-]+\/[a-z0-9-]+$/.test(branch);
+      if (!branch.startsWith(userPrefix) || !isFormatSafe) {
+        return NextResponse.json({ error: "Unauthorized access or invalid draft branch name" }, { status: 403 });
       }
       const draft = await getPersonalDraftBranch(token, branch);
       return NextResponse.json({ draft });
@@ -115,12 +117,43 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const ALLOWED_VERTICALS = [
+      "ai-ml",
+      "ar-vr-game-dev",
+      "competitive-programming",
+      "cybersecurity",
+      "ssnhacks",
+      "design-ui-ux",
+      "full-stack",
+      "open-source",
+      "club",
+    ];
+
+    const safeVertical = vertical || "club";
+    if (!ALLOWED_VERTICALS.includes(safeVertical)) {
+      return NextResponse.json(
+        { error: `Invalid vertical '${safeVertical}'. Allowed verticals are: ${ALLOWED_VERTICALS.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    const rawSlug = (slug || title || "untitled").trim();
+    const cleanSlug = rawSlug
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "")
+      .slice(0, 50);
+
+    if (!cleanSlug) {
+      return NextResponse.json({ error: "Invalid draft title or slug" }, { status: 400 });
+    }
+
     const result = await savePersonalDraftBranch({
       token,
       authorUsername: userData.login,
       authorDisplayName: userData.name || userData.login,
-      vertical: vertical || "club",
-      slug: slug || title,
+      vertical: safeVertical,
+      slug: cleanSlug,
       title: title || "Untitled Draft",
       summary: summary || "",
       coverImage,

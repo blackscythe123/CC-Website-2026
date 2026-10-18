@@ -3,6 +3,7 @@ import path from "path";
 import matter from "gray-matter";
 import { remark } from "remark";
 import html from "remark-html";
+import sanitizeHtml from "sanitize-html";
 
 export interface PostSummary {
   slug: string;
@@ -35,17 +36,17 @@ export function isPostVisibleOnPortal(
 }
 
 function resolveContentDir(): string {
-  const candidates = [
-    path.resolve(process.cwd(), "../../content"),
-    path.resolve(process.cwd(), "content"),
-    path.resolve(process.cwd(), "../content"),
-    path.resolve(__dirname, "../../../../../content"),
-    path.resolve(__dirname, "../../../../content"),
-  ];
-  for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
+  const monorepoContent = path.resolve(process.cwd(), "../../content");
+  if (fs.existsSync(/* turbopackIgnore: true */ monorepoContent)) {
+    return monorepoContent;
   }
-  return candidates[0];
+
+  const rootContent = path.resolve(process.cwd(), "content");
+  if (fs.existsSync(/* turbopackIgnore: true */ rootContent)) {
+    return rootContent;
+  }
+
+  return monorepoContent;
 }
 
 export function getAllPosts(portalId: string = "main-portal"): PostSummary[] {
@@ -146,10 +147,76 @@ export async function getPost(
 
   const fileContents = fs.readFileSync(filePath, "utf8");
   const { data, content } = matter(fileContents);
-  const processed = await remark().use(html).process(content);
-
   const authorUsername = data.authorUsername || "";
   const authorAvatar = data.authorAvatar || (authorUsername ? `https://github.com/${authorUsername}.png` : "");
+  const processed = await remark().use(html).process(content);
+  const rawHtml = processed.toString();
+  const contentHtml = sanitizeHtml(rawHtml, {
+    allowedTags: [
+      "h1", "h2", "h3", "h4", "h5", "h6",
+      "p", "a", "b", "i", "strong", "em", "strike", "code", "hr", "br",
+      "div", "table", "thead", "caption", "tbody", "tr", "th", "td",
+      "pre", "blockquote", "ul", "ol", "li", "span", "img", "del", "sup", "sub"
+    ],
+    allowedAttributes: {
+      a: ["href", "name", "target", "rel", "title"],
+      img: ["src", "alt", "title", "width", "height", "loading"],
+      code: ["class"],
+      span: ["class"],
+      div: ["class"],
+      pre: ["class"],
+      th: ["class"],
+      td: ["class"],
+    },
+    allowedSchemes: ["http", "https", "mailto"],
+    allowedSchemesByTag: {
+      img: ["http", "https"],
+    },
+    transformTags: {
+      a: (tagName, attribs) => {
+        const rawHref = (attribs.href || "#").trim();
+        const isSafe =
+          rawHref.startsWith("#") ||
+          (rawHref.startsWith("/") && !rawHref.startsWith("//")) ||
+          rawHref.startsWith("https://") ||
+          rawHref.startsWith("http://") ||
+          rawHref.startsWith("mailto:");
+
+        return {
+          tagName: "a",
+          attribs: {
+            href: isSafe ? rawHref : "#",
+            rel: "noopener noreferrer nofollow",
+            target: attribs.target || "_blank",
+            ...(attribs.title ? { title: attribs.title } : {}),
+          },
+        };
+      },
+      img: (tagName, attribs) => {
+        const src = (attribs.src || "").trim();
+        const isSafe =
+          src.startsWith("https://") ||
+          src.startsWith("http://") ||
+          (src.startsWith("/") && !src.startsWith("//"));
+
+        if (!isSafe) {
+          return { tagName: "span", attribs: {} };
+        }
+        return {
+          tagName: "img",
+          attribs: {
+            src,
+            alt: attribs.alt || "",
+            loading: "lazy",
+            ...(attribs.title ? { title: attribs.title } : {}),
+            ...(attribs.width ? { width: attribs.width } : {}),
+            ...(attribs.height ? { height: attribs.height } : {}),
+          },
+        };
+      },
+    },
+    disallowedTagsMode: "discard",
+  });
 
   return {
     slug: postSlug,
@@ -162,6 +229,6 @@ export async function getPost(
     summary: data.summary || "",
     coverImage: data.coverImage || "",
     tags: Array.isArray(data.tags) ? data.tags : [],
-    contentHtml: processed.toString(),
+    contentHtml,
   };
 }

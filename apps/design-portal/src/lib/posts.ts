@@ -21,17 +21,17 @@ export interface PortalPostDetail extends PortalPostSummary {
 }
 
 function resolveContentDir(): string {
-  const candidates = [
-    path.resolve(process.cwd(), "../../content"),
-    path.resolve(process.cwd(), "content"),
-    path.resolve(process.cwd(), "../content"),
-    path.resolve(__dirname, "../../../../../content"),
-    path.resolve(__dirname, "../../../../content"),
-  ];
-  for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
+  const monorepoContent = path.resolve(process.cwd(), "../../content");
+  if (fs.existsSync(/* turbopackIgnore: true */ monorepoContent)) {
+    return monorepoContent;
   }
-  return candidates[0];
+
+  const rootContent = path.resolve(process.cwd(), "content");
+  if (fs.existsSync(/* turbopackIgnore: true */ rootContent)) {
+    return rootContent;
+  }
+
+  return monorepoContent;
 }
 
 export function getPortalPosts(): PortalPostSummary[] {

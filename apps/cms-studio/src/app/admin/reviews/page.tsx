@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import StudioNav from "@/components/StudioNav";
 import { UserRoleInfo } from "@/lib/roles";
 import { marked } from "marked";
+import { sanitizeArticleHtml } from "@/lib/sanitize";
 import {
   CheckCircle,
   ExternalLink,
@@ -573,7 +574,7 @@ export default function EditorialReviewsPage() {
                 <div
                   className="article-preview text-gray-800 pt-4"
                   dangerouslySetInnerHTML={{
-                    __html: marked.parse(previewArticle.markdownBody || "") as string,
+                    __html: sanitizeArticleHtml(marked.parse(previewArticle.markdownBody || "") as string),
                   }}
                 />
               </div>

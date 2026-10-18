@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import StudioNav from "@/components/StudioNav";
 import { UserRoleInfo } from "@/lib/roles";
 import { marked } from "marked";
+import { sanitizeArticleHtml } from "@/lib/sanitize";
 import {
   Image as ImageIcon,
   Code,
@@ -76,10 +77,11 @@ export default function AdminEditorPage() {
   // Real-time Markdown Parsing & Stats for Preview
   const parsedHtml = useMemo(() => {
     try {
-      return marked.parse(content || "*Start writing to preview your article...*", {
+      const rawHtml = marked.parse(content || "*Start writing to preview your article...*", {
         gfm: true,
         breaks: true,
       }) as string;
+      return sanitizeArticleHtml(rawHtml);
     } catch {
       return "<p class='text-red-500'>Error parsing markdown</p>";
     }
@@ -498,15 +500,14 @@ export default function AdminEditorPage() {
       "image/png",
       "image/webp",
       "image/gif",
-      "image/svg+xml",
     ];
     if (!allowedMimes.includes(file.type)) {
-      setErrorMessage("Only JPEG, PNG, WebP, GIF, and SVG images are supported.");
+      setErrorMessage("Only JPEG, PNG, WebP, and GIF images are supported. SVGs and RAW camera formats are strictly forbidden.");
       return null;
     }
     const MAX_SIZE = 5 * 1024 * 1024; // 5MB
     if (file.size > MAX_SIZE) {
-      setErrorMessage("Image exceeds 5MB size limit.");
+      setErrorMessage(`Image is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Maximum allowed image size is 5MB.`);
       return null;
     }
 

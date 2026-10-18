@@ -9,13 +9,15 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@types/sanitize-html": "^2.16.2",
     "date-fns": "^4.4.0",
     "gray-matter": "^4.0.3",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "remark": "^15.0.1",
-    "remark-html": "^16.0.1"
+    "remark-html": "^16.0.1",
+    "sanitize-html": "^2.18.1"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",

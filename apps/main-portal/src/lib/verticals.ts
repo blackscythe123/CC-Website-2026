@@ -17,16 +17,17 @@ export interface VerticalMetadata {
 }
 
 function resolveVerticalsDir(): string {
-  const candidate1 = path.resolve(process.cwd(), "../../content/verticals");
-  if (fs.existsSync(candidate1)) return candidate1;
+  const monorepoVerticals = path.resolve(process.cwd(), "../../content/verticals");
+  if (fs.existsSync(/* turbopackIgnore: true */ monorepoVerticals)) {
+    return monorepoVerticals;
+  }
 
-  const candidate2 = path.resolve(process.cwd(), "content/verticals");
-  if (fs.existsSync(candidate2)) return candidate2;
+  const rootVerticals = path.resolve(process.cwd(), "content/verticals");
+  if (fs.existsSync(/* turbopackIgnore: true */ rootVerticals)) {
+    return rootVerticals;
+  }
 
-  const candidate3 = path.resolve(__dirname, "../../../../../content/verticals");
-  if (fs.existsSync(candidate3)) return candidate3;
-
-  return candidate1;
+  return monorepoVerticals;
 }
 
 export function getAllVerticals(): VerticalMetadata[] {

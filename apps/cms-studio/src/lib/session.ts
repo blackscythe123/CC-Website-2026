@@ -14,8 +14,13 @@ const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 function getEncryptionKey(): Buffer {
   const secret =
     process.env.SESSION_SECRET ||
-    process.env.OAUTH_GITHUB_CLIENT_SECRET ||
-    "ssn-coding-club-cms-secret-key-production-2026";
+    process.env.OAUTH_GITHUB_CLIENT_SECRET;
+
+  if (!secret) {
+    throw new Error(
+      "CRITICAL SECURITY CONFIGURATION ERROR: Neither SESSION_SECRET nor OAUTH_GITHUB_CLIENT_SECRET is defined in the environment. Refusing to seal/unseal sessions with an insecure fallback key."
+    );
+  }
   // Derive a 32-byte (256-bit) key deterministically using SHA-256
   return crypto.createHash("sha256").update(secret).digest();
 }
@@ -51,19 +56,21 @@ export function unsealSession(sealed: string): SessionData | null {
   if (!sealed || typeof sealed !== "string") return null;
 
   const parts = sealed.split(".");
-  // If not in iv.authTag.ciphertext format, check if it's a legacy raw GitHub token for smooth transition
+  // Strictly require iv.authTag.ciphertext format; no raw unencrypted tokens permitted
   if (parts.length !== 3) {
-    if (sealed.startsWith("gho_") || sealed.startsWith("ghp_") || sealed.length === 40) {
-      return {
-        token: sealed,
-        issuedAt: Date.now(),
-        expiresAt: Date.now() + SESSION_DURATION_MS,
-      };
-    }
     return null;
   }
 
   const [ivHex, authTagHex, encryptedHex] = parts;
+
+  // Strictly enforce NIST SP 800-38D AES-GCM parameters: 96-bit (12-byte) IV and 128-bit (16-byte) Auth Tag
+  if (ivHex.length !== 24 || authTagHex.length !== 32 || encryptedHex.length === 0) {
+    return null;
+  }
+
+  if (!/^[0-9a-fA-F]+$/.test(ivHex) || !/^[0-9a-fA-F]+$/.test(authTagHex) || !/^[0-9a-fA-F]+$/.test(encryptedHex)) {
+    return null;
+  }
 
   try {
     const key = getEncryptionKey();
@@ -77,7 +84,7 @@ export function unsealSession(sealed: string): SessionData | null {
     const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
     const data: SessionData = JSON.parse(decrypted.toString("utf8"));
 
-    if (!data.token || data.expiresAt < Date.now()) {
+    if (!data.token || typeof data.expiresAt !== "number" || data.expiresAt < Date.now()) {
       return null;
     }
 

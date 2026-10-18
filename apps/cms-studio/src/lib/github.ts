@@ -38,6 +38,35 @@ export interface DraftResult {
   branch: string;
 }
 
+const ALLOWED_VERTICALS = [
+  "ai-ml",
+  "ar-vr-game-dev",
+  "competitive-programming",
+  "cybersecurity",
+  "ssnhacks",
+  "design-ui-ux",
+  "full-stack",
+  "open-source",
+  "club",
+];
+
+function isSafePendingImage(filename: string, base64: string): boolean {
+  const extMatch = filename.toLowerCase().match(/\.([a-z0-9]+)$/);
+  const ext = extMatch ? extMatch[1] : "";
+  const allowed = ["jpg", "jpeg", "png", "webp", "gif"];
+  if (!allowed.includes(ext)) return false;
+
+  const buf = Buffer.from(base64, "base64");
+  if (buf.length > 5 * 1024 * 1024) return false;
+
+  const isJpeg = buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+  const isPng = buf.length > 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+  const isGif = buf.length > 4 && buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38;
+  const isWebp = buf.length > 12 && buf.toString("utf8", 0, 4) === "RIFF" && buf.toString("utf8", 8, 12) === "WEBP";
+
+  return isJpeg || isPng || isGif || isWebp;
+}
+
 export async function createDraftAndPullRequest(params: CreateDraftParams): Promise<DraftResult> {
   const fallbackToken = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
   let octokit = getOctokit(params.token);
@@ -55,6 +84,10 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     pullNumber,
     existingBranch,
   } = params;
+
+  if (!ALLOWED_VERTICALS.includes(vertical)) {
+    throw new Error(`Invalid technical vertical: '${vertical}'. Must be one of: ${ALLOWED_VERTICALS.join(", ")}`);
+  }
 
   let branchName = existingBranch;
 
@@ -106,7 +139,12 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
 
   if (pendingImages && pendingImages.length > 0) {
     for (const img of pendingImages) {
-      const cleanImgName = `${Date.now()}-${img.filename.toLowerCase().replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+      if (!isSafePendingImage(img.filename, img.base64)) {
+        continue;
+      }
+      const ext = img.filename.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] || "png";
+      const base = img.filename.replace(/\.[^/.]+$/, "").toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+      const cleanImgName = `${Date.now()}-${base}.${ext}`;
       const imgPath = `apps/main-portal/public/uploads/${cleanImgName}`;
       const permanentUrl = `/uploads/${cleanImgName}`;
 
@@ -489,7 +527,17 @@ export async function approveAndMergePR(
       pull_number: pullNumber,
     });
     const headBranch = prData.head.ref;
-    const prAuthor = prData.user?.login || "author";
+    const prAuthor = (prData.user?.login || "author").toLowerCase();
+    const cleanReviewer = reviewerUsername.toLowerCase();
+
+    // STRICT GOVERNANCE CHECK: Authors can NEVER approve their own articles under any role
+    if (prAuthor === cleanReviewer) {
+      return {
+        success: false,
+        merged: false,
+        message: "Self-approval is forbidden. An author cannot approve their own pull request.",
+      };
+    }
 
     // 2. Submit approving review for this reviewer
     try {
@@ -501,7 +549,7 @@ export async function approveAndMergePR(
         body: `Approved by @${reviewerUsername} (${reviewerRole}) via SSN Coding Club CMS Studio`,
       });
     } catch {
-      // Self-review not permitted by GitHub API, continue to evaluation
+      // Continue to evaluation
     }
 
     // 3. Evaluate Quorum Requirements:
@@ -513,28 +561,31 @@ export async function approveAndMergePR(
       isQuorumReached = true;
     } else if (reviewerRole === "deputy") {
       if (authorRole === "member") {
-        // Fetch all current approvals on PR
+        // Fetch all current reviews on PR and compute latest state per reviewer
         const { data: allReviews } = await octokit.pulls.listReviews({
           owner: REPO_OWNER,
           repo: REPO_NAME,
           pull_number: pullNumber,
         });
 
-        const distinctApprovers = Array.from(
-          new Set(
-            allReviews
-              .filter((r) => r.state === "APPROVED")
-              .map((r) => r.user?.login?.toLowerCase())
-              .filter(Boolean) as string[]
-          )
-        );
-
-        // Include current reviewer if not yet in distinctApprovers
-        if (!distinctApprovers.includes(reviewerUsername.toLowerCase())) {
-          distinctApprovers.push(reviewerUsername.toLowerCase());
+        // Compute latest state per distinct user (excluding the PR author)
+        const latestReviewByUser = new Map<string, string>();
+        for (const r of allReviews) {
+          const u = r.user?.login?.toLowerCase();
+          if (u && u !== prAuthor) {
+            latestReviewByUser.set(u, r.state);
+          }
         }
 
-        const deputyApproverCount = distinctApprovers.filter((u) =>
+        // Include current reviewer's approval
+        latestReviewByUser.set(cleanReviewer, "APPROVED");
+
+        // Filter valid approvers: latest state must be strictly APPROVED
+        const validApprovers = Array.from(latestReviewByUser.entries())
+          .filter(([, state]) => state === "APPROVED")
+          .map(([user]) => user);
+
+        const deputyApproverCount = validApprovers.filter((u) =>
           deputyUsernames.map((d) => d.toLowerCase()).includes(u)
         ).length;
 
@@ -544,7 +595,7 @@ export async function approveAndMergePR(
           return {
             success: true,
             merged: false,
-            message: `Deputy approval recorded! (1/2 Deputy Approvals). Awaiting second Deputy or Vertical Head approval.`,
+            message: `Deputy approval recorded! (${deputyApproverCount}/2 Deputy Approvals). Awaiting second Deputy or Vertical Head approval.`,
           };
         }
       } else {
@@ -604,11 +655,19 @@ export async function deletePublishedPost(
   slug: string,
   removerUsername: string
 ): Promise<{ success: boolean; message: string }> {
+  // Security validation: strictly alphanumeric lowercase slugs with hyphens only
+  const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/(^-|-$)/g, "");
+  if (!cleanSlug || cleanSlug !== slug.toLowerCase()) {
+    return { success: false, message: "Security error: Invalid article slug format. Traversal characters are strictly forbidden." };
+  }
+
+  const cleanVertical = vertical.toLowerCase().replace(/[^a-z0-9-]/g, "");
+
   const octokit = getOctokit(token);
   const filePath =
-    vertical === "club"
-      ? `content/club/posts/${slug}.md`
-      : `content/verticals/${vertical}/posts/${slug}.md`;
+    cleanVertical === "club"
+      ? `content/club/posts/${cleanSlug}.md`
+      : `content/verticals/${cleanVertical}/posts/${cleanSlug}.md`;
 
   try {
     const { data } = await octokit.repos.getContent({
@@ -802,6 +861,10 @@ export async function savePersonalDraftBranch(params: PersonalDraftParams): Prom
     pendingImages,
   } = params;
 
+  if (!ALLOWED_VERTICALS.includes(vertical)) {
+    throw new Error(`Invalid technical vertical: '${vertical}'. Must be one of: ${ALLOWED_VERTICALS.join(", ")}`);
+  }
+
   const cleanSlug = (slug || title || "untitled")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -841,7 +904,12 @@ export async function savePersonalDraftBranch(params: PersonalDraftParams): Prom
 
   if (pendingImages && pendingImages.length > 0) {
     for (const img of pendingImages) {
-      const cleanImgName = `${Date.now()}-${img.filename.toLowerCase().replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+      if (!isSafePendingImage(img.filename, img.base64)) {
+        continue;
+      }
+      const ext = img.filename.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] || "png";
+      const base = img.filename.replace(/\.[^/.]+$/, "").toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+      const cleanImgName = `${Date.now()}-${base}.${ext}`;
       const imgPath = `apps/main-portal/public/uploads/${cleanImgName}`;
       const permanentUrl = `/uploads/${cleanImgName}`;
 

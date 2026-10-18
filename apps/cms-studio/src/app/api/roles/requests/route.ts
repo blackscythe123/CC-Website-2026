@@ -52,7 +52,9 @@ function parseRoleRequestIssue(issue: GitHubIssueItem): RoleRequest {
 
   // Fallback to title parsing: [Role Application] @username for vertical (role)
   const titleMatch = issue.title.match(/\[Role Application\]\s*@?([^\s]+)\s+for\s+([^\s]+)\s*\(([^)]+)\)/i);
-  const username = metadata.username || (titleMatch ? titleMatch[1] : issue.user?.login || "unknown");
+  // SECURITY FIX: Strictly bind applicant username to authenticated GitHub issue author
+  // Never trust user-mutable JSON metadata in the issue body for identity
+  const username = issue.user?.login || (titleMatch ? titleMatch[1] : "unknown");
   const vertical = metadata.vertical || (titleMatch ? titleMatch[2] : "ai-ml");
   const rawRole = metadata.requestedRole || (titleMatch ? titleMatch[3].toLowerCase() : "member");
   const requestedRole: "member" | "deputy" | "vertical_head" =

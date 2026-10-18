@@ -45,7 +45,7 @@ export default async function VerticalDynamicPage({
           href="/#verticals"
           className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-stone-600 hover:text-stone-900 transition"
         >
-          &larr; Back to All 10 Verticals
+          &larr; Back to All 8 Verticals
         </Link>
       </div>
 

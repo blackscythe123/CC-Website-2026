@@ -9,6 +9,7 @@
     "build:portal": "pnpm --filter main-portal build",
     "build:cms": "pnpm --filter cms-studio build",
     "test:content": "node scripts/validate-content.mjs",
+    "repurpose": "node scripts/repurpose-post.mjs",
     "ci": "pnpm run test:content && pnpm -r build"
   },
   "devDependencies": {

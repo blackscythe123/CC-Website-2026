@@ -12,15 +12,13 @@ import { getSessionToken } from "@/lib/session";
 
 const ALL_VERTICALS = [
   "ai-ml",
-  "web-dev",
-  "cybersecurity",
-  "cloud-devops",
+  "ar-vr-game-dev",
   "competitive-programming",
-  "mobile-dev",
-  "ui-ux",
-  "blockchain",
-  "iot-embedded",
-  "game-dev",
+  "cybersecurity",
+  "ssnhacks",
+  "design-ui-ux",
+  "full-stack",
+  "open-source",
 ];
 
 interface PublishedPostItem {
@@ -169,6 +167,21 @@ export async function DELETE(request: NextRequest) {
     if (!vertical || !slug) {
       return NextResponse.json(
         { error: "vertical and slug are required to unpublish an article." },
+        { status: 400 }
+      );
+    }
+
+    const validVerticals = [...ALL_VERTICALS, "club"];
+    if (!validVerticals.includes(vertical)) {
+      return NextResponse.json(
+        { error: `Invalid technical vertical: '${vertical}'` },
+        { status: 400 }
+      );
+    }
+
+    if (!/^[a-z0-9-]+$/.test(slug)) {
+      return NextResponse.json(
+        { error: "Invalid article slug format. Path traversal characters are strictly forbidden." },
         { status: 400 }
       );
     }

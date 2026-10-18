@@ -4,7 +4,7 @@ import { getAllVerticals } from "@/lib/verticals";
 
 export const metadata = {
   title: "Cross-Vertical Blog Feed | SSN Coding Club",
-  description: "Browse articles, tutorials, and research notes across all 10 engineering verticals.",
+  description: "Browse articles, tutorials, and research notes across all 8 engineering verticals.",
 };
 
 export default function BlogIndexPage() {

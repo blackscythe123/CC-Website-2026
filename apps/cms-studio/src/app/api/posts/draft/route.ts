@@ -83,6 +83,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const ALLOWED_VERTICALS = [
+      "ai-ml",
+      "ar-vr-game-dev",
+      "competitive-programming",
+      "cybersecurity",
+      "ssnhacks",
+      "design-ui-ux",
+      "full-stack",
+      "open-source",
+      "club",
+    ];
+
+    if (!ALLOWED_VERTICALS.includes(vertical)) {
+      return NextResponse.json(
+        { error: `Invalid vertical '${vertical}'. Allowed verticals are: ${ALLOWED_VERTICALS.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    if (existingBranch && !/^(?:draft|cms)\/[a-z0-9_-]+\/[a-z0-9-]+$/.test(existingBranch)) {
+      return NextResponse.json(
+        { error: "Invalid branch format. Path traversal characters in branch names are strictly forbidden." },
+        { status: 400 }
+      );
+    }
+
     // Role check for club-wide announcements
     if (vertical === "club" && roleInfo.role !== "superadmin") {
       return NextResponse.json(
@@ -127,12 +153,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const cleanSlug =
-      slug ||
-      title
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "");
+    const rawSlug = (slug || title || "").trim();
+    const cleanSlug = rawSlug
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "")
+      .slice(0, 80);
+
+    if (!cleanSlug || cleanSlug.length < 2) {
+      return NextResponse.json(
+        { error: "Invalid article slug or title. Only alphanumeric characters and hyphens are permitted." },
+        { status: 400 }
+      );
+    }
 
     // 1-to-1 Vertical to Portal Mapping (Zero Contradiction Architecture)
     const VERTICAL_PORTAL_MAP: Record<string, string> = {

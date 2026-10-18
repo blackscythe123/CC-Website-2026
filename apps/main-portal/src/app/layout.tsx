@@ -6,8 +6,8 @@ import { getAllVerticals } from "@/lib/verticals";
 import { getAllPosts } from "@/lib/posts";
 
 export const metadata: Metadata = {
-  title: "SSN Coding Club (CC) | 10 Engineering Verticals",
-  description: "Official portal of SSN Coding Club showcasing our 10 autonomous technical verticals, engineering articles, workshops, and open-source projects.",
+  title: "SSN Coding Club (CC) | 8 Engineering Verticals",
+  description: "Official portal of SSN Coding Club showcasing our 8 autonomous technical verticals, engineering articles, workshops, and open-source projects.",
 };
 
 export default function RootLayout({

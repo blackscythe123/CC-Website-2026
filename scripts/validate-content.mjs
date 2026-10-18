@@ -74,6 +74,22 @@ const EventSchema = z.object({
   registrationUrl: z.string().optional(),
 });
 
+const SyndicationSchema = z.object({
+  title: z.string().min(3, "Title must be at least 3 characters"),
+  sourceSlug: z.string().min(1, "sourceSlug is required"),
+  author: z.string().min(2, "Author must be at least 2 characters"),
+  date: z
+    .union([
+      z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Date must follow YYYY-MM-DD format"),
+      z.date(),
+    ])
+    .transform((val) => (val instanceof Date ? val.toISOString().split("T")[0] : val)),
+  vertical: z.enum(VALID_VERTICALS).optional(),
+  canonicalUrl: z.string().url().optional(),
+  status: z.enum(["draft", "scheduled", "published"]).optional(),
+  platforms: z.array(z.string()).optional(),
+});
+
 // Helper to recursively find all markdown files in content directory
 function findMarkdownFiles(dir) {
   let results = [];
@@ -128,8 +144,11 @@ for (const filePath of allPostFiles) {
 
   // Schema Validation based on content type
   const isEvent = relativePath.includes("events");
+  const isSyndication = relativePath.includes("syndication");
   const schemaResult = isEvent
     ? EventSchema.safeParse(parsed.data)
+    : isSyndication
+    ? SyndicationSchema.safeParse(parsed.data)
     : PostSchema.safeParse(parsed.data);
 
   if (!schemaResult.success) {
@@ -140,7 +159,7 @@ for (const filePath of allPostFiles) {
         issue: `Frontmatter error at '${err.path.join(".")}': ${err.message}`,
       });
     }
-  } else if (!isEvent) {
+  } else if (!isEvent && !isSyndication) {
     const data = schemaResult.data;
 
     // Target Portals Validation

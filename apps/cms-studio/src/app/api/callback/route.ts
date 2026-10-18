@@ -4,8 +4,15 @@ import { setSessionCookie } from "@/lib/session";
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
+  const state = searchParams.get("state");
+  const cookieState = request.cookies.get("oauth_state")?.value;
   const error = searchParams.get("error");
   const errorDescription = searchParams.get("error_description");
+
+  // Prevent OAuth CSRF attacks by strictly validating the cryptographic state parameter
+  if (!state || !cookieState || state !== cookieState) {
+    return new NextResponse("OAuth state verification failed. Possible CSRF attempt detected.", { status: 403 });
+  }
 
   if (error) {
     const errorHtml = `
@@ -97,7 +104,32 @@ export async function GET(request: NextRequest) {
       headers: { "Content-Type": "text/html" },
     });
 
-    setSessionCookie(responseObj, token);
+    // Clear consumed oauth_state cookie to prevent replay
+    responseObj.cookies.set("oauth_state", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+
+    let userLogin: string | undefined;
+    try {
+      const userRes = await fetch("https://api.github.com/user", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "User-Agent": "coding-club-cms-studio",
+        },
+      });
+      if (userRes.ok) {
+        const u = await userRes.json();
+        userLogin = u.login;
+      }
+    } catch {
+      // Non-fatal
+    }
+
+    setSessionCookie(responseObj, token, userLogin);
 
     return responseObj;
   } catch (err: unknown) {

@@ -94,18 +94,37 @@ export async function POST(request: NextRequest) {
 
     // Anti-IDOR: Fetch actual PR from GitHub to verify true target vertical
     const prData = await getPRDetails(token, pullNumber);
+    const authorUsername = prData.user?.login || "unknown";
 
-    // Parse true vertical from PR title or branch name
+    // Strictly enforce anti-self-review: Authors can NEVER review or approve their own PRs
+    if (userData.login.toLowerCase() === authorUsername.toLowerCase()) {
+      return NextResponse.json(
+        {
+          error: "Access Denied: Self-review is strictly forbidden. Authors cannot review, approve, or request changes on their own pull requests.",
+        },
+        { status: 403 }
+      );
+    }
+
+    // Determine true vertical from PR article content to prevent PR title vertical spoofing
     let actualVertical = "general";
-    const titleMatch =
-      prData.title.match(/\[(?:Draft:\s*)?([a-zA-Z0-9_-]+)\]/i) ||
-      prData.title.match(/feat\(([a-zA-Z0-9_-]+)\)/i);
-    const branchMatch = prData.head.ref.match(/^(?:draft|cms)\/([a-zA-Z0-9_-]+)\//i);
+    try {
+      const article = await getPRArticleContent(token, pullNumber);
+      if (article.vertical) {
+        actualVertical = article.vertical.toLowerCase();
+      }
+    } catch {
+      // Fallback to title/branch parsing if content retrieval is unavailable
+      const titleMatch =
+        prData.title.match(/\[(?:Draft:\s*)?([a-zA-Z0-9_-]+)\]/i) ||
+        prData.title.match(/feat\(([a-zA-Z0-9_-]+)\)/i);
+      const branchMatch = prData.head.ref.match(/^(?:draft|cms)\/([a-zA-Z0-9_-]+)\//i);
 
-    if (titleMatch && titleMatch[1]) {
-      actualVertical = titleMatch[1].toLowerCase();
-    } else if (branchMatch && branchMatch[1]) {
-      actualVertical = branchMatch[1].toLowerCase();
+      if (titleMatch && titleMatch[1]) {
+        actualVertical = titleMatch[1].toLowerCase();
+      } else if (branchMatch && branchMatch[1]) {
+        actualVertical = branchMatch[1].toLowerCase();
+      }
     }
 
     // Verify reviewer authority
@@ -139,7 +158,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Handling Approval (Multi-Deputy Quorum check)
-    const authorUsername = prData.user?.login || "unknown";
     const authorRoleInfo = getUserRoleInfo(authorUsername);
     const allRoles = readRoles();
     const deputiesInVertical = allRoles.deputies[actualVertical] || [];

@@ -2,15 +2,13 @@ import { z } from "zod";
 
 export const VALID_VERTICALS = [
   "ai-ml",
-  "web-dev",
-  "cybersecurity",
-  "cloud-devops",
+  "ar-vr-game-dev",
   "competitive-programming",
-  "mobile-dev",
-  "ui-ux",
-  "blockchain",
-  "iot-embedded",
-  "game-dev",
+  "cybersecurity",
+  "ssnhacks",
+  "design-ui-ux",
+  "full-stack",
+  "open-source",
   "club",
 ] as const;
 
@@ -43,6 +41,24 @@ export const PostFrontmatterSchema = z.object({
 });
 
 export type PostFrontmatter = z.infer<typeof PostFrontmatterSchema>;
+
+export const SyndicationFrontmatterSchema = z.object({
+  title: z.string().min(3, "Title must be at least 3 characters"),
+  sourceSlug: z.string().min(1, "sourceSlug is required"),
+  vertical: z.enum(VALID_VERTICALS).optional(),
+  author: z.string().min(2, "Author must be at least 2 characters"),
+  date: z
+    .union([
+      z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Date must follow YYYY-MM-DD format"),
+      z.date(),
+    ])
+    .transform((val) => (val instanceof Date ? val.toISOString().split("T")[0] : val)),
+  canonicalUrl: z.string().url().optional(),
+  status: z.enum(["draft", "scheduled", "published"]).optional().default("draft"),
+  platforms: z.array(z.string()).optional().default(["twitter", "linkedin", "discord", "whatsapp"]),
+});
+
+export type SyndicationFrontmatter = z.infer<typeof SyndicationFrontmatterSchema>;
 
 export interface PortalConfig {
   id: string;

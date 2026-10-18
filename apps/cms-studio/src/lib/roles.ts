@@ -29,6 +29,7 @@ export interface UserRoleInfo {
   username: string;
   role: UserRoleType;
   verticals: string[];
+  rolesByVertical?: Record<string, UserRoleType>;
 }
 
 const ROLES_FILE_PATH = path.resolve(process.cwd(), "../../content/club/roles.json");
@@ -97,6 +98,10 @@ export function getUserRoleInfo(username: string): UserRoleInfo {
   // Tier 1: Superadmin (Controls all)
   const isSuperadmin = roles.superadmins.some((u) => u.toLowerCase() === normalized);
   if (isSuperadmin) {
+    const rolesByVertical: Record<string, UserRoleType> = {};
+    ALL_VERTICAL_SLUGS.forEach((v) => {
+      rolesByVertical[v] = "superadmin";
+    });
     return {
       username,
       role: "superadmin",
@@ -104,73 +109,76 @@ export function getUserRoleInfo(username: string): UserRoleInfo {
         "club",
         ...ALL_VERTICAL_SLUGS,
       ],
+      rolesByVertical,
     };
   }
 
-  // Tier 2: Vertical Head (Admin for that vertical - strictly 1 per vertical)
-  const headVerticals: string[] = [];
+  // Cross-vertical role mapping
+  const rolesByVertical: Record<string, UserRoleType> = {};
+  const allVerticalsSet = new Set<string>();
+
   for (const [vertical, heads] of Object.entries(roles.vertical_heads || {})) {
     if (Array.isArray(heads) && heads.some((u) => u.toLowerCase() === normalized)) {
-      headVerticals.push(vertical);
+      rolesByVertical[vertical] = "vertical_head";
+      allVerticalsSet.add(vertical);
     }
   }
 
-  if (headVerticals.length > 0) {
-    return {
-      username,
-      role: "vertical_head",
-      verticals: headVerticals,
-    };
-  }
-
-  // Tier 3: Deputy (Co-lead / Reviewer for that vertical)
-  const deputyVerticals: string[] = [];
   for (const [vertical, deps] of Object.entries(roles.deputies || {})) {
     if (Array.isArray(deps) && deps.some((u) => u.toLowerCase() === normalized)) {
-      deputyVerticals.push(vertical);
+      if (!rolesByVertical[vertical]) {
+        rolesByVertical[vertical] = "deputy";
+      }
+      allVerticalsSet.add(vertical);
     }
   }
 
-  if (deputyVerticals.length > 0) {
-    return {
-      username,
-      role: "deputy",
-      verticals: deputyVerticals,
-    };
-  }
-
-  // Tier 4: Member (Assigned to specific vertical(s))
-  const memberVerticals: string[] = [];
   for (const [vertical, mems] of Object.entries(roles.members || {})) {
     if (Array.isArray(mems) && mems.some((u) => u.toLowerCase() === normalized)) {
-      memberVerticals.push(vertical);
+      if (!rolesByVertical[vertical]) {
+        rolesByVertical[vertical] = "member";
+      }
+      allVerticalsSet.add(vertical);
     }
+  }
+
+  const assignedVerticals = Array.from(allVerticalsSet);
+  const rolesList = Object.values(rolesByVertical);
+
+  let primaryRole: UserRoleType = "member";
+  if (rolesList.includes("vertical_head")) {
+    primaryRole = "vertical_head";
+  } else if (rolesList.includes("deputy")) {
+    primaryRole = "deputy";
+  } else {
+    primaryRole = "member";
   }
 
   return {
     username,
-    role: "member",
-    verticals: memberVerticals,
+    role: primaryRole,
+    verticals: assignedVerticals,
+    rolesByVertical,
   };
 }
 
 export function canUserApproveVertical(username: string, vertical: string): boolean {
-  const info = getUserRoleInfo(username);
-  if (info.role === "superadmin") return true;
-  if (
-    (info.role === "vertical_head" || info.role === "deputy") &&
-    info.verticals.includes(vertical)
-  ) {
-    return true;
-  }
-  return false;
+  const roles = readRoles();
+  const normalized = username.toLowerCase().trim();
+  if (roles.superadmins.some((u) => u.toLowerCase() === normalized)) return true;
+
+  const isHead = roles.vertical_heads[vertical]?.some((u) => u.toLowerCase() === normalized);
+  const isDep = roles.deputies[vertical]?.some((u) => u.toLowerCase() === normalized);
+  return Boolean(isHead || isDep);
 }
 
 export function canDeletePost(username: string, vertical: string): boolean {
-  const info = getUserRoleInfo(username);
-  if (info.role === "superadmin") return true;
-  if (info.role === "vertical_head" && info.verticals.includes(vertical)) return true;
-  return false;
+  const roles = readRoles();
+  const normalized = username.toLowerCase().trim();
+  if (roles.superadmins.some((u) => u.toLowerCase() === normalized)) return true;
+
+  const isHead = roles.vertical_heads[vertical]?.some((u) => u.toLowerCase() === normalized);
+  return Boolean(isHead);
 }
 
 export function canApproveRoleRequest(
@@ -178,25 +186,26 @@ export function canApproveRoleRequest(
   requestedRole: "member" | "deputy" | "vertical_head",
   vertical: string
 ): boolean {
-  const info = getUserRoleInfo(reviewerUsername);
-  if (info.role === "superadmin") return true;
+  const roles = readRoles();
+  const normalized = reviewerUsername.toLowerCase().trim();
+  if (roles.superadmins.some((u) => u.toLowerCase() === normalized)) return true;
 
   if (requestedRole === "vertical_head") {
     // Only Super Admin can approve a Vertical Head
     return false;
   }
 
+  const isHead = roles.vertical_heads[vertical]?.some((u) => u.toLowerCase() === normalized);
+  const isDep = roles.deputies[vertical]?.some((u) => u.toLowerCase() === normalized);
+
   if (requestedRole === "deputy") {
     // Vertical Head of that vertical or Super Admin
-    return info.role === "vertical_head" && info.verticals.includes(vertical);
+    return Boolean(isHead);
   }
 
   if (requestedRole === "member") {
-    // Deputy of that vertical, Vertical Head of that vertical, or Super Admin
-    return (
-      (info.role === "vertical_head" || info.role === "deputy") &&
-      info.verticals.includes(vertical)
-    );
+    // Deputy or Vertical Head of that vertical, or Super Admin
+    return Boolean(isHead || isDep);
   }
 
   return false;
@@ -243,6 +252,12 @@ export function assignRole(
   }
 
   if (role === "deputy") {
+    // Purge head or member in this vertical on promotion/demotion
+    if (updated.vertical_heads[vertical]) {
+      updated.vertical_heads[vertical] = updated.vertical_heads[vertical].filter(
+        (u) => u.toLowerCase() !== cleanUser
+      );
+    }
     if (!updated.deputies[vertical]) updated.deputies[vertical] = [];
     if (!updated.deputies[vertical].some((u) => u.toLowerCase() === cleanUser)) {
       updated.deputies[vertical].push(cleanUser);
@@ -256,6 +271,17 @@ export function assignRole(
   }
 
   if (role === "member") {
+    // Purge head or deputy in this vertical on demotion
+    if (updated.vertical_heads[vertical]) {
+      updated.vertical_heads[vertical] = updated.vertical_heads[vertical].filter(
+        (u) => u.toLowerCase() !== cleanUser
+      );
+    }
+    if (updated.deputies[vertical]) {
+      updated.deputies[vertical] = updated.deputies[vertical].filter(
+        (u) => u.toLowerCase() !== cleanUser
+      );
+    }
     if (!updated.members[vertical]) updated.members[vertical] = [];
     if (!updated.members[vertical].some((u) => u.toLowerCase() === cleanUser)) {
       updated.members[vertical].push(cleanUser);
@@ -318,17 +344,23 @@ export async function writeRolesAndSyncCodeowners(
 ): Promise<void> {
   const rolesJsonContent = JSON.stringify(roles, null, 2);
 
-  // Generate .github/CODEOWNERS
-  const superowner = roles.superadmins[0] ? `@${roles.superadmins[0]}` : "@blackscythe123";
+  // Generate .github/CODEOWNERS (include all superadmins)
+  const allSuperowners =
+    roles.superadmins.length > 0
+      ? roles.superadmins.map((s) => `@${s}`).join(" ")
+      : "@blackscythe123";
   let codeownersContent = `# SSN Coding Club CMS - Code Owners & Editorial Approval Mapping\n# Auto-generated from content/club/roles.json\n\n`;
-  codeownersContent += `* ${superowner}\n\n`;
-  codeownersContent += `# Announcements & Club Core\ncontent/club/** ${superowner}\n\n`;
+  codeownersContent += `* ${allSuperowners}\n\n`;
+  codeownersContent += `# Announcements & Club Core\ncontent/club/** ${allSuperowners}\n\n`;
 
   for (const vertical of ALL_VERTICAL_SLUGS) {
     const heads = roles.vertical_heads[vertical] || [];
     const deps = roles.deputies[vertical] || [];
     const allApprovers = [...heads, ...deps];
-    const reviewers = allApprovers.length > 0 ? allApprovers.map((h) => `@${h}`).join(" ") : superowner;
+    const reviewers =
+      allApprovers.length > 0
+        ? allApprovers.map((h) => `@${h}`).join(" ")
+        : allSuperowners;
     codeownersContent += `content/verticals/${vertical}/** ${reviewers}\n`;
   }
 

@@ -100,21 +100,33 @@ export async function GET(request: NextRequest) {
 
     const userData = await userRes.json();
     const roleInfo = getUserRoleInfo(userData.login);
-    const octokit = new Octokit({ auth: token });
+    const activeToken = process.env.GITHUB_ADMIN_TOKEN || token;
+    const octokit = new Octokit({ auth: activeToken });
 
     let issueRequests: RoleRequest[] = [];
     try {
+      // Query recent issues and match either by label or by [Role Application] title prefix
+      // (Handles GitHub stripping labels when non-collaborator applicants submit issues)
       const { data: issues } = await octokit.issues.listForRepo({
         owner: REPO_OWNER,
         repo: REPO_NAME,
-        labels: LABEL_ROLE_APPLICATION,
         state: "all",
         sort: "created",
         direction: "desc",
         per_page: 50,
       });
 
-      issueRequests = issues.map(parseRoleRequestIssue);
+      const roleIssues = issues.filter((iss) => {
+        const hasLabel = iss.labels?.some(
+          (lbl) =>
+            (typeof lbl === "string" ? lbl : lbl.name)?.toLowerCase() ===
+            LABEL_ROLE_APPLICATION.toLowerCase()
+        );
+        const hasTitlePrefix = iss.title.trim().toLowerCase().startsWith("[role application]");
+        return Boolean(hasLabel || hasTitlePrefix);
+      });
+
+      issueRequests = roleIssues.map(parseRoleRequestIssue);
     } catch (issueErr) {
       console.warn("Failed to fetch issues for role applications:", issueErr);
     }
@@ -131,10 +143,13 @@ export async function GET(request: NextRequest) {
     const visibleRequests = allRequests.filter((req) => {
       if (roleInfo.role === "superadmin") return true;
       if (req.username.toLowerCase() === userData.login.toLowerCase()) return true;
-      if (roleInfo.role === "vertical_head" && roleInfo.verticals.includes(req.vertical)) {
+
+      const userRoleInVert = roleInfo.rolesByVertical?.[req.vertical] || roleInfo.role;
+      if (userRoleInVert === "superadmin") return true;
+      if (userRoleInVert === "vertical_head") {
         return req.requestedRole === "member" || req.requestedRole === "deputy";
       }
-      if (roleInfo.role === "deputy" && roleInfo.verticals.includes(req.vertical)) {
+      if (userRoleInVert === "deputy") {
         return req.requestedRole === "member";
       }
       return false;
@@ -187,20 +202,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const activeToken = process.env.GITHUB_ADMIN_TOKEN || token;
     const octokit = new Octokit({ auth: token });
+    const adminOctokit = new Octokit({ auth: activeToken });
 
     // Check if duplicate open issue already exists
     let existingDuplicate = false;
     try {
-      const { data: existingIssues } = await octokit.issues.listForRepo({
+      const { data: existingIssues } = await adminOctokit.issues.listForRepo({
         owner: REPO_OWNER,
         repo: REPO_NAME,
-        labels: LABEL_ROLE_APPLICATION,
         state: "open",
         creator: userData.login,
       });
 
       existingDuplicate = existingIssues.some((iss) => {
+        const hasLabel = iss.labels?.some(
+          (lbl) =>
+            (typeof lbl === "string" ? lbl : lbl.name)?.toLowerCase() ===
+            LABEL_ROLE_APPLICATION.toLowerCase()
+        );
+        const hasTitlePrefix = iss.title.trim().toLowerCase().startsWith("[role application]");
+        if (!hasLabel && !hasTitlePrefix) return false;
+
         const parsed = parseRoleRequestIssue(iss);
         return (
           parsed.username.toLowerCase() === userData.login.toLowerCase() &&
@@ -251,6 +275,21 @@ ${JSON.stringify(
       labels: [LABEL_ROLE_APPLICATION],
       body: issueBody,
     });
+
+    // Ensure the label is attached using the privileged admin token
+    // (since GitHub API silently drops labels if applicant is not yet a repo collaborator)
+    if (process.env.GITHUB_ADMIN_TOKEN) {
+      try {
+        await adminOctokit.issues.addLabels({
+          owner: REPO_OWNER,
+          repo: REPO_NAME,
+          issue_number: createdIssue.number,
+          labels: [LABEL_ROLE_APPLICATION],
+        });
+      } catch (labelErr) {
+        console.warn("Could not attach label with admin token:", labelErr);
+      }
+    }
 
     const parsedRequest = parseRoleRequestIssue(createdIssue);
 

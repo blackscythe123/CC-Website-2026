@@ -37,7 +37,7 @@ const ALT_ROLES_FILE_PATH = path.resolve(process.cwd(), "content/club/roles.json
 const CODEOWNERS_PATH = path.resolve(process.cwd(), "../../.github/CODEOWNERS");
 const ALT_CODEOWNERS_PATH = path.resolve(process.cwd(), ".github/CODEOWNERS");
 
-const ALL_VERTICAL_SLUGS = [
+export const ALL_VERTICAL_SLUGS = [
   "ai-ml",
   "ar-vr-game-dev",
   "competitive-programming",
@@ -47,6 +47,8 @@ const ALL_VERTICAL_SLUGS = [
   "full-stack",
   "open-source",
 ];
+
+export const GITHUB_USERNAME_REGEX = /^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/;
 
 function getRolesFilePath(): string {
   if (fs.existsSync(ROLES_FILE_PATH)) return ROLES_FILE_PATH;
@@ -218,6 +220,9 @@ export function assignRole(
   vertical?: string
 ): ClubRoles {
   const cleanUser = targetUsername.toLowerCase().trim().replace(/^@/, "");
+  if (!GITHUB_USERNAME_REGEX.test(cleanUser)) {
+    throw new Error(`Invalid GitHub username '${cleanUser}'. Traversal or special characters are strictly forbidden.`);
+  }
   const updated: ClubRoles = {
     superadmins: [...(roles.superadmins || [])],
     vertical_heads: { ...(roles.vertical_heads || {}) },

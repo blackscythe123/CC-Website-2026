@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createDraftAndPullRequest } from "@/lib/github";
+import { createDraftAndPullRequest, getPRDetails } from "@/lib/github";
 import { getUserRoleInfo } from "@/lib/roles";
 import { getSessionToken } from "@/lib/session";
 
@@ -109,6 +109,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let verifiedPullNumber: number | undefined = undefined;
+    if (pullNumber) {
+      const parsedPull = parseInt(String(pullNumber), 10);
+      if (isNaN(parsedPull) || parsedPull <= 0) {
+        return NextResponse.json({ error: "Invalid pullNumber format." }, { status: 400 });
+      }
+
+      // Anti-IDOR: verify that the PR actually belongs to the authenticated user (or superadmin)
+      try {
+        const prDetails = await getPRDetails(token, parsedPull);
+        const prAuthor = prDetails.user?.login?.toLowerCase();
+        if (prAuthor !== userData.login.toLowerCase() && roleInfo.role !== "superadmin") {
+          return NextResponse.json(
+            { error: "Access Denied: You cannot submit revisions to a Pull Request opened by another author." },
+            { status: 403 }
+          );
+        }
+
+        if (existingBranch && existingBranch !== prDetails.head.ref) {
+          return NextResponse.json(
+            {
+              error: `Branch mismatch: specified branch '${existingBranch}' does not match PR branch '${prDetails.head.ref}'.`,
+            },
+            { status: 400 }
+          );
+        }
+        verifiedPullNumber = parsedPull;
+      } catch (prErr: unknown) {
+        const errorMsg = prErr instanceof Error ? prErr.message : "Failed to verify Pull Request ownership";
+        return NextResponse.json({ error: `Invalid PR #${parsedPull}: ${errorMsg}` }, { status: 404 });
+      }
+    }
+
     // Role check for club-wide announcements
     if (vertical === "club" && roleInfo.role !== "superadmin") {
       return NextResponse.json(
@@ -196,14 +229,14 @@ export async function POST(request: NextRequest) {
       tags: Array.isArray(tags) ? tags : [],
       markdownBody,
       pendingImages: Array.isArray(pendingImages) ? pendingImages : [],
-      pullNumber: pullNumber ? parseInt(String(pullNumber), 10) : undefined,
+      pullNumber: verifiedPullNumber,
       existingBranch: existingBranch || undefined,
     });
 
     return NextResponse.json({
       success: true,
-      message: pullNumber
-        ? `Revisions committed to PR #${pullNumber} successfully!`
+      message: verifiedPullNumber
+        ? `Revisions committed to PR #${verifiedPullNumber} successfully!`
         : `Post submitted for review! Pull Request #${result.pullNumber} opened.`,
       ...result,
     });

@@ -6,6 +6,8 @@ import {
   getUserRoleInfo,
   assignRole,
   removeRole,
+  ALL_VERTICAL_SLUGS,
+  GITHUB_USERNAME_REGEX,
 } from "@/lib/roles";
 import { getSessionToken } from "@/lib/session";
 
@@ -142,11 +144,43 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action, targetUsername, role, vertical } = body;
 
+    if (!action || !["assign", "remove"].includes(action)) {
+      return NextResponse.json(
+        { error: "action must be either 'assign' or 'remove'." },
+        { status: 400 }
+      );
+    }
+
     if (!targetUsername || !role) {
       return NextResponse.json(
         { error: "targetUsername and role are required." },
         { status: 400 }
       );
+    }
+
+    const cleanUsername = String(targetUsername).trim().replace(/^@/, "");
+    if (!GITHUB_USERNAME_REGEX.test(cleanUsername)) {
+      return NextResponse.json(
+        { error: "Invalid GitHub username. Traversal or special characters are strictly forbidden." },
+        { status: 400 }
+      );
+    }
+
+    const validRoles = ["superadmin", "vertical_head", "deputy", "member"];
+    if (!validRoles.includes(role)) {
+      return NextResponse.json(
+        { error: `Invalid role '${role}'. Must be one of: ${validRoles.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    if (role !== "superadmin") {
+      if (!vertical || !ALL_VERTICAL_SLUGS.includes(vertical)) {
+        return NextResponse.json(
+          { error: `A valid technical vertical is required for role '${role}'. Allowed verticals: ${ALL_VERTICAL_SLUGS.join(", ")}` },
+          { status: 400 }
+        );
+      }
     }
 
     // Role Allocation Governance Check:
@@ -191,9 +225,9 @@ export async function POST(request: NextRequest) {
     let roles = readRoles();
 
     if (action === "assign") {
-      roles = assignRole(roles, targetUsername, role, vertical);
+      roles = assignRole(roles, cleanUsername, role, vertical);
     } else if (action === "remove") {
-      roles = removeRole(roles, targetUsername, role, vertical);
+      roles = removeRole(roles, cleanUsername, role, vertical);
     }
 
     // Serverless-safe commit with GitHub Token to main

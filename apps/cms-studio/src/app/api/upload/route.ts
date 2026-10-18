@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { uploadImageToGitHub } from "@/lib/github";
+import { getUserRoleInfo } from "@/lib/roles";
 import { getSessionToken } from "@/lib/session";
 
 export async function POST(request: NextRequest) {
@@ -10,6 +11,58 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // 1. Verify user identity
+    const userRes = await fetch("https://api.github.com/user", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "User-Agent": "coding-club-cms-studio",
+      },
+    });
+
+    if (!userRes.ok) {
+      return NextResponse.json({ error: "Invalid GitHub token." }, { status: 401 });
+    }
+
+    const userData = await userRes.json();
+    const roleInfo = getUserRoleInfo(userData.login);
+
+    // 2. Strictly enforce repository collaborator permission
+    const repoRes = await fetch("https://api.github.com/repos/blackscythe123/CC-Website-2026", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "User-Agent": "coding-club-cms-studio",
+      },
+    });
+
+    if (repoRes.ok) {
+      const repoData = await repoRes.json();
+      if (!repoData.permissions?.push && !repoData.permissions?.admin) {
+        return NextResponse.json(
+          {
+            error:
+              "Access Denied: Internal tool only. Repo collaborator permission required.",
+          },
+          { status: 403 }
+        );
+      }
+    } else {
+      return NextResponse.json(
+        { error: "Access Denied: Repository collaborator access required." },
+        { status: 403 }
+      );
+    }
+
+    // 3. Unassigned members are not authorized to upload directly
+    if (roleInfo.role === "member" && (!roleInfo.verticals || roleInfo.verticals.length === 0)) {
+      return NextResponse.json(
+        {
+          error:
+            "Access Denied: You must be assigned to a technical vertical in Governance & Roles before uploading media.",
+        },
+        { status: 403 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
 

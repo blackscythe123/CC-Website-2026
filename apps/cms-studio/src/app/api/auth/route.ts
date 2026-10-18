@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const { searchParams } = new URL(request.url);
-  const scope = searchParams.get("scope") || "repo,user";
+  // Strictly fixed OAuth scope to prevent arbitrary scope manipulation
+  const scope = "repo,user";
   const state = crypto.randomUUID();
 
   const authUrl = new URL("https://github.com/login/oauth/authorize");

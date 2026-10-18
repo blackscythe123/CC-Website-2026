@@ -25,6 +25,32 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const ALLOWED_VERTICALS = [
+    "ai-ml",
+    "ar-vr-game-dev",
+    "competitive-programming",
+    "cybersecurity",
+    "ssnhacks",
+    "design-ui-ux",
+    "full-stack",
+    "open-source",
+    "club",
+  ];
+
+  if (!ALLOWED_VERTICALS.includes(vertical)) {
+    return NextResponse.json(
+      { error: `Invalid technical vertical: '${vertical}'` },
+      { status: 400 }
+    );
+  }
+
+  if (!/^[a-z0-9-]+$/.test(slug)) {
+    return NextResponse.json(
+      { error: "Invalid article slug format. Path traversal characters are strictly forbidden." },
+      { status: 400 }
+    );
+  }
+
   try {
     let rawMarkdown = "";
 

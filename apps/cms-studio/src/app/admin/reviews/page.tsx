@@ -247,10 +247,12 @@ export default function EditorialReviewsPage() {
         ) : (
           <div className="space-y-4">
             {prs.map((pr) => {
+              const isAuthor = user && pr.author.toLowerCase() === user.login.toLowerCase();
               const canReview =
-                roleInfo?.role === "superadmin" ||
-                ((roleInfo?.role === "vertical_head" || roleInfo?.role === "deputy") &&
-                  roleInfo.verticals.includes(pr.vertical));
+                !isAuthor &&
+                (roleInfo?.role === "superadmin" ||
+                  ((roleInfo?.role === "vertical_head" || roleInfo?.role === "deputy") &&
+                    roleInfo.verticals.includes(pr.vertical)));
 
               const hasApproved =
                 user && pr.approvers?.map((a) => a.toLowerCase()).includes(user.login.toLowerCase());

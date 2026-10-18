@@ -7,6 +7,7 @@ import {
   canApproveRoleRequest,
   assignRole,
   RoleRequest,
+  ALL_VERTICAL_SLUGS,
 } from "@/lib/roles";
 import { getSessionToken } from "@/lib/session";
 
@@ -202,6 +203,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const validRoles = ["member", "deputy", "vertical_head"];
+    if (!validRoles.includes(requestedRole)) {
+      return NextResponse.json(
+        { error: `Invalid requestedRole '${requestedRole}'. Allowed roles: ${validRoles.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    if (!ALL_VERTICAL_SLUGS.includes(vertical)) {
+      return NextResponse.json(
+        { error: `Invalid vertical '${vertical}'. Allowed verticals: ${ALL_VERTICAL_SLUGS.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
     const activeToken = process.env.GITHUB_ADMIN_TOKEN || token;
     const octokit = new Octokit({ auth: token });
     const adminOctokit = new Octokit({ auth: activeToken });
@@ -359,6 +375,27 @@ export async function PATCH(request: NextRequest) {
 
     if (!targetReq) {
       return NextResponse.json({ error: "Request not found." }, { status: 404 });
+    }
+
+    if (targetReq.status !== "pending") {
+      return NextResponse.json(
+        { error: `Request has already been evaluated (current status: ${targetReq.status}).` },
+        { status: 400 }
+      );
+    }
+
+    // Strictly enforce anti-self-approval: Applicants cannot approve or reject their own role requests
+    if (
+      userData.login.toLowerCase() === targetReq.username.toLowerCase() &&
+      reviewerRoleInfo.role !== "superadmin"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Access Denied: Self-approval is strictly forbidden. Applicants cannot evaluate their own role application.",
+        },
+        { status: 403 }
+      );
     }
 
     // Verify reviewer authority

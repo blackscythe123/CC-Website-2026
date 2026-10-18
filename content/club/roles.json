@@ -20,7 +20,9 @@
     "cybersecurity": [],
     "ssnhacks": [],
     "design-ui-ux": [],
-    "full-stack": [],
+    "full-stack": [
+      "amdravidranjan"
+    ],
     "open-source": []
   },
   "members": {
@@ -31,7 +33,9 @@
     "ssnhacks": [],
     "design-ui-ux": [],
     "full-stack": [
-      "isha666"
+      "isha666",
+      "barath-j593",
+      "rishirithesh"
     ],
     "open-source": []
   },

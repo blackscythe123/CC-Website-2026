@@ -179,8 +179,27 @@ export function canApproveRoleRequest(
   vertical: string
 ): boolean {
   const info = getUserRoleInfo(reviewerUsername);
-  // Only Super Admin can approve/commit role changes because main branch is protected
-  return info.role === "superadmin";
+  if (info.role === "superadmin") return true;
+
+  if (requestedRole === "vertical_head") {
+    // Only Super Admin can approve a Vertical Head
+    return false;
+  }
+
+  if (requestedRole === "deputy") {
+    // Vertical Head of that vertical or Super Admin
+    return info.role === "vertical_head" && info.verticals.includes(vertical);
+  }
+
+  if (requestedRole === "member") {
+    // Deputy of that vertical, Vertical Head of that vertical, or Super Admin
+    return (
+      (info.role === "vertical_head" || info.role === "deputy") &&
+      info.verticals.includes(vertical)
+    );
+  }
+
+  return false;
 }
 
 export function assignRole(
@@ -294,7 +313,8 @@ export function removeRole(
 
 export async function writeRolesAndSyncCodeowners(
   roles: ClubRoles,
-  githubToken?: string
+  githubToken?: string,
+  authorAttestation?: { name: string; email: string; message?: string }
 ): Promise<void> {
   const rolesJsonContent = JSON.stringify(roles, null, 2);
 
@@ -327,12 +347,19 @@ export async function writeRolesAndSyncCodeowners(
     console.warn("Local file write skipped (read-only environment):", err);
   }
 
-  // 2. If GitHub token is present, commit to GitHub directly (Serverless/Vercel Safe)
-  if (githubToken) {
+  // 2. Commit to GitHub directly using admin token or reviewer session token
+  const activeToken = process.env.GITHUB_ADMIN_TOKEN || githubToken;
+  if (activeToken) {
     try {
-      const octokit = new Octokit({ auth: githubToken });
+      const octokit = new Octokit({ auth: activeToken });
       const owner = "blackscythe123";
       const repo = "CC-Website-2026";
+
+      const commitAuthor = authorAttestation
+        ? { name: authorAttestation.name, email: authorAttestation.email }
+        : undefined;
+
+      const commitMessage = authorAttestation?.message || "chore(governance): update roles hierarchy";
 
       // Commit roles.json
       let rolesSha: string | undefined;
@@ -351,10 +378,11 @@ export async function writeRolesAndSyncCodeowners(
         owner,
         repo,
         path: "content/club/roles.json",
-        message: "chore(governance): update roles hierarchy",
+        message: commitMessage,
         content: Buffer.from(rolesJsonContent, "utf-8").toString("base64"),
         sha: rolesSha,
         branch: "main",
+        ...(commitAuthor ? { author: commitAuthor } : {}),
       });
 
       // Commit .github/CODEOWNERS
@@ -378,6 +406,7 @@ export async function writeRolesAndSyncCodeowners(
         content: Buffer.from(codeownersContent, "utf-8").toString("base64"),
         sha: codeownersSha,
         branch: "main",
+        ...(commitAuthor ? { author: commitAuthor } : {}),
       });
     } catch (gitErr) {
       console.error("Error committing roles update to GitHub:", gitErr);

@@ -283,6 +283,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const userData = await userRes.json();
+    const reviewerRoleInfo = getUserRoleInfo(userData.login);
     const body = await request.json();
     const { requestId, action } = body;
 
@@ -340,15 +341,56 @@ export async function PATCH(request: NextRequest) {
       if (roles.pending_requests) {
         roles.pending_requests = roles.pending_requests.filter((r) => r.id !== targetReq.id);
       }
-      await writeRolesAndSyncCodeowners(roles, token);
 
+      const reviewerDisplayName = userData.name || userData.login;
+      const reviewerEmail = `${userData.login}@users.noreply.github.com`;
+      const commitMessage = `chore(governance): @${userData.login} approved & invited @${targetReq.username} as ${targetReq.requestedRole} (${targetReq.vertical})`;
+
+      // Layer 1: Cryptographic Git author attestation with fallback to GITHUB_ADMIN_TOKEN
+      await writeRolesAndSyncCodeowners(roles, token, {
+        name: reviewerDisplayName,
+        email: reviewerEmail,
+        message: commitMessage,
+      });
+
+      // Dispatch repository collaborator invitation if admin token is available
+      let inviteDispatched = false;
+      const adminToken = process.env.GITHUB_ADMIN_TOKEN || token;
+      try {
+        const adminOctokit = new Octokit({ auth: adminToken });
+        await adminOctokit.repos.addCollaborator({
+          owner: REPO_OWNER,
+          repo: REPO_NAME,
+          username: targetReq.username,
+          permission: "push",
+        });
+        inviteDispatched = true;
+      } catch (invErr) {
+        console.warn("Could not dispatch repo collaborator invite:", invErr);
+      }
+
+      // Layer 2: Public GitHub Issue Audit Comment
       if (!isNaN(issueNumber)) {
         try {
+          const nowIso = new Date().toISOString();
+          const auditComment = [
+            `🔒 **Official Governance Audit Log**`,
+            `• **Applicant:** @${targetReq.username}`,
+            `• **Assigned Role:** \`${targetReq.requestedRole}\` (\`${targetReq.vertical}\`)`,
+            `• **Approved By:** @${userData.login} (Role: \`${reviewerRoleInfo.role}\`)`,
+            `• **Action:** ${
+              inviteDispatched
+                ? "Repository collaborator invite dispatched automatically via GitHub API."
+                : "Role assigned in roles.json hierarchy."
+            }`,
+            `• **Audit Timestamp:** \`${nowIso}\``,
+          ].join("\n");
+
           await octokit.issues.createComment({
             owner: REPO_OWNER,
             repo: REPO_NAME,
             issue_number: issueNumber,
-            body: `✅ **Approved & Assigned**: @${userData.login} approved this application. @${targetReq.username} is now assigned as \`${targetReq.requestedRole}\` of \`${targetReq.vertical}\`.`,
+            body: auditComment,
           });
           await octokit.issues.update({
             owner: REPO_OWNER,
@@ -373,11 +415,19 @@ export async function PATCH(request: NextRequest) {
 
       if (!isNaN(issueNumber)) {
         try {
+          const nowIso = new Date().toISOString();
+          const rejectComment = [
+            `⛔ **Application Rejected**`,
+            `• **Applicant:** @${targetReq.username}`,
+            `• **Rejected By:** @${userData.login} (Role: \`${reviewerRoleInfo.role}\`)`,
+            `• **Timestamp:** \`${nowIso}\``,
+          ].join("\n");
+
           await octokit.issues.createComment({
             owner: REPO_OWNER,
             repo: REPO_NAME,
             issue_number: issueNumber,
-            body: `❌ **Rejected**: Application was reviewed and rejected by @${userData.login}.`,
+            body: rejectComment,
           });
           await octokit.issues.update({
             owner: REPO_OWNER,

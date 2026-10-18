@@ -1,16 +1,16 @@
 # SSN Coding Club CMS - Code Owners & Editorial Approval Mapping
 # Auto-generated from content/club/roles.json
 
-* @blackscythe123 @techieRahul17
+* @blackscythe123 @techierahul17
 
 # Announcements & Club Core
-content/club/** @blackscythe123 @techieRahul17
+content/club/** @blackscythe123 @techierahul17
 
-content/verticals/ai-ml/** @blackscythe123 @techieRahul17
-content/verticals/ar-vr-game-dev/** @blackscythe123 @techieRahul17
-content/verticals/competitive-programming/** @blackscythe123 @techieRahul17
-content/verticals/cybersecurity/** @blackscythe123 @techieRahul17
-content/verticals/ssnhacks/** @blackscythe123 @techieRahul17
-content/verticals/design-ui-ux/** @blackscythe123 @techieRahul17
-content/verticals/full-stack/** @AvGeeky @amdravidranjan
-content/verticals/open-source/** @blackscythe123 @techieRahul17
+content/verticals/ai-ml/** @blackscythe123 @techierahul17
+content/verticals/ar-vr-game-dev/** @blackscythe123 @techierahul17
+content/verticals/competitive-programming/** @blackscythe123 @techierahul17
+content/verticals/cybersecurity/** @blackscythe123 @techierahul17
+content/verticals/ssnhacks/** @blackscythe123 @techierahul17
+content/verticals/design-ui-ux/** @blackscythe123 @techierahul17
+content/verticals/full-stack/** @avgeeky @amdravidranjan @ruusheka
+content/verticals/open-source/** @blackscythe123 @techierahul17

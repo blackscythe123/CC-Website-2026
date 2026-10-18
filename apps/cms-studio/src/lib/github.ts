@@ -704,26 +704,7 @@ export async function deletePublishedPost(
   }
 }
 
-export async function uploadImageToGitHub(
-  token: string,
-  filename: string,
-  base64Data: string
-): Promise<string> {
-  const octokit = getOctokit(token);
-  const cleanName = `${Date.now()}-${filename.toLowerCase().replace(/[^a-z0-9.-]+/g, "-")}`;
-  const repoPath = `apps/main-portal/public/uploads/${cleanName}`;
 
-  await octokit.repos.createOrUpdateFileContents({
-    owner: REPO_OWNER,
-    repo: REPO_NAME,
-    path: repoPath,
-    message: `chore(media): upload ${cleanName}`,
-    content: base64Data,
-    branch: MAIN_BRANCH,
-  });
-
-  return `/uploads/${cleanName}`;
-}
 
 export interface PublishedPostMetadata {
   slug: string;

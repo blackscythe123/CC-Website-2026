@@ -114,7 +114,7 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
         owner: REPO_OWNER,
         repo: REPO_NAME,
         path: imgPath,
-        message: `chore(media): upload ${cleanImgName} on draft branch`,
+        message: `chore(media): upload ${cleanImgName} on draft branch [skip vercel]`,
         content: img.base64,
         branch: branchName,
       });
@@ -174,8 +174,8 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     repo: REPO_NAME,
     path: filePath,
     message: pullNumber
-      ? `fix(${vertical}): update revisions for PR #${pullNumber}`
-      : `feat(${vertical}): add ${cleanSlug} article`,
+      ? `fix(${vertical}): update revisions for PR #${pullNumber} [skip vercel]`
+      : `feat(${vertical}): add ${cleanSlug} article [skip vercel]`,
     content: contentBase64,
     branch: branchName,
     sha: existingFileSha,
@@ -907,7 +907,7 @@ export async function savePersonalDraftBranch(params: PersonalDraftParams): Prom
     owner: REPO_OWNER,
     repo: REPO_NAME,
     path: filePath,
-    message: `draft(${vertical}): update wip draft ${cleanSlug}`,
+    message: `draft(${vertical}): update wip draft ${cleanSlug} [skip vercel]`,
     content: contentBase64,
     branch: branchName,
     sha: existingSha,

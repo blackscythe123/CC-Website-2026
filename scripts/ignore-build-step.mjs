@@ -1,9 +1,9 @@
 import { execSync } from "node:child_process";
 
-// 1. Never build draft branches on Vercel
+// 1. Strictly enforce: ONLY 'main' branch builds on Vercel
 const branch = process.env.VERCEL_GIT_COMMIT_REF || "";
-if (branch.startsWith("draft/")) {
-  console.log(`[ignore-build] Branch '${branch}' is a draft branch. Skipping build.`);
+if (branch && branch !== "main") {
+  console.log(`[ignore-build] Branch '${branch}' is not 'main'. Skipping preview deployment.`);
   process.exit(0);
 }
 

@@ -13,6 +13,9 @@ import {
 } from "@/lib/roles";
 import { getSessionToken } from "@/lib/session";
 
+const REPO_OWNER = "blackscythe123";
+const REPO_NAME = "CC-Website-2026";
+
 export async function GET(request: NextRequest) {
   const token = getSessionToken(request);
 
@@ -232,13 +235,61 @@ export async function POST(request: NextRequest) {
       roles = removeRole(roles, cleanUsername, role, vertical);
     }
 
+    const reviewerDisplayName = userData.name || userData.login;
+    const reviewerEmail = `${userData.login}@users.noreply.github.com`;
+    const commitMessage = `chore(governance): @${userData.login} ${
+      action === "assign"
+        ? `assigned @${cleanUsername} as ${role}${vertical ? ` (${vertical})` : ""}`
+        : `removed @${cleanUsername} from ${role}${vertical ? ` (${vertical})` : ""}`
+    }`;
+
     // Serverless-safe commit with GitHub Token to main
-    await writeRolesAndSyncCodeowners(roles, token);
+    await writeRolesAndSyncCodeowners(roles, token, {
+      name: reviewerDisplayName,
+      email: reviewerEmail,
+      message: commitMessage,
+    });
+
+    // Automatically manage repository collaborator access
+    const activeAdminToken = process.env.GITHUB_ADMIN_TOKEN || token;
+    let inviteDispatched = false;
+
+    if (action === "assign") {
+      try {
+        const adminOctokit = new Octokit({ auth: activeAdminToken });
+        await adminOctokit.repos.addCollaborator({
+          owner: REPO_OWNER,
+          repo: REPO_NAME,
+          username: cleanUsername,
+          permission: "push",
+        });
+        inviteDispatched = true;
+      } catch (invErr) {
+        console.warn("Could not dispatch repo collaborator invite:", invErr);
+      }
+    } else if (action === "remove") {
+      const remainingInfo = getUserRoleInfo(cleanUsername, roles);
+      if (remainingInfo.role === "member" && remainingInfo.verticals.length === 0) {
+        try {
+          const adminOctokit = new Octokit({ auth: activeAdminToken });
+          await adminOctokit.repos.removeCollaborator({
+            owner: REPO_OWNER,
+            repo: REPO_NAME,
+            username: cleanUsername,
+          });
+        } catch (remErr) {
+          console.warn("Could not remove repo collaborator:", remErr);
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      message: `${action === "assign" ? "Assigned" : "Removed"} ${role} successfully.`,
+      message: `${action === "assign" ? "Assigned" : "Removed"} ${role} successfully.${
+        inviteDispatched ? " Repository collaborator invitation dispatched automatically." : ""
+      }`,
       roles,
+      inviteDispatched,
     });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Failed to update roles";

@@ -45,7 +45,7 @@ export default function EditorToolbar({
   onOpenPublish,
 }: EditorToolbarProps) {
   return (
-    <div className="sticky top-16 z-40 border-b border-gray-100 bg-white/95 px-4 py-2.5 backdrop-blur-md">
+    <div className="sticky top-14 md:top-0 z-30 border-b border-gray-100 bg-white/95 px-4 py-2.5 backdrop-blur-md">
       <div className={`mx-auto flex ${viewMode === "split" ? "max-w-7xl" : "max-w-4xl"} flex-wrap items-center justify-between gap-x-4 gap-y-2 transition-all duration-200`}>
         <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
           <span className="font-semibold text-gray-700">Vertical:</span>

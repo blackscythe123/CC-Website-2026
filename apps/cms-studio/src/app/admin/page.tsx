@@ -3,17 +3,9 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Edit3, Eye } from "lucide-react";
 import { marked } from "marked";
-import StudioNav from "@/components/StudioNav";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
 import { ALL_VERTICALS, CLUB_VERTICAL } from "@/lib/verticals";
-import { useStudioSession } from "@/lib/hooks/useStudioSession";
-import { useEditorNotifications } from "@/lib/hooks/useEditorNotifications";
-import {
-  AccessRequestScreen,
-  PendingInviteScreen,
-  SignInScreen,
-  StudioLoadingScreen,
-} from "@/components/editor/AccessScreens";
+import { useStudio } from "@/components/shell/StudioContext";
 import EditorToolbar, { type ViewMode } from "@/components/editor/EditorToolbar";
 import {
   AuthorPendingBanner,
@@ -42,9 +34,19 @@ import {
 } from "@/lib/draftStorage";
 
 export default function AdminEditorPage() {
-  const { user, roleInfo, collaboratorStatus, loading } = useStudioSession();
-  const { authorPendingPrs, reviewerPendingCount, authorFeedbackPr, setAuthorFeedbackPr } =
-    useEditorNotifications(user, roleInfo);
+  const { user, roleInfo, queue } = useStudio();
+  const authorPendingPrs = queue.mySubmitted;
+  const reviewerPendingCount = queue.needsMyReviewCount;
+  const [feedbackDismissed, setFeedbackDismissed] = useState(false);
+  const authorFeedbackPr =
+    !feedbackDismissed && queue.myChangesRequested
+      ? {
+          number: queue.myChangesRequested.number,
+          title: queue.myChangesRequested.title,
+          feedback: queue.myChangesRequested.latestFeedback,
+          vertical: queue.myChangesRequested.vertical,
+        }
+      : null;
 
   // Editor Content State
   const [title, setTitle] = useState("");
@@ -369,7 +371,7 @@ export default function AdminEditorPage() {
           branch: data.article.branch,
           originalTitle: data.article.title || "",
         });
-        setAuthorFeedbackPr(null);
+        setFeedbackDismissed(true);
       }
     } catch (err) {
       console.error("Error loading feedback draft:", err);
@@ -514,17 +516,6 @@ export default function AdminEditorPage() {
     }
   };
 
-  if (loading) return <StudioLoadingScreen />;
-  if (!user) return <SignInScreen />;
-
-  // Internal Tool Security Gate: Strictly verify repository collaborator status
-  if (collaboratorStatus && !collaboratorStatus.isCollaborator) {
-    if (collaboratorStatus.hasPendingInvite) {
-      return <PendingInviteScreen user={user} inviteUrl={collaboratorStatus.inviteUrl} />;
-    }
-    return <AccessRequestScreen user={user} />;
-  }
-
   const editorCanvas = (
     <EditorCanvas
       user={user}
@@ -560,8 +551,6 @@ export default function AdminEditorPage() {
 
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans">
-      <StudioNav user={user} roleInfo={roleInfo} />
-
       <EditorToolbar
         viewMode={viewMode}
         onViewModeChange={setViewMode}

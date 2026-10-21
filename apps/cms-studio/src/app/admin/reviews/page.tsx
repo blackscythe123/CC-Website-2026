@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import StudioNav from "@/components/StudioNav";
+import { useStudio } from "@/components/shell/StudioContext";
 import { UserRoleInfo } from "@/lib/roles";
 import { marked } from "marked";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
@@ -50,10 +50,8 @@ interface PreviewArticleData {
 }
 
 export default function EditorialReviewsPage() {
-  const [user, setUser] = useState<{ login: string; name: string; avatar_url: string } | null>(
-    null
-  );
-  const [roleInfo, setRoleInfo] = useState<UserRoleInfo | null>(null);
+  const { user, roleInfo: sessionRole } = useStudio();
+  const [roleInfo, setRoleInfo] = useState<UserRoleInfo | null>(sessionRole);
   const [prs, setPrs] = useState<PendingPR[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
@@ -85,18 +83,7 @@ export default function EditorialReviewsPage() {
   };
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.authenticated) {
-          setUser(data.user);
-          setRoleInfo(data.roleInfo);
-          fetchReviews();
-        } else {
-          setLoading(false);
-        }
-      })
-      .catch(() => setLoading(false));
+    fetchReviews();
   }, []);
 
   const handleApprove = async (pr: PendingPR) => {
@@ -190,8 +177,6 @@ export default function EditorialReviewsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50/50 text-gray-900 font-sans">
-      <StudioNav user={user} roleInfo={roleInfo} />
-
       <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 space-y-8">
         {/* Header */}
         <div className="flex flex-col justify-between gap-4 border-b border-gray-200 pb-6 sm:flex-row sm:items-end">

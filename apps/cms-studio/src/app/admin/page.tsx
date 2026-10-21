@@ -889,7 +889,7 @@ export default function AdminEditorPage() {
 
       {/* Editor Sub-Header Toolbar */}
       <div className="sticky top-16 z-40 border-b border-gray-100 bg-white/95 px-4 py-2.5 backdrop-blur-md">
-        <div className={`mx-auto flex ${viewMode === "split" ? "max-w-7xl" : "max-w-4xl"} items-center justify-between gap-4 transition-all duration-200`}>
+        <div className={`mx-auto flex ${viewMode === "split" ? "max-w-7xl" : "max-w-4xl"} flex-wrap items-center justify-between gap-x-4 gap-y-2 transition-all duration-200`}>
           <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
             <span className="font-semibold text-gray-700">Vertical:</span>
             {isUnassignedMember ? (
@@ -910,7 +910,7 @@ export default function AdminEditorPage() {
                 ))}
               </select>
             )}
-            <span>•</span>
+            <span className="hidden sm:inline">•</span>
             <span className="text-amber-600 font-medium hidden sm:inline">Requires Approval</span>
             {pendingImages.length > 0 && (
               <>
@@ -923,7 +923,7 @@ export default function AdminEditorPage() {
             )}
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:shrink-0 sm:justify-end sm:gap-2.5">
             {/* View Mode Segmented Pill */}
             <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50/90 p-0.5 text-xs font-medium shadow-xs">
               <button
@@ -935,6 +935,8 @@ export default function AdminEditorPage() {
                     : "text-gray-500 hover:text-gray-900"
                 }`}
                 title="Canvas Editor only"
+                aria-label="Write"
+                aria-pressed={viewMode === "write"}
               >
                 <Edit3 className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Write</span>
@@ -948,6 +950,8 @@ export default function AdminEditorPage() {
                     : "text-gray-500 hover:text-gray-900"
                 }`}
                 title="Split screen: write & see real-time preview side-by-side"
+                aria-label="Split view"
+                aria-pressed={viewMode === "split"}
               >
                 <Columns className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Split</span>
@@ -961,6 +965,8 @@ export default function AdminEditorPage() {
                     : "text-gray-500 hover:text-gray-900"
                 }`}
                 title="Full live reading preview"
+                aria-label="Preview"
+                aria-pressed={viewMode === "preview"}
               >
                 <Eye className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Preview</span>
@@ -973,6 +979,7 @@ export default function AdminEditorPage() {
               onClick={handleFetchRemoteDrafts}
               className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition"
               title="View and restore drafts saved to GitHub branches across devices"
+              aria-label="Cloud Drafts"
             >
               <Cloud className="h-3.5 w-3.5 text-blue-600" />
               <span className="hidden md:inline">Cloud Drafts</span>
@@ -990,6 +997,7 @@ export default function AdminEditorPage() {
                 type="button"
                 onClick={handleSaveRemoteDraft}
                 disabled={isSavingRemoteDraft || isSavingDraft || isUnassignedMember}
+                aria-label={isSavingRemoteDraft ? "Syncing draft" : "Save Draft"}
                 className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 shadow-xs hover:bg-gray-50 hover:border-gray-400 transition active:scale-95 disabled:opacity-50"
                 title={
                   isUnassignedMember
@@ -998,7 +1006,7 @@ export default function AdminEditorPage() {
                 }
               >
                 <CloudUpload className="h-3.5 w-3.5 text-blue-600" />
-                <span>{isSavingRemoteDraft ? "Syncing..." : "Save Draft"}</span>
+                <span className="hidden sm:inline">{isSavingRemoteDraft ? "Syncing..." : "Save Draft"}</span>
               </button>
             </div>
 
@@ -1009,7 +1017,8 @@ export default function AdminEditorPage() {
                 title="You must be assigned to a vertical in Governance & Roles before submitting articles"
               >
                 <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                <span>Request Role to Publish</span>
+                <span className="sm:hidden">Request Role</span>
+                <span className="hidden sm:inline">Request Role to Publish</span>
               </a>
             ) : activeRevisionPr ? (
               <button
@@ -1024,7 +1033,8 @@ export default function AdminEditorPage() {
                 onClick={() => setShowDrawer(true)}
                 className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 transition"
               >
-                <span>Publish / Submit</span>
+                <span className="sm:hidden">Submit</span>
+                <span className="hidden sm:inline">Publish / Submit</span>
                 <Send className="h-3.5 w-3.5" />
               </button>
             )}

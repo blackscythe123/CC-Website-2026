@@ -14,6 +14,8 @@ import {
   Clock,
   AlertCircle,
   ChevronDown,
+  Menu,
+  X,
 } from "lucide-react";
 
 interface StudioNavProps {
@@ -32,7 +34,22 @@ export default function StudioNav({ user, roleInfo }: StudioNavProps) {
   const pathname = usePathname();
   const [notifications, setNotifications] = useState<NavNotification[]>([]);
   const [showBellDropdown, setShowBellDropdown] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close the mobile menu on navigation and on Escape
+  useEffect(() => {
+    setShowMobileMenu(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!showMobileMenu) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowMobileMenu(false);
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [showMobileMenu]);
 
   useEffect(() => {
     if (!user) return;
@@ -116,12 +133,20 @@ export default function StudioNav({ user, roleInfo }: StudioNavProps) {
 
   const totalNotifs = notifications.length;
 
+  // `label` fits the desktop bar without wrapping; `fullLabel` is used in the mobile menu and as a tooltip
+  const navLinks = [
+    { href: "/admin", label: "Write", fullLabel: "Canvas Editor", icon: Edit3, iconClass: "", badge: 0, visible: true },
+    { href: "/admin/reviews", label: "Reviews", fullLabel: "Editorial Reviews", icon: CheckSquare, iconClass: "", badge: totalNotifs, visible: true },
+    { href: "/admin/posts", label: "Articles", fullLabel: "Manage Articles", icon: FileText, iconClass: "text-emerald-600", badge: 0, visible: canManagePosts },
+    { href: "/admin/roles", label: "Roles", fullLabel: "Governance & Roles", icon: Shield, iconClass: "text-purple-600", badge: 0, visible: canManageRoles },
+  ].filter((link) => link.visible);
+
   return (
     <header className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
         {/* Brand */}
-        <div className="flex items-center gap-6">
-          <Link href="/admin" className="flex items-center gap-2.5">
+        <div className="flex min-w-0 items-center gap-6">
+          <Link href="/admin" className="flex shrink-0 items-center gap-2.5 whitespace-nowrap">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 font-mono text-sm font-bold text-white shadow-xs">
               &lt;/&gt;
             </span>
@@ -129,75 +154,40 @@ export default function StudioNav({ user, roleInfo }: StudioNavProps) {
               <span className="text-base font-bold tracking-tight text-gray-900">
                 Coding Club
               </span>
-              <span className="ml-1.5 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+              <span className="ml-1.5 hidden rounded-full sm:inline bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
                 Studio
               </span>
             </div>
           </Link>
 
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1 text-sm font-medium">
-            <Link
-              href="/admin"
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
-                pathname === "/admin"
-                  ? "bg-gray-100 text-gray-900 font-semibold"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-              }`}
-            >
-              <Edit3 className="h-4 w-4" />
-              <span>Canvas Editor</span>
-            </Link>
-
-            <Link
-              href="/admin/reviews"
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
-                pathname === "/admin/reviews"
-                  ? "bg-gray-100 text-gray-900 font-semibold"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-              }`}
-            >
-              <CheckSquare className="h-4 w-4" />
-              <span>Editorial Reviews</span>
-              {totalNotifs > 0 && (
-                <span className="inline-flex items-center justify-center rounded-full bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white shadow-xs">
-                  {totalNotifs}
-                </span>
-              )}
-            </Link>
-
-            {canManagePosts && (
+          {/* Navigation Links (desktop) */}
+          <nav className="hidden lg:flex items-center gap-1 text-sm font-medium">
+            {navLinks.map(({ href, label, fullLabel, icon: Icon, iconClass, badge }) => (
               <Link
-                href="/admin/posts"
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
-                  pathname === "/admin/posts"
+                key={href}
+                href={href}
+                title={fullLabel}
+                aria-current={pathname === href ? "page" : undefined}
+                className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 transition ${
+                  pathname === href
                     ? "bg-gray-100 text-gray-900 font-semibold"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
               >
-                <FileText className="h-4 w-4 text-emerald-600" />
-                <span className="text-gray-700 font-medium">Manage Articles</span>
+                <Icon className={`h-4 w-4 ${iconClass}`} />
+                <span>{label}</span>
+                {badge > 0 && (
+                  <span className="inline-flex items-center justify-center rounded-full bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white shadow-xs">
+                    {badge}
+                  </span>
+                )}
               </Link>
-            )}
-
-            {canManageRoles && (
-              <Link
-                href="/admin/roles"
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
-                  pathname === "/admin/roles"
-                    ? "bg-gray-100 text-gray-900 font-semibold"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                }`}
-              >
-                <Shield className="h-4 w-4 text-purple-600" />
-                <span className="text-purple-700 font-semibold">Governance &amp; Roles</span>
-              </Link>
-            )}
+            ))}
           </nav>
         </div>
 
         {/* User Info / Auth */}
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3">
           {user ? (
             <div className="flex items-center gap-2 sm:gap-3">
               {/* Notification Bell with Dropdown */}
@@ -207,6 +197,8 @@ export default function StudioNav({ user, roleInfo }: StudioNavProps) {
                   onClick={() => setShowBellDropdown(!showBellDropdown)}
                   className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition"
                   title="Notifications & Review Status"
+                  aria-label={`Notifications (${totalNotifs})`}
+                  aria-expanded={showBellDropdown}
                 >
                   <Bell className="h-4 w-4" />
                   {totalNotifs > 0 && (
@@ -217,7 +209,7 @@ export default function StudioNav({ user, roleInfo }: StudioNavProps) {
                 </button>
 
                 {showBellDropdown && (
-                  <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-gray-200 bg-white p-3 shadow-xl z-50 space-y-2">
+                  <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-96 sm:w-96 rounded-2xl border border-gray-200 bg-white p-3 shadow-xl z-50 space-y-2">
                     <div className="flex items-center justify-between border-b border-gray-100 pb-2 px-1">
                       <span className="text-xs font-bold text-gray-900">
                         Editorial Notifications ({totalNotifs})
@@ -274,14 +266,14 @@ export default function StudioNav({ user, roleInfo }: StudioNavProps) {
               </div>
 
               {/* User Avatar & Role */}
-              <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50/80 py-1 pl-1 pr-3">
+              <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50/80 p-1 sm:pr-3">
                 <img
                   src={user.avatar_url}
                   alt={user.login}
                   className="h-7 w-7 rounded-full border border-gray-200 object-cover"
                 />
-                <div className="flex flex-col text-left">
-                  <span className="text-xs font-bold text-gray-800 leading-tight">
+                <div className="hidden flex-col text-left sm:flex">
+                  <span className="whitespace-nowrap text-xs font-bold text-gray-800 leading-tight">
                     @{user.login}
                   </span>
                   <span className="text-[10px] font-semibold text-blue-600 capitalize leading-tight">
@@ -294,9 +286,21 @@ export default function StudioNav({ user, roleInfo }: StudioNavProps) {
                 onClick={handleLogout}
                 className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-xs hover:bg-gray-50 hover:text-red-600 transition"
                 title="Log out"
+                aria-label="Log out"
               >
                 <LogOut className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Logout</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowMobileMenu((open) => !open)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition lg:hidden"
+                aria-label={showMobileMenu ? "Close menu" : "Open menu"}
+                aria-expanded={showMobileMenu}
+                aria-controls="studio-mobile-menu"
+              >
+                {showMobileMenu ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
               </button>
             </div>
           ) : (
@@ -309,6 +313,36 @@ export default function StudioNav({ user, roleInfo }: StudioNavProps) {
           )}
         </div>
       </div>
+
+      {/* Navigation Links (mobile / tablet) */}
+      {user && showMobileMenu && (
+        <nav
+          id="studio-mobile-menu"
+          className="border-t border-gray-100 bg-white px-4 py-2 shadow-lg lg:hidden"
+        >
+          {navLinks.map(({ href, fullLabel, icon: Icon, iconClass, badge }) => (
+            <Link
+              key={href}
+              href={href}
+              onClick={() => setShowMobileMenu(false)}
+              aria-current={pathname === href ? "page" : undefined}
+              className={`flex items-center gap-3 rounded-lg px-3 py-3 text-sm transition ${
+                pathname === href
+                  ? "bg-gray-100 text-gray-900 font-semibold"
+                  : "text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              <Icon className={`h-4 w-4 ${iconClass}`} />
+              <span className="flex-1">{fullLabel}</span>
+              {badge > 0 && (
+                <span className="inline-flex items-center justify-center rounded-full bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                  {badge}
+                </span>
+              )}
+            </Link>
+          ))}
+        </nav>
+      )}
     </header>
   );
 }

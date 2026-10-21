@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import StudioNav from "@/components/StudioNav";
+import { useStudio } from "@/components/shell/StudioContext";
 import { ClubRoles, UserRoleInfo, RoleRequest } from "@/lib/roles";
 import {
   Crown,
@@ -46,10 +46,7 @@ const ALL_VERTICALS = [
 ];
 
 export default function AdminRolesPage() {
-  const [user, setUser] = useState<{ login: string; name: string; avatar_url: string } | null>(
-    null
-  );
-  const [roleInfo, setRoleInfo] = useState<UserRoleInfo | null>(null);
+  const { user, roleInfo, collaboratorStatus } = useStudio();
   const [roles, setRoles] = useState<ClubRoles | null>(null);
   const [requests, setRequests] = useState<RoleRequest[]>([]);
   const [candidates, setCandidates] = useState<CandidateUser[]>([]);
@@ -80,11 +77,6 @@ export default function AdminRolesPage() {
   const [submittingApply, setSubmittingApply] = useState(false);
 
   // Collaborator & Role Adjustment State
-  const [collaboratorStatus, setCollaboratorStatus] = useState<{
-    isCollaborator: boolean;
-    hasPendingInvite: boolean;
-    inviteUrl: string;
-  } | null>(null);
   const [assignedRoleMap, setAssignedRoleMap] = useState<
     Record<string, "member" | "deputy" | "vertical_head">
   >({});
@@ -107,20 +99,8 @@ export default function AdminRolesPage() {
   };
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.authenticated) {
-          setUser(data.user);
-          setRoleInfo(data.roleInfo);
-          if (data.collaboratorStatus) {
-            setCollaboratorStatus(data.collaboratorStatus);
-          }
-          fetchRolesData();
-        }
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    fetchRolesData();
+    setLoading(false);
   }, []);
 
   // Keystroke Debounce (400ms)
@@ -345,7 +325,6 @@ export default function AdminRolesPage() {
   if (!canManage) {
     return (
       <div className="min-h-screen bg-gray-50 font-sans">
-        <StudioNav user={user} roleInfo={roleInfo} />
         <div className="mx-auto max-w-lg px-4 py-12 space-y-6">
           {feedback && (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 text-xs font-semibold text-emerald-800 flex items-center justify-between">
@@ -544,8 +523,6 @@ export default function AdminRolesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50/50 text-gray-900 font-sans">
-      <StudioNav user={user} roleInfo={roleInfo} />
-
       <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 space-y-8">
         {collaboratorStatus && !collaboratorStatus.isCollaborator && collaboratorStatus.hasPendingInvite && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">

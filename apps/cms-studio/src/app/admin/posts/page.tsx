@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import StudioNav from "@/components/StudioNav";
+import { useStudio } from "@/components/shell/StudioContext";
 import { UserRoleInfo } from "@/lib/roles";
 import {
   FileText,
@@ -28,10 +28,8 @@ interface PublishedPost {
 }
 
 export default function ManagePostsPage() {
-  const [user, setUser] = useState<{ login: string; name: string; avatar_url: string } | null>(
-    null
-  );
-  const [roleInfo, setRoleInfo] = useState<UserRoleInfo | null>(null);
+  const { user, roleInfo: sessionRole } = useStudio();
+  const [, setRoleInfo] = useState<UserRoleInfo | null>(sessionRole);
   const [posts, setPosts] = useState<PublishedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -97,18 +95,7 @@ export default function ManagePostsPage() {
   };
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.authenticated) {
-          setUser(data.user);
-          setRoleInfo(data.roleInfo);
-          fetchPosts();
-        } else {
-          setLoading(false);
-        }
-      })
-      .catch(() => setLoading(false));
+    fetchPosts();
   }, []);
 
   const handleDeletePost = async () => {
@@ -162,8 +149,6 @@ export default function ManagePostsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50/50 text-gray-900 font-sans">
-      <StudioNav user={user} roleInfo={roleInfo} />
-
       <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 space-y-8">
         {/* Header */}
         <div className="flex flex-col justify-between gap-4 border-b border-gray-200 pb-6 sm:flex-row sm:items-end">

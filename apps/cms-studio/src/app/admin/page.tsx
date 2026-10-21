@@ -1,39 +1,36 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import StudioNav from "@/components/StudioNav";
-import { UserRoleInfo } from "@/lib/roles";
+import { Edit3, Eye } from "lucide-react";
 import { marked } from "marked";
+import StudioNav from "@/components/StudioNav";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
+import { ALL_VERTICALS, CLUB_VERTICAL } from "@/lib/verticals";
+import { useStudioSession } from "@/lib/hooks/useStudioSession";
+import { useEditorNotifications } from "@/lib/hooks/useEditorNotifications";
 import {
-  Image as ImageIcon,
-  Code,
-  Quote,
-  Heading2,
-  Heading3,
-  Minus,
-  List,
-  Sparkles,
-  Send,
-  UploadCloud,
-  CheckCircle2,
-  AlertCircle,
-  X,
-  ExternalLink,
-  Eye,
-  Edit3,
-  Columns,
-  Save,
-  Check,
-  Bell,
-  Clock,
-  Cloud,
-  CloudUpload,
-  FolderOpen,
-  Mail,
-  ShieldAlert,
-  AlertTriangle,
-} from "lucide-react";
+  AccessRequestScreen,
+  PendingInviteScreen,
+  SignInScreen,
+  StudioLoadingScreen,
+} from "@/components/editor/AccessScreens";
+import EditorToolbar, { type ViewMode } from "@/components/editor/EditorToolbar";
+import {
+  AuthorPendingBanner,
+  ChangesRequestedBanner,
+  RecoveredDraftBanner,
+  ReviewerActionBanner,
+  UnassignedMemberBanner,
+} from "@/components/editor/EditorBanners";
+import EditorCanvas from "@/components/editor/EditorCanvas";
+import ArticlePreview from "@/components/editor/ArticlePreview";
+import PublishDrawer from "@/components/editor/PublishDrawer";
+import {
+  CloudDraftsModal,
+  SubmissionSuccessModal,
+  SuccessToast,
+  type RemoteDraftSummary,
+} from "@/components/editor/EditorDialogs";
 
 import {
   saveLocalDraft,
@@ -44,34 +41,17 @@ import {
   PendingDraftImage,
 } from "@/lib/draftStorage";
 
-interface UserProfile {
-  login: string;
-  name: string;
-  avatar_url: string;
-}
-
-const ALL_VERTICALS = [
-  { slug: "ai-ml", name: "🤖 AI / ML" },
-  { slug: "ar-vr-game-dev", name: "🎮 AR, VR & Game Dev" },
-  { slug: "competitive-programming", name: "🏆 Competitive Programming" },
-  { slug: "cybersecurity", name: "🛡️ Cyber Security" },
-  { slug: "ssnhacks", name: "⚡ SSN Hacks" },
-  { slug: "design-ui-ux", name: "🎨 Design & UI/UX" },
-  { slug: "full-stack", name: "🌐 Full Stack" },
-  { slug: "open-source", name: "💻 Open Source (OSS)" },
-];
-
 export default function AdminEditorPage() {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [roleInfo, setRoleInfo] = useState<UserRoleInfo | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, roleInfo, collaboratorStatus, loading } = useStudioSession();
+  const { authorPendingPrs, reviewerPendingCount, authorFeedbackPr, setAuthorFeedbackPr } =
+    useEditorNotifications(user, roleInfo);
 
   // Editor Content State
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [coverImage, setCoverImage] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [viewMode, setViewMode] = useState<"write" | "split" | "preview">("write");
+  const [viewMode, setViewMode] = useState<ViewMode>("write");
   const [pendingImages, setPendingImages] = useState<PendingDraftImage[]>([]);
 
   // Real-time Markdown Parsing & Stats for Preview
@@ -99,7 +79,6 @@ export default function AdminEditorPage() {
   const [showDrawer, setShowDrawer] = useState(false);
   const [selectedVertical, setSelectedVertical] = useState("ai-ml");
   const [summary, setSummary] = useState("");
-  const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submissionResult, setSubmissionResult] = useState<{
@@ -115,53 +94,18 @@ export default function AdminEditorPage() {
 
   // Cross-Device Git Cloud Drafts State (Zero-DB Persistence)
   const [showRemoteDraftsModal, setShowRemoteDraftsModal] = useState(false);
-  const [remoteDrafts, setRemoteDrafts] = useState<{
-    branch: string;
-    slug: string;
-    vertical: string;
-    title: string;
-    updatedAt: string;
-  }[]>([]);
+  const [remoteDrafts, setRemoteDrafts] = useState<RemoteDraftSummary[]>([]);
   const [loadingRemoteDrafts, setLoadingRemoteDrafts] = useState(false);
   const [isSavingRemoteDraft, setIsSavingRemoteDraft] = useState(false);
   const [remoteDraftSuccessMessage, setRemoteDraftSuccessMessage] = useState<string | null>(null);
 
-  // In-App Editorial Notifications & Review Requests
-  const [authorPendingPrs, setAuthorPendingPrs] = useState<{
-    number: number;
-    title: string;
-    vertical: string;
-    createdAt: string;
-  }[]>([]);
-  const [reviewerPendingCount, setReviewerPendingCount] = useState(0);
-  const [authorFeedbackPr, setAuthorFeedbackPr] = useState<{
-    number: number;
-    title: string;
-    feedback: string;
-    vertical: string;
-    branch?: string;
-  } | null>(null);
+  // Revising a PR after editorial feedback
   const [loadingFeedbackDraft, setLoadingFeedbackDraft] = useState(false);
   const [activeRevisionPr, setActiveRevisionPr] = useState<{
     number: number;
     branch: string;
     originalTitle: string;
   } | null>(null);
-
-  // Repository Collaborator Access State (Internal Tool Enforcement)
-  const [collaboratorStatus, setCollaboratorStatus] = useState<{
-    isCollaborator: boolean;
-    hasPendingInvite: boolean;
-    inviteUrl: string;
-  } | null>(null);
-
-  // Self-Serve Role / Collaborator Access Application State
-  const [requestVertical, setRequestVertical] = useState("full-stack");
-  const [requestRole, setRequestRole] = useState<"member" | "deputy">("member");
-  const [requestNote, setRequestNote] = useState("");
-  const [requestSubmitting, setRequestSubmitting] = useState(false);
-  const [requestSuccess, setRequestSuccess] = useState<string | null>(null);
-  const [requestError, setRequestError] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -170,7 +114,7 @@ export default function AdminEditorPage() {
   const userVerticals = roleInfo?.verticals || [];
   const availableVerticals = useMemo(() => {
     if (isSuperadmin) {
-      return [{ slug: "club", name: "📢 Coding Club Announcements" }, ...ALL_VERTICALS];
+      return [CLUB_VERTICAL, ...ALL_VERTICALS];
     }
     return ALL_VERTICALS.filter((v) => userVerticals.includes(v.slug));
   }, [isSuperadmin, userVerticals]);
@@ -183,8 +127,8 @@ export default function AdminEditorPage() {
     }
   }, [availableVerticals, selectedVertical]);
 
+  // Check for recoverable IndexedDB local draft
   useEffect(() => {
-    // 1. Check for recoverable IndexedDB local draft
     getLocalDraft().then((draft) => {
       if (
         draft &&
@@ -193,90 +137,23 @@ export default function AdminEditorPage() {
         setRecoveredDraft(draft);
       }
     });
-
-    // 2. Fetch authenticated user profile & check for review requests / feedback
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.authenticated) {
-          setUser(data.user);
-          setRoleInfo(data.roleInfo);
-          if (data.collaboratorStatus) {
-            setCollaboratorStatus(data.collaboratorStatus);
-          }
-          // Auto-select allowed vertical
-          if (data.roleInfo?.verticals?.length > 0) {
-            setSelectedVertical(data.roleInfo.verticals[0]);
-          }
-
-          // Fetch all review PRs to track authored posts and reviewer queues
-          fetch("/api/posts/reviews")
-            .then((r) => r.json())
-            .then((rData) => {
-              if (rData.prs && data.user) {
-                // 1. Author's PRs with feedback requested
-                const myPrWithFeedback = rData.prs.find(
-                  (p: { author: string; changesRequested?: boolean; latestFeedback?: string }) =>
-                    p.author.toLowerCase() === data.user.login.toLowerCase() &&
-                    p.changesRequested &&
-                    p.latestFeedback
-                );
-                if (myPrWithFeedback) {
-                  setAuthorFeedbackPr({
-                    number: myPrWithFeedback.number,
-                    title: myPrWithFeedback.title,
-                    feedback: myPrWithFeedback.latestFeedback,
-                    vertical: myPrWithFeedback.vertical,
-                  });
-                }
-
-                // 2. Author's PRs currently under review
-                const myPending = rData.prs
-                  .filter(
-                    (p: { author: string; changesRequested?: boolean }) =>
-                      p.author.toLowerCase() === data.user.login.toLowerCase() &&
-                      !p.changesRequested
-                  )
-                  .map((p: { number: number; title: string; vertical: string; createdAt: string }) => ({
-                    number: p.number,
-                    title: p.title,
-                    vertical: p.vertical,
-                    createdAt: p.createdAt,
-                  }));
-                setAuthorPendingPrs(myPending);
-
-                // 3. For reviewers: PRs waiting for their review
-                if (
-                  data.roleInfo?.role === "superadmin" ||
-                  data.roleInfo?.role === "vertical_head" ||
-                  data.roleInfo?.role === "deputy"
-                ) {
-                  const forReviewer = rData.prs.filter(
-                    (p: { author: string; vertical: string; changesRequested?: boolean }) => {
-                      if (p.changesRequested) return false; // Waiting on author to revise
-                      const isSelf = p.author.toLowerCase() === data.user.login.toLowerCase();
-                      if (isSelf) return false;
-                      if (data.roleInfo.role === "superadmin") return true;
-                      return data.roleInfo.verticals.includes(p.vertical);
-                    }
-                  );
-                  setReviewerPendingCount(forReviewer.length);
-                }
-              }
-            })
-            .catch(() => {});
-
-          // Auto-load PR if requested via URL param (e.g. /admin?revise=6)
-          const urlParams = new URLSearchParams(window.location.search);
-          const revisePrNum = urlParams.get("revise");
-          if (revisePrNum) {
-            handleLoadFeedbackPR(parseInt(revisePrNum, 10));
-          }
-        }
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
   }, []);
+
+  // Once signed in: pick the first allowed vertical and honour /admin?revise=<PR number>
+  const sessionInitDone = useRef(false);
+  useEffect(() => {
+    if (!user || sessionInitDone.current) return;
+    sessionInitDone.current = true;
+
+    if (roleInfo?.verticals?.length) {
+      setSelectedVertical(roleInfo.verticals[0]);
+    }
+
+    const revisePrNum = new URLSearchParams(window.location.search).get("revise");
+    if (revisePrNum) {
+      handleLoadFeedbackPR(parseInt(revisePrNum, 10));
+    }
+  }, [user, roleInfo]);
 
   // Manual Save Draft Handler (Local Browser Storage)
   const handleManualSaveDraft = async () => {
@@ -582,21 +459,6 @@ export default function AdminEditorPage() {
     }, 10);
   };
 
-  const handleAddTag = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      const val = tagInput.trim().replace(/^,/, "");
-      if (val && !tags.includes(val)) {
-        setTags([...tags, val]);
-        setTagInput("");
-      }
-    }
-  };
-
-  const removeTag = (t: string) => {
-    setTags(tags.filter((item) => item !== t));
-  };
-
   const handleSubmitDraft = async () => {
     if (!title.trim() || title.trim().length < 3) {
       setErrorMessage("Please enter an article title of at least 3 characters.");
@@ -652,1106 +514,183 @@ export default function AdminEditorPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center space-y-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent mx-auto"></div>
-          <p className="text-sm font-medium text-gray-500">Loading CMS Studio...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4">
-        <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-lg space-y-6">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 font-mono text-2xl font-bold text-white shadow-md">
-            &lt;/&gt;
-          </div>
-          <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">SSN Coding Club Studio</h1>
-            <p className="mt-2 text-sm text-gray-500">
-              Modern Medium-style writing canvas backed by GitHub.
-            </p>
-          </div>
-          <a
-            href="/api/auth"
-            className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-black transition"
-          >
-            Sign in with GitHub
-          </a>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <StudioLoadingScreen />;
+  if (!user) return <SignInScreen />;
 
   // Internal Tool Security Gate: Strictly verify repository collaborator status
   if (collaboratorStatus && !collaboratorStatus.isCollaborator) {
     if (collaboratorStatus.hasPendingInvite) {
-      return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-amber-200 bg-white p-8 text-center shadow-lg space-y-6">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 shadow-xs">
-              <Mail className="h-8 w-8" />
-            </div>
-            <div>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
-                ⏳ Pending Invitation
-              </span>
-              <h1 className="mt-3 text-2xl font-extrabold text-gray-900">Accept Repository Invite</h1>
-              <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-                You are signed in as <strong>@{user.login}</strong>. You have an invitation to join <strong>blackscythe123/CC-Website-2026</strong>, but you haven&apos;t accepted it yet!
-              </p>
-            </div>
-            <div className="space-y-3">
-              <a
-                href={collaboratorStatus.inviteUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-3 text-sm font-bold text-white shadow-xs hover:bg-amber-700 transition"
-              >
-                <span>Accept Invitation on GitHub ↗</span>
-              </a>
-              <button
-                onClick={() => window.location.reload()}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition"
-              >
-                <span>I have accepted, check again</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      );
+      return <PendingInviteScreen user={user} inviteUrl={collaboratorStatus.inviteUrl} />;
     }
-
-    const handleAccessRequestSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setRequestSubmitting(true);
-      setRequestError(null);
-      setRequestSuccess(null);
-
-      try {
-        const res = await fetch("/api/roles/requests", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            vertical: requestVertical,
-            requestedRole: requestRole,
-            note: requestNote.trim() || undefined,
-          }),
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error || "Failed to submit role application");
-        }
-
-        setRequestSuccess(
-          data.message ||
-            "Your application has been submitted! Once approved by Superadmin or Vertical Head, you will receive repo push access automatically."
-        );
-      } catch (err: unknown) {
-        setRequestError(err instanceof Error ? err.message : "Failed to submit application");
-      } finally {
-        setRequestSubmitting(false);
-      }
-    };
-
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50/50 px-4 py-12">
-        <div className="w-full max-w-lg rounded-3xl border border-gray-200 bg-white p-8 text-left shadow-xl space-y-6">
-          <div className="flex items-center gap-4 border-b border-gray-100 pb-5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-100 text-purple-700 shadow-xs shrink-0">
-              <ShieldAlert className="h-6 w-6" />
-            </div>
-            <div>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-purple-700">
-                🔒 Member Onboarding
-              </span>
-              <h1 className="text-xl font-extrabold text-gray-900 mt-1">Request Repository Access &amp; Role</h1>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4 text-xs text-blue-900 space-y-1.5">
-            <p>
-              Signed in as <strong>@{user.login}</strong> ({user.name || "GitHub Contributor"}).
-            </p>
-            <p className="text-blue-800">
-              SSN Coding Club Studio is an internal tool. Submit your technical vertical request below to automatically trigger repository collaborator onboarding.
-            </p>
-          </div>
-
-          {requestSuccess ? (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-900 space-y-3">
-              <div className="flex items-center gap-2 font-bold text-emerald-800">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-                <span>Application Submitted Successfully!</span>
-              </div>
-              <p className="text-xs text-emerald-800 leading-relaxed">
-                {requestSuccess}
-              </p>
-              <div className="pt-2 flex items-center justify-between border-t border-emerald-200/60">
-                <button
-                  type="button"
-                  onClick={() => window.location.reload()}
-                  className="rounded-xl bg-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800 transition"
-                >
-                  Check Approval Status
-                </button>
-                <a
-                  href="/api/auth/logout"
-                  className="text-xs font-semibold text-emerald-800 hover:underline"
-                >
-                  Sign Out
-                </a>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleAccessRequestSubmit} className="space-y-4">
-              {requestError && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800 flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
-                  <span>{requestError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1.5">
-                  Select Your Technical Vertical
-                </label>
-                <select
-                  value={requestVertical}
-                  onChange={(e) => setRequestVertical(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 p-2.5 text-sm text-gray-900 focus:border-purple-600 focus:bg-white focus:outline-hidden transition font-medium"
-                >
-                  {ALL_VERTICALS.map((v) => (
-                    <option key={v.slug} value={v.slug}>
-                      {v.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1.5">
-                  Requested Role
-                </label>
-                <select
-                  value={requestRole}
-                  onChange={(e) => setRequestRole(e.target.value as "member" | "deputy")}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 p-2.5 text-sm text-gray-900 focus:border-purple-600 focus:bg-white focus:outline-hidden transition font-medium"
-                >
-                  <option value="member">Member (Draft articles, collaborate in wing)</option>
-                  <option value="deputy">Deputy (Review &amp; approve wing articles)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1.5">
-                  Note / Department &amp; Year
-                </label>
-                <textarea
-                  rows={2}
-                  value={requestNote}
-                  onChange={(e) => setRequestNote(e.target.value)}
-                  placeholder="e.g. 2nd year IT, passionate about web dev &amp; microservices"
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50/50 p-2.5 text-sm text-gray-900 focus:border-purple-600 focus:bg-white focus:outline-hidden transition"
-                />
-              </div>
-
-              <div className="flex items-center justify-between gap-3 pt-3 border-t border-gray-100">
-                <a
-                  href="/api/auth/logout"
-                  className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition text-center"
-                >
-                  Sign Out
-                </a>
-                <button
-                  type="submit"
-                  disabled={requestSubmitting}
-                  className="flex-1 rounded-xl bg-purple-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-purple-700 transition disabled:opacity-50 text-center"
-                >
-                  {requestSubmitting ? "Submitting Application..." : "Submit Join Request ↗"}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </div>
-    );
+    return <AccessRequestScreen user={user} />;
   }
+
+  const editorCanvas = (
+    <EditorCanvas
+      user={user}
+      roleInfo={roleInfo}
+      selectedVertical={selectedVertical}
+      title={title}
+      onTitleChange={setTitle}
+      content={content}
+      onContentChange={setContent}
+      coverImage={coverImage}
+      onCoverImageChange={setCoverImage}
+      wordCount={wordCount}
+      readingTime={readingTime}
+      uploadingImage={uploadingImage}
+      onImageUpload={handleImageUpload}
+      onInsert={insertAtCursor}
+      onDrop={handleDrop}
+      textareaRef={textareaRef}
+    />
+  );
+
+  const articlePreview = (
+    <ArticlePreview
+      user={user}
+      selectedVertical={selectedVertical}
+      title={title}
+      coverImage={coverImage}
+      html={parsedHtml}
+      wordCount={wordCount}
+      readingTime={readingTime}
+    />
+  );
 
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans">
       <StudioNav user={user} roleInfo={roleInfo} />
 
-      {/* Editor Sub-Header Toolbar */}
-      <div className="sticky top-16 z-40 border-b border-gray-100 bg-white/95 px-4 py-2.5 backdrop-blur-md">
-        <div className={`mx-auto flex ${viewMode === "split" ? "max-w-7xl" : "max-w-4xl"} flex-wrap items-center justify-between gap-x-4 gap-y-2 transition-all duration-200`}>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-            <span className="font-semibold text-gray-700">Vertical:</span>
-            {isUnassignedMember ? (
-              <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                Unassigned (Draft Only)
-              </span>
-            ) : (
-              <select
-                value={selectedVertical}
-                onChange={(e) => setSelectedVertical(e.target.value)}
-                className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-800 shadow-2xs focus:border-blue-500 focus:bg-white focus:outline-hidden"
-              >
-                {availableVerticals.map((v) => (
-                  <option key={v.slug} value={v.slug}>
-                    {v.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            <span className="hidden sm:inline">•</span>
-            <span className="text-amber-600 font-medium hidden sm:inline">Requires Approval</span>
-            {pendingImages.length > 0 && (
-              <>
-                <span className="hidden sm:inline">•</span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-0.5 font-semibold text-purple-700">
-                  <ImageIcon className="h-3 w-3" />
-                  {pendingImages.length} image{pendingImages.length > 1 ? "s" : ""}
-                </span>
-              </>
-            )}
-          </div>
+      <EditorToolbar
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        isUnassignedMember={isUnassignedMember}
+        availableVerticals={availableVerticals}
+        selectedVertical={selectedVertical}
+        onVerticalChange={setSelectedVertical}
+        pendingImageCount={pendingImages.length}
+        lastSavedAt={lastSavedAt}
+        isSavingDraft={isSavingDraft}
+        isSavingRemoteDraft={isSavingRemoteDraft}
+        onOpenCloudDrafts={handleFetchRemoteDrafts}
+        onSaveRemoteDraft={handleSaveRemoteDraft}
+        revisionPrNumber={activeRevisionPr?.number ?? null}
+        onOpenPublish={() => setShowDrawer(true)}
+      />
 
-          <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:shrink-0 sm:justify-end sm:gap-2.5">
-            {/* View Mode Segmented Pill */}
-            <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50/90 p-0.5 text-xs font-medium shadow-xs">
-              <button
-                type="button"
-                onClick={() => setViewMode("write")}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1 transition ${
-                  viewMode === "write"
-                    ? "bg-white text-gray-900 shadow-xs font-semibold"
-                    : "text-gray-500 hover:text-gray-900"
-                }`}
-                title="Canvas Editor only"
-                aria-label="Write"
-                aria-pressed={viewMode === "write"}
-              >
-                <Edit3 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Write</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("split")}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1 transition ${
-                  viewMode === "split"
-                    ? "bg-white text-gray-900 shadow-xs font-semibold"
-                    : "text-gray-500 hover:text-gray-900"
-                }`}
-                title="Split screen: write & see real-time preview side-by-side"
-                aria-label="Split view"
-                aria-pressed={viewMode === "split"}
-              >
-                <Columns className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Split</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("preview")}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1 transition ${
-                  viewMode === "preview"
-                    ? "bg-white text-gray-900 shadow-xs font-semibold"
-                    : "text-gray-500 hover:text-gray-900"
-                }`}
-                title="Full live reading preview"
-                aria-label="Preview"
-                aria-pressed={viewMode === "preview"}
-              >
-                <Eye className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Preview</span>
-              </button>
+      {submissionResult && (
+        <SubmissionSuccessModal
+          pullNumber={submissionResult.pullNumber}
+          prUrl={submissionResult.prUrl}
+          onClose={() => setSubmissionResult(null)}
+        />
+      )}
+
+      {recoveredDraft && (
+        <RecoveredDraftBanner
+          updatedAt={recoveredDraft.updatedAt}
+          onRestore={handleRestoreDraft}
+          onDiscard={handleDiscardDraft}
+        />
+      )}
+      {authorPendingPrs.length > 0 && <AuthorPendingBanner prs={authorPendingPrs} />}
+      {reviewerPendingCount > 0 && <ReviewerActionBanner count={reviewerPendingCount} />}
+      {isUnassignedMember && <UnassignedMemberBanner login={user.login} />}
+      {authorFeedbackPr && (
+        <ChangesRequestedBanner
+          pr={authorFeedbackPr}
+          loading={loadingFeedbackDraft}
+          onRevise={() => handleLoadFeedbackPR(authorFeedbackPr.number)}
+        />
+      )}
+
+      {viewMode === "write" && (
+        <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+          {editorCanvas}
+        </main>
+      )}
+
+      {viewMode === "preview" && (
+        <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+          <div className="mb-6 flex items-center justify-between rounded-xl bg-blue-50/80 border border-blue-100 px-4 py-2.5 text-xs text-blue-800">
+            <div className="flex items-center gap-2">
+              <Eye className="h-4 w-4 text-blue-600" />
+              <span className="font-semibold">Live Article Preview</span>
+              <span className="hidden sm:inline text-blue-500">— Exactly as readers will see it once published</span>
             </div>
-
-            {/* Cloud Drafts / Cross-Device Sync Button */}
             <button
               type="button"
-              onClick={handleFetchRemoteDrafts}
-              className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition"
-              title="View and restore drafts saved to GitHub branches across devices"
-              aria-label="Cloud Drafts"
+              onClick={() => setViewMode("write")}
+              className="font-medium text-blue-700 hover:text-blue-900 underline"
             >
-              <Cloud className="h-3.5 w-3.5 text-blue-600" />
-              <span className="hidden md:inline">Cloud Drafts</span>
+              Return to Edit &rarr;
             </button>
+          </div>
+          {articlePreview}
+        </main>
+      )}
 
-            {/* Save to Cloud Branch (Zero-DB Remote Persistence) */}
-            <div className="flex items-center gap-1.5">
-              {lastSavedAt && (
-                <span className="hidden xl:inline-flex items-center gap-1 text-[11px] text-gray-500 font-mono">
-                  <Check className="h-3 w-3 text-emerald-600" />
-                  <span>{lastSavedAt}</span>
+      {viewMode === "split" && (
+        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            {/* Left Column: Markdown Canvas */}
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs">
+              <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <span className="flex items-center gap-1.5">
+                  <Edit3 className="h-3.5 w-3.5 text-blue-600" />
+                  Markdown Canvas
                 </span>
-              )}
-              <button
-                type="button"
-                onClick={handleSaveRemoteDraft}
-                disabled={isSavingRemoteDraft || isSavingDraft || isUnassignedMember}
-                aria-label={isSavingRemoteDraft ? "Syncing draft" : "Save Draft"}
-                className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 shadow-xs hover:bg-gray-50 hover:border-gray-400 transition active:scale-95 disabled:opacity-50"
-                title={
-                  isUnassignedMember
-                    ? "You must be assigned to a vertical in Governance & Roles before syncing cloud drafts"
-                    : "Push WIP draft to your personal Git draft branch (drafts/username/slug) so you can resume on another device"
-                }
-              >
-                <CloudUpload className="h-3.5 w-3.5 text-blue-600" />
-                <span className="hidden sm:inline">{isSavingRemoteDraft ? "Syncing..." : "Save Draft"}</span>
-              </button>
-            </div>
-
-            {isUnassignedMember ? (
-              <a
-                href="/admin/roles"
-                className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-300 px-3.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-500/25 transition"
-                title="You must be assigned to a vertical in Governance & Roles before submitting articles"
-              >
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                <span className="sm:hidden">Request Role</span>
-                <span className="hidden sm:inline">Request Role to Publish</span>
-              </a>
-            ) : activeRevisionPr ? (
-              <button
-                onClick={() => setShowDrawer(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-red-700 transition"
-              >
-                <span>Update PR #{activeRevisionPr.number}</span>
-                <Send className="h-3.5 w-3.5" />
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowDrawer(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 transition"
-              >
-                <span className="sm:hidden">Submit</span>
-                <span className="hidden sm:inline">Publish / Submit</span>
-                <Send className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Success Notification Modal */}
-      {submissionResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-5 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-              <CheckCircle2 className="h-8 w-8" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">Submitted for Editorial Review!</h3>
-              <p className="mt-2 text-sm text-gray-500">
-                Your post has been committed to a draft branch and opened as Pull Request{" "}
-                <span className="font-bold text-gray-800">#{submissionResult.pullNumber}</span> on
-                GitHub.
-              </p>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-3 text-xs text-gray-600 text-left space-y-1">
-              <div>
-                <strong>Governance Rule:</strong> A designated Vertical Head or Superadmin will
-                review and merge this PR on the Editorial Reviews page before it goes live.
+                <span>{wordCount} words</span>
               </div>
+              {editorCanvas}
             </div>
-            <div className="flex flex-col gap-2 pt-2">
-              <a
-                href={submissionResult.prUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                <span>View PR #{submissionResult.pullNumber} on GitHub</span>
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-              <a
-                href="/admin/reviews"
-                className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-              >
-                Go to Editorial Reviews Dashboard &rarr;
-              </a>
-              <button
-                onClick={() => setSubmissionResult(null)}
-                className="text-xs text-gray-400 hover:text-gray-600 pt-1"
-              >
-                Close & Continue Writing
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Unsaved Local Draft Recovered Notification Banner */}
-      {recoveredDraft && (
-        <div className="mx-auto max-w-4xl px-4 pt-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm text-xs text-amber-900">
-            <div className="flex items-center gap-3">
-              <Sparkles className="h-5 w-5 text-amber-600 shrink-0" />
-              <div>
-                <span className="font-bold text-amber-950">⚡ Unsaved Local Draft Recovered!</span>
-                <p className="text-amber-800 mt-0.5">
-                  An unsaved draft from {new Date(recoveredDraft.updatedAt).toLocaleTimeString()} was saved in browser storage.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={handleRestoreDraft}
-                className="rounded-xl bg-amber-600 px-3.5 py-1.5 font-bold text-white shadow-xs hover:bg-amber-700 transition"
-              >
-                Restore Draft
-              </button>
-              <button
-                type="button"
-                onClick={handleDiscardDraft}
-                className="rounded-xl border border-amber-300 bg-white px-3 py-1.5 font-semibold text-amber-800 hover:bg-amber-100 transition"
-              >
-                Discard
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Author Review Requested Notification Banner */}
-      {authorPendingPrs.length > 0 && (
-        <div className="mx-auto max-w-4xl px-4 pt-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50/80 p-4 shadow-sm text-xs text-blue-900">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white font-bold shrink-0">
-                📬
-              </div>
-              <div>
-                <span className="font-bold text-blue-950">
-                  Review Requested: You have {authorPendingPrs.length} article{authorPendingPrs.length > 1 ? "s" : ""} under Editorial Review
+            {/* Right Column: Live Rendered Preview */}
+            <div className="lg:sticky lg:top-28">
+              <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <span className="flex items-center gap-1.5">
+                  <Eye className="h-3.5 w-3.5 text-emerald-600" />
+                  Real-Time Live Preview
                 </span>
-                <div className="text-blue-800 mt-1 space-y-0.5">
-                  {authorPendingPrs.map((pr) => (
-                    <div key={pr.number} className="flex items-center gap-2">
-                      <span>•</span>
-                      <span>
-                        <strong>PR #{pr.number}</strong> &ldquo;{pr.title}&rdquo; in
-                      </span>
-                      <span className="font-mono bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded text-[10px] font-semibold">
-                        {pr.vertical}
-                      </span>
-                      <span className="text-blue-600 text-[11px]">(Awaiting Reviewer Approval)</span>
-                    </div>
-                  ))}
-                </div>
+                <span className="text-emerald-600 font-medium">⚡ Instant Sync</span>
+              </div>
+              <div className="max-h-[calc(100vh-10rem)] overflow-y-auto pr-1">
+                {articlePreview}
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <a
-                href="/admin/reviews"
-                className="rounded-xl bg-blue-600 px-3.5 py-1.5 font-bold text-white shadow-xs hover:bg-blue-700 transition"
-              >
-                Track in Reviews &rarr;
-              </a>
-            </div>
           </div>
-        </div>
+        </main>
       )}
 
-      {/* Reviewer Action Notice Banner */}
-      {reviewerPendingCount > 0 && (
-        <div className="mx-auto max-w-4xl px-4 pt-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 shadow-sm text-xs text-emerald-900">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold shrink-0">
-                ⚡
-              </div>
-              <div>
-                <span className="font-bold text-emerald-950">
-                  Editorial Action Required: {reviewerPendingCount} article{reviewerPendingCount > 1 ? "s" : ""} awaiting your sign-off
-                </span>
-                <p className="text-emerald-800 mt-0.5">
-                  Articles have been submitted for your vertical. Review, test, and approve or request revisions.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <a
-                href="/admin/reviews"
-                className="rounded-xl bg-emerald-600 px-3.5 py-1.5 font-bold text-white shadow-xs hover:bg-emerald-700 transition"
-              >
-                Review Articles ({reviewerPendingCount}) &rarr;
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Unassigned Member Notice Banner */}
-      {isUnassignedMember && (
-        <div className="mx-auto max-w-4xl px-4 pt-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 shadow-xs text-xs text-amber-900">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500 text-white font-bold shrink-0">
-                <AlertTriangle className="h-5 w-5" />
-              </div>
-              <div>
-                <span className="font-bold text-amber-950 text-sm">
-                  Role Assignment Required
-                </span>
-                <p className="text-amber-800 mt-0.5">
-                  You are signed in as <strong>@{user?.login}</strong>, but have not been assigned to any of the 8 technical verticals yet. You can write and save drafts locally, but you must be assigned a role before submitting posts.
-                </p>
-              </div>
-            </div>
-            <a
-              href="/admin/roles"
-              className="rounded-xl bg-amber-600 px-3.5 py-2 font-bold text-white shadow-xs hover:bg-amber-700 transition shrink-0"
-            >
-              Request Role ↗
-            </a>
-          </div>
-        </div>
-      )}
-
-      {/* Editorial Changes Requested Notification Banner */}
-      {authorFeedbackPr && (
-        <div className="mx-auto max-w-4xl px-4 pt-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 shadow-sm text-xs text-red-900">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-              <div>
-                <div className="font-bold text-red-950">
-                  ⚠️ Editorial Feedback on PR #{authorFeedbackPr.number}: &ldquo;{authorFeedbackPr.title}&rdquo;
-                </div>
-                <p className="text-red-800 mt-1 whitespace-pre-wrap font-sans">
-                  <strong>Revision Required:</strong> {authorFeedbackPr.feedback}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-              <button
-                type="button"
-                onClick={() => handleLoadFeedbackPR(authorFeedbackPr.number)}
-                disabled={loadingFeedbackDraft}
-                className="rounded-xl bg-red-600 px-3.5 py-1.5 font-bold text-white shadow-xs hover:bg-red-700 transition disabled:opacity-50"
-              >
-                {loadingFeedbackDraft ? "Loading..." : "Load Draft & Revise"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Reusable Editor Canvas Form */}
-      {(() => {
-        const editorFormNode = (
-          <div className="space-y-6">
-            {/* Cover Image Selector */}
-            <div>
-              {coverImage ? (
-                <div className="relative group overflow-hidden rounded-2xl border border-gray-200 shadow-sm">
-                  <img
-                    src={coverImage}
-                    alt="Cover"
-                    className="h-64 w-full object-cover sm:h-80 transition"
-                  />
-                  <button
-                    onClick={() => setCoverImage("")}
-                    className="absolute top-3 right-3 rounded-full bg-black/60 p-1.5 text-white backdrop-blur-sm hover:bg-black transition"
-                    title="Remove cover"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <label className="flex h-24 w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/50 hover:bg-gray-50 hover:border-blue-400 transition">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-gray-500">
-                    <UploadCloud className="h-5 w-5 text-gray-400" />
-                    <span>Add a cover banner image (drag &amp; drop or click to upload)</span>
-                  </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={async (e) => {
-                      if (e.target.files?.[0]) {
-                        const url = await handleImageUpload(e.target.files[0]);
-                        if (url) setCoverImage(url);
-                      }
-                    }}
-                  />
-                </label>
-              )}
-            </div>
-
-            {/* Title (Big Medium-style Headline) */}
-            <textarea
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Title"
-              rows={1}
-              className="w-full resize-none border-none text-3xl sm:text-5xl font-extrabold tracking-tight text-gray-900 placeholder-gray-300 focus:outline-hidden focus:ring-0 leading-tight"
-              onInput={(e) => {
-                const target = e.target as HTMLTextAreaElement;
-                target.style.height = "auto";
-                target.style.height = target.scrollHeight + "px";
-              }}
-            />
-
-            {/* Author Byline Card (Medium-Style in Write Canvas) */}
-            {user && (
-              <div className="flex items-center justify-between border-y border-gray-100 py-3 my-2 text-xs">
-                <div className="flex items-center gap-3">
-                  <img
-                    src={user.avatar_url}
-                    alt={user.name || user.login}
-                    className="h-9 w-9 rounded-full ring-2 ring-gray-100 object-cover shadow-2xs"
-                  />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-900">{user.name || user.login}</span>
-                      <span className="text-[11px] font-mono text-gray-400">@{user.login}</span>
-                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 capitalize">
-                        {roleInfo?.role.replace("_", " ") || "Author"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-0.5">
-                      <span>Targeting:</span>
-                      <span className="font-medium text-gray-700">
-                        {selectedVertical === "club"
-                          ? "📢 Coding Club Announcements"
-                          : ALL_VERTICALS.find((v) => v.slug === selectedVertical)?.name || selectedVertical}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="hidden sm:flex items-center gap-3 text-gray-400 font-mono text-[11px]">
-                  <span>{wordCount} words</span>
-                  <span>•</span>
-                  <span>{readingTime} min read</span>
-                </div>
-              </div>
-            )}
-
-            {/* Floating Formatting Toolbar */}
-            <div className="sticky top-28 z-30 flex flex-wrap items-center gap-1.5 rounded-xl border border-gray-200 bg-white/95 p-1.5 shadow-sm backdrop-blur-md">
-              <button
-                onClick={() => insertAtCursor("\n\n## Section Heading\n\n")}
-                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
-                title="Heading 2"
-              >
-                <Heading2 className="h-3.5 w-3.5" />
-                <span>H2</span>
-              </button>
-              <button
-                onClick={() => insertAtCursor("\n\n### Subheading\n\n")}
-                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
-                title="Heading 3"
-              >
-                <Heading3 className="h-3.5 w-3.5" />
-                <span>H3</span>
-              </button>
-              <button
-                onClick={() => insertAtCursor("\n\n> Medium-style memorable pull-quote...\n\n")}
-                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
-                title="Quote"
-              >
-                <Quote className="h-3.5 w-3.5" />
-                <span>Quote</span>
-              </button>
-              <button
-                onClick={() => insertAtCursor("\n\n```typescript\n// Your code snippet here\n```\n\n")}
-                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
-                title="Code Block"
-              >
-                <Code className="h-3.5 w-3.5" />
-                <span>Code</span>
-              </button>
-              <button
-                onClick={() => insertAtCursor("\n\n- Item 1\n- Item 2\n- Item 3\n\n")}
-                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
-                title="Bulleted List"
-              >
-                <List className="h-3.5 w-3.5" />
-                <span>List</span>
-              </button>
-              <button
-                onClick={() => insertAtCursor("\n\n---\n\n")}
-                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition"
-                title="Divider"
-              >
-                <Minus className="h-3.5 w-3.5" />
-                <span>Divider</span>
-              </button>
-
-              <label className="flex items-center gap-1 cursor-pointer rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition ml-auto">
-                <ImageIcon className="h-3.5 w-3.5" />
-                <span>{uploadingImage ? "Processing..." : "Insert Mid-Post Image"}</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={uploadingImage}
-                  onChange={async (e) => {
-                    if (e.target.files?.[0]) {
-                      const url = await handleImageUpload(e.target.files[0]);
-                      if (url) {
-                        insertAtCursor(`\n\n![${e.target.files[0].name}](${url})\n\n`);
-                      }
-                    }
-                  }}
-                />
-              </label>
-            </div>
-
-            {/* Medium-style Body Canvas Area */}
-            <textarea
-              ref={textareaRef}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              onDrop={handleDrop}
-              placeholder="Tell your story... Drag and drop images anywhere mid-article, or click 'Insert Mid-Post Image'..."
-              className="min-h-[500px] w-full resize-none border-none text-lg leading-relaxed text-gray-800 placeholder-gray-300 focus:outline-hidden focus:ring-0"
-            />
-          </div>
-        );
-
-        const previewNode = (
-          <article className="rounded-2xl border border-gray-100 bg-white p-6 sm:p-10 shadow-sm transition">
-            {/* Cover Image Banner */}
-            {coverImage ? (
-              <div className="mb-8 overflow-hidden rounded-2xl shadow-sm border border-gray-100">
-                <img
-                  src={coverImage}
-                  alt={title || "Cover Image"}
-                  className="h-64 sm:h-96 w-full object-cover"
-                />
-              </div>
-            ) : null}
-
-            {/* Metadata Bar */}
-            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-4">
-              <span className="rounded-full bg-blue-50 px-2.5 py-0.5 font-semibold text-blue-700">
-                {selectedVertical === "club"
-                  ? "📢 Coding Club Announcements"
-                  : ALL_VERTICALS.find((v) => v.slug === selectedVertical)?.name || selectedVertical}
-              </span>
-              <span>•</span>
-              <span>{new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
-              <span>•</span>
-              <span className="font-medium text-gray-600">{readingTime} min read</span>
-              <span>•</span>
-              <span>{wordCount} words</span>
-            </div>
-
-            {/* Title */}
-            <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight mb-6">
-              {title.trim() ? title : <span className="text-gray-300 italic">Untitled Article</span>}
-            </h1>
-
-            {/* Author Card */}
-            {user && (
-              <div className="flex items-center gap-3.5 border-y border-gray-100 py-4 my-6">
-                <img
-                  src={user.avatar_url}
-                  alt={user.name || user.login}
-                  className="h-10 w-10 rounded-full ring-2 ring-gray-100"
-                />
-                <div>
-                  <div className="text-sm font-semibold text-gray-900">{user.name || user.login}</div>
-                  <div className="text-xs text-gray-500">
-                    @{user.login}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Rendered Markdown Body */}
-            <div
-              className="article-preview text-gray-800"
-              dangerouslySetInnerHTML={{ __html: parsedHtml }}
-            />
-          </article>
-        );
-
-        if (viewMode === "write") {
-          return (
-            <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-              {editorFormNode}
-            </main>
-          );
-        }
-
-        if (viewMode === "preview") {
-          return (
-            <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-              <div className="mb-6 flex items-center justify-between rounded-xl bg-blue-50/80 border border-blue-100 px-4 py-2.5 text-xs text-blue-800">
-                <div className="flex items-center gap-2">
-                  <Eye className="h-4 w-4 text-blue-600" />
-                  <span className="font-semibold">Live Article Preview</span>
-                  <span className="hidden sm:inline text-blue-500">— Exactly as readers will see it once published</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setViewMode("write")}
-                  className="font-medium text-blue-700 hover:text-blue-900 underline"
-                >
-                  Return to Edit &rarr;
-                </button>
-              </div>
-              {previewNode}
-            </main>
-          );
-        }
-
-        return (
-          <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-              {/* Left Column: Markdown Canvas */}
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs">
-                <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  <span className="flex items-center gap-1.5">
-                    <Edit3 className="h-3.5 w-3.5 text-blue-600" />
-                    Markdown Canvas
-                  </span>
-                  <span>{wordCount} words</span>
-                </div>
-                {editorFormNode}
-              </div>
-
-              {/* Right Column: Live Rendered Preview */}
-              <div className="lg:sticky lg:top-28">
-                <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  <span className="flex items-center gap-1.5">
-                    <Eye className="h-3.5 w-3.5 text-emerald-600" />
-                    Real-Time Live Preview
-                  </span>
-                  <span className="text-emerald-600 font-medium">⚡ Instant Sync</span>
-                </div>
-                <div className="max-h-[calc(100vh-10rem)] overflow-y-auto pr-1">
-                  {previewNode}
-                </div>
-              </div>
-            </div>
-          </main>
-        );
-      })()}
-
-      {/* Publish Slide-Over Drawer (Medium Style) */}
       {showDrawer && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition">
-          <div className="flex h-full w-full max-w-md flex-col justify-between bg-white p-6 shadow-2xl sm:p-8">
-            <div className="space-y-6 overflow-y-auto">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-                <h2 className="text-xl font-bold text-gray-900">Publishing Submission</h2>
-                <button
-                  onClick={() => setShowDrawer(false)}
-                  className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              {errorMessage && (
-                <div className="flex items-center gap-2 rounded-xl bg-red-50 p-3 text-xs font-medium text-red-700">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{errorMessage}</span>
-                </div>
-              )}
-
-              {/* Vertical Selection */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-                  Article Vertical
-                </label>
-                <select
-                  value={selectedVertical}
-                  onChange={(e) => setSelectedVertical(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-white p-2.5 text-sm font-medium text-gray-900 shadow-xs focus:border-blue-600 focus:outline-hidden"
-                >
-                  {availableVerticals.map((v) => (
-                    <option key={v.slug} value={v.slug}>
-                      {v.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="mt-2.5 rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-xs text-blue-900">
-                  <div className="font-semibold text-blue-950 flex items-center gap-1.5">
-                    <span>🎯 Target Portal:</span>
-                    <span className="font-mono text-blue-800">
-                      {selectedVertical === "club"
-                        ? "codingclub.tech (Main Portal)"
-                        : `${selectedVertical}.codingclub.tech (${selectedVertical} Portal)`}
-                    </span>
-                  </div>
-                  <p className="text-blue-700/80 mt-1 text-[11px]">
-                    Autonomous 1-to-1 vertical routing. This article will live strictly inside its designated vertical portal and codebase.
-                  </p>
-                </div>
-              </div>
-
-              {/* Summary / Subtitle */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-                  Article Summary / Excerpt
-                </label>
-                <textarea
-                  value={summary}
-                  onChange={(e) => setSummary(e.target.value)}
-                  rows={3}
-                  placeholder="A concise 2-sentence teaser for cards and social previews..."
-                  className="w-full rounded-xl border border-gray-200 p-2.5 text-sm text-gray-800 shadow-xs focus:border-blue-600 focus:outline-hidden"
-                />
-              </div>
-
-              {/* Tags */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-                  Tags (Press Enter or Comma)
-                </label>
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {tags.map((t) => (
-                    <span
-                      key={t}
-                      className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700"
-                    >
-                      #{t}
-                      <button
-                        type="button"
-                        onClick={() => removeTag(t)}
-                        className="hover:text-red-600"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <input
-                  type="text"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={handleAddTag}
-                  placeholder="e.g. Nextjs, Turbopack, AI"
-                  className="w-full rounded-xl border border-gray-200 p-2.5 text-sm text-gray-800 shadow-xs focus:border-blue-600 focus:outline-hidden"
-                />
-              </div>
-
-              {/* Governance & Approval Policy Box */}
-              <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4 text-xs text-blue-900 space-y-1.5">
-                <div className="flex items-center gap-1.5 font-bold">
-                  <Sparkles className="h-4 w-4 text-blue-600" />
-                  <span>Club Governance Workflow</span>
-                </div>
-                <p className="leading-relaxed text-blue-800">
-                  Submitting will create a dedicated Git draft branch and Pull Request. In
-                  accordance with club rules, even Superadmins must review and approve posts before
-                  they are merged to main.
-                </p>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-100 pt-4">
-              <button
-                type="button"
-                onClick={handleSubmitDraft}
-                disabled={submitting}
-                className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white shadow-md transition disabled:opacity-50 ${
-                  activeRevisionPr
-                    ? "bg-red-600 hover:bg-red-700"
-                    : "bg-emerald-600 hover:bg-emerald-700"
-                }`}
-              >
-                {submitting
-                  ? "Pushing Revisions..."
-                  : activeRevisionPr
-                  ? `Update PR #${activeRevisionPr.number} with Revisions 🚀`
-                  : "Submit for Editorial Review 🚀"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <PublishDrawer
+          onClose={() => setShowDrawer(false)}
+          errorMessage={errorMessage}
+          availableVerticals={availableVerticals}
+          selectedVertical={selectedVertical}
+          onVerticalChange={setSelectedVertical}
+          summary={summary}
+          onSummaryChange={setSummary}
+          tags={tags}
+          onTagsChange={setTags}
+          revisionPrNumber={activeRevisionPr?.number ?? null}
+          submitting={submitting}
+          onSubmit={handleSubmitDraft}
+        />
       )}
 
-      {/* Cloud Drafts Modal (Zero-DB Cross-Device Sync) */}
       {showRemoteDraftsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Cloud className="h-5 w-5 text-blue-600" />
-                <h3 className="text-base font-bold text-gray-900">Your Cloud Git Drafts</h3>
-              </div>
-              <button
-                onClick={() => setShowRemoteDraftsModal(false)}
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <p className="text-xs text-gray-500">
-              These are unmerged WIP drafts pushed to personal branches (<code>drafts/{user?.login}/*</code>). You can open and continue them on any device without losing work.
-            </p>
-
-            {loadingRemoteDrafts ? (
-              <div className="py-8 text-center text-xs text-gray-400 font-mono">
-                Querying GitHub draft branches...
-              </div>
-            ) : remoteDrafts.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-200 py-8 text-center text-xs text-gray-400">
-                No cloud draft branches found for @{user?.login}. Click <strong>&quot;Save Draft&quot;</strong> in the toolbar to save your first cloud copy!
-              </div>
-            ) : (
-              <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
-                {remoteDrafts.map((d) => (
-                  <div
-                    key={d.branch}
-                    className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/50 p-3 text-xs hover:border-blue-400 transition"
-                  >
-                    <div>
-                      <div className="font-semibold text-gray-900 capitalize">{d.title}</div>
-                      <div className="text-[11px] font-mono text-gray-400 mt-0.5">
-                        {d.branch} • {new Date(d.updatedAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleLoadRemoteDraft(d.branch)}
-                      className="rounded-lg bg-blue-600 px-3 py-1.5 font-semibold text-white shadow-2xs hover:bg-blue-700 transition"
-                    >
-                      Load Draft
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex justify-end pt-2 border-t border-gray-100">
-              <button
-                type="button"
-                onClick={() => setShowRemoteDraftsModal(false)}
-                className="rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        <CloudDraftsModal
+          login={user.login}
+          drafts={remoteDrafts}
+          loading={loadingRemoteDrafts}
+          onLoad={handleLoadRemoteDraft}
+          onClose={() => setShowRemoteDraftsModal(false)}
+        />
       )}
 
-      {/* Cloud Draft Save Success Toast */}
-      {remoteDraftSuccessMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white p-4 shadow-xl text-xs font-semibold text-emerald-800 animate-slide-up">
-          <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-          <span>{remoteDraftSuccessMessage}</span>
-        </div>
-      )}
+      {remoteDraftSuccessMessage && <SuccessToast message={remoteDraftSuccessMessage} />}
     </div>
   );
 }

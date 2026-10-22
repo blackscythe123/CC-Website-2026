@@ -88,7 +88,7 @@ export default function Menu({
           id={menuId}
           role="menu"
           onKeyDown={onKeyDown}
-          className={`absolute top-full z-50 mt-1.5 min-w-56 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-bg p-1.5 text-text shadow-float ${
+          className={`absolute top-full z-50 mt-1.5 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-bg p-1.5 text-text shadow-float ${
             align === "end" ? "right-0" : "left-0"
           }`}
         >
@@ -114,8 +114,10 @@ export default function Menu({
                 } focus:outline-none`}
               >
                 {Icon ? <Icon className="h-4 w-4 shrink-0 text-muted" aria-hidden /> : null}
-                <span className="flex-1">{item.label}</span>
-                {item.hint ? <span className="text-xs text-muted">{item.hint}</span> : null}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{item.label}</span>
+                  {item.hint ? <span className="block text-xs text-muted">{item.hint}</span> : null}
+                </span>
               </button>
             );
           })}

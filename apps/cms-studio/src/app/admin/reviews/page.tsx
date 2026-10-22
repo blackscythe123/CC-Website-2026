@@ -63,7 +63,7 @@ export default function ReviewsPage() {
       pr.author.toLowerCase() === login
         ? roleInfo?.rolesByVertical?.[pr.vertical] ?? roleInfo?.role ?? null
         : authorRoleIn(roles, pr.author, pr.vertical);
-    return reviewProgress(authorRole, pr.approvers, roles?.deputies[pr.vertical] || []);
+    return reviewProgress(authorRole, pr.approvers, roles ? roles.deputies[pr.vertical] || [] : null);
   };
 
   const approve = async (pr: ReviewPr) => {

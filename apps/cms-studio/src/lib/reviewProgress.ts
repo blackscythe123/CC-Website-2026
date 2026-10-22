@@ -23,13 +23,16 @@ export function authorRoleIn(roles: RoleLists | null, login: string, vertical: s
 export function reviewProgress(
   authorRole: UserRoleType | null,
   approvers: string[],
-  deputies: string[]
+  /** Deputies of the PR's vertical, or null when the viewer cannot load the role lists */
+  deputies: string[] | null
 ): { text: string; tone: "success" | "neutral"; title?: string } {
   const approved = approvers.map((a) => a.toLowerCase());
 
   if (authorRole === "member") {
-    const deputySet = new Set(deputies.map((d) => d.toLowerCase()));
-    const deputyApprovals = approved.filter((a) => deputySet.has(a)).length;
+    // An open member post can only carry deputy approvals (a head or superadmin approval merges it),
+    // so without the deputy list every approver counts.
+    const deputySet = deputies ? new Set(deputies.map((d) => d.toLowerCase())) : null;
+    const deputyApprovals = deputySet ? approved.filter((a) => deputySet.has(a)).length : approved.length;
     return {
       text: `${deputyApprovals}/2 approvals`,
       tone: deputyApprovals > 0 ? "success" : "neutral",

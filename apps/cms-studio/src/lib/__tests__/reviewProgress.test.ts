@@ -23,4 +23,6 @@ it("member with none", () => expect(reviewProgress("member", [], ["d1"]).tone).t
 it("deputy author", () => expect(reviewProgress("deputy", [], []).text).toBe("needs 1 head or superadmin"));
 it("unknown author role", () => expect(reviewProgress(null, ["a", "b"], []).text).toBe("2 approvals"));
 it("unknown author role, single approval", () => expect(reviewProgress(null, ["a"], []).text).toBe("1 approval"));
+it("member post with unknown deputy list counts every approver (heads/superadmins would have merged it)", () =>
+  expect(reviewProgress("member", ["d2"], null).text).toBe("1/2 approvals"));
 it("is case-insensitive", () => expect(reviewProgress("member", ["D1"], ["d1"]).text).toBe("1/2 approvals"));

@@ -1,108 +1,94 @@
 import Link from "next/link";
-import { Edit3, CheckSquare, Shield, ArrowRight } from "lucide-react";
+import { ArrowRight, GitPullRequest, PenLine, Rocket, SquareCheck, Users } from "lucide-react";
+import { buttonClasses } from "@/components/ui";
+import { SignInHero } from "@/components/illustrations";
+import ThemeSwitch from "@/components/theme/ThemeSwitch";
+import { ALL_VERTICALS } from "@/lib/verticals";
+
+const STEPS = [
+  { icon: PenLine, title: "Write", body: "Draft in the editor. It autosaves on your device and can sync to GitHub." },
+  { icon: GitPullRequest, title: "Submit", body: "Submitting opens a pull request on a draft branch." },
+  { icon: Rocket, title: "Go live", body: "Once a reviewer approves it, the post is merged and published." },
+];
+
+const LINKS = [
+  { href: "/admin", icon: PenLine, title: "Write", body: "Start or continue an article" },
+  { href: "/admin/reviews", icon: SquareCheck, title: "Reviews", body: "Approve posts or see feedback on yours" },
+  { href: "/admin/roles", icon: Users, title: "People", body: "Roles, applications and joining a vertical" },
+];
 
 export default function CmsStudioHome() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-6 text-gray-900 font-sans">
-      <div className="w-full max-w-2xl rounded-3xl border border-gray-200 bg-white p-8 sm:p-10 shadow-sm space-y-8">
-        <div className="flex items-center gap-3.5">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 font-mono text-xl font-bold text-white shadow-md">
-            &lt;/&gt;
-          </div>
+    <div className="min-h-screen bg-surface">
+      <header className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
+        <div className="flex items-center gap-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/mark.png" alt="" aria-hidden width={32} height={32} className="rounded-lg" />
+          <span className="leading-tight">
+            <span className="block text-[15px] font-bold">Studio</span>
+            <span className="block text-xs text-muted">SSN Coding Club</span>
+          </span>
+        </div>
+        <ThemeSwitch className="w-28" />
+      </header>
+
+      <main className="mx-auto max-w-5xl px-4 pb-16 pt-6 sm:px-6 sm:pt-12">
+        <section className="grid items-center gap-10 md:grid-cols-[1.1fr_1fr]">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">
-              SSN Coding Club CMS Studio
-            </h1>
-            <p className="text-sm text-gray-500">
-              Next-generation Medium-style editor backed by Git branches &amp; PR reviews.
+            <h1 className="text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl">Write for the club. Get reviewed. Go live.</h1>
+            <p className="mt-4 max-w-lg text-base leading-relaxed text-muted">
+              Studio is where members of the {ALL_VERTICALS.length} verticals write articles, and where deputies and heads review them before they reach
+              codingclub.tech.
             </p>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-900">
-              Zero-Database Governance Pipeline
-            </span>
-            <span className="text-xs text-blue-700 font-medium">10 Autonomous Verticals</span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-xl bg-white p-3.5 shadow-xs border border-blue-100">
-              <span className="block text-[10px] font-bold text-gray-400 uppercase">Stage 1</span>
-              <span className="mt-0.5 block text-sm font-bold text-gray-800">Medium Canvas</span>
-              <span className="mt-1 block text-xs text-gray-500">Draft created</span>
-            </div>
-            <div className="rounded-xl bg-white p-3.5 shadow-xs border border-blue-100">
-              <span className="block text-[10px] font-bold text-amber-600 uppercase">Stage 2</span>
-              <span className="mt-0.5 block text-sm font-bold text-amber-900">PR Opened</span>
-              <span className="mt-1 block text-xs text-gray-500">Requires review</span>
-            </div>
-            <div className="rounded-xl bg-white p-3.5 shadow-xs border border-blue-100">
-              <span className="block text-[10px] font-bold text-emerald-600 uppercase">Stage 3</span>
-              <span className="mt-0.5 block text-sm font-bold text-emerald-900">Live on Main</span>
-              <span className="mt-1 block text-xs text-gray-500">Approved &amp; Merged</span>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link href="/admin" className={buttonClasses({ variant: "primary", size: "lg" })}>
+                Open Studio
+                <ArrowRight className="h-[18px] w-[18px]" aria-hidden />
+              </Link>
+              <Link href="/admin/reviews" className={buttonClasses({ size: "lg" })}>
+                Review posts
+              </Link>
             </div>
           </div>
-        </div>
+          <SignInHero className="mx-auto h-auto w-full max-w-sm" />
+        </section>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Link
-            href="/admin"
-            className="flex flex-col justify-between rounded-2xl border border-gray-200 p-4 hover:border-blue-400 hover:shadow-sm transition"
-          >
-            <div>
-              <Edit3 className="h-5 w-5 text-blue-600" />
-              <h3 className="mt-2 text-sm font-bold text-gray-900">Canvas Editor</h3>
-              <p className="mt-1 text-xs text-gray-500">Write with slash commands &amp; images</p>
-            </div>
-            <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-blue-600">
-              <span>Open</span>
-              <ArrowRight className="h-3 w-3" />
-            </div>
-          </Link>
+        <section aria-labelledby="how-title" className="mt-16">
+          <h2 id="how-title" className="text-sm font-bold uppercase tracking-wide text-muted">
+            How publishing works
+          </h2>
+          <ol className="mt-4 grid gap-3 sm:grid-cols-3">
+            {STEPS.map(({ icon: Icon, title, body }, i) => (
+              <li key={title} className="rounded-xl border border-border bg-bg p-5 shadow-card">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-accent-strong">
+                    <Icon className="h-4 w-4" aria-hidden />
+                  </span>
+                  <span className="text-xs font-semibold text-muted">Step {i + 1}</span>
+                </div>
+                <h3 className="mt-3 font-bold">{title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted">{body}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
 
-          <Link
-            href="/admin/reviews"
-            className="flex flex-col justify-between rounded-2xl border border-gray-200 p-4 hover:border-blue-400 hover:shadow-sm transition"
-          >
-            <div>
-              <CheckSquare className="h-5 w-5 text-emerald-600" />
-              <h3 className="mt-2 text-sm font-bold text-gray-900">Reviews &amp; PRs</h3>
-              <p className="mt-1 text-xs text-gray-500">Inspect &amp; approve pending drafts</p>
-            </div>
-            <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-emerald-600">
-              <span>Inspect</span>
-              <ArrowRight className="h-3 w-3" />
-            </div>
-          </Link>
-
-          <Link
-            href="/admin/roles"
-            className="flex flex-col justify-between rounded-2xl border border-gray-200 p-4 hover:border-purple-400 hover:shadow-sm transition"
-          >
-            <div>
-              <Shield className="h-5 w-5 text-purple-600" />
-              <h3 className="mt-2 text-sm font-bold text-gray-900">Superadmin Roles</h3>
-              <p className="mt-1 text-xs text-gray-500">Manage team roles &amp; CODEOWNERS</p>
-            </div>
-            <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-purple-600">
-              <span>Manage</span>
-              <ArrowRight className="h-3 w-3" />
-            </div>
-          </Link>
-        </div>
-
-        <div className="pt-2 text-center">
-          <Link
-            href="/admin"
-            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-700 transition"
-          >
-            <span>Launch CMS Studio</span>
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </div>
+        <section aria-label="Shortcuts" className="mt-10 grid gap-3 sm:grid-cols-3">
+          {LINKS.map(({ href, icon: Icon, title, body }) => (
+            <Link
+              key={href}
+              href={href}
+              className="group flex items-start gap-3 rounded-xl border border-border bg-bg p-5 shadow-card transition hover:border-border-strong"
+            >
+              <Icon className="mt-0.5 h-5 w-5 shrink-0 text-muted group-hover:text-accent" aria-hidden />
+              <span>
+                <span className="block font-bold">{title}</span>
+                <span className="mt-0.5 block text-sm text-muted">{body}</span>
+              </span>
+            </Link>
+          ))}
+        </section>
+      </main>
     </div>
   );
 }

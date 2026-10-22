@@ -1,4 +1,5 @@
-export { default as Button, buttonClasses } from "./Button";
+export { default as Button } from "./Button";
+export { buttonClasses } from "./buttonClasses";
 export { default as IconButton } from "./IconButton";
 export { default as Badge } from "./Badge";
 export { default as Card } from "./Card";

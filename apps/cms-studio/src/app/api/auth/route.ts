@@ -20,8 +20,9 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Strictly fixed OAuth scope to prevent arbitrary scope manipulation
-  const scope = "repo,user";
+  // Least-privilege OAuth scope: public repo access + read-only user profile & email
+  // Strictly avoids asking for 'repo' (full control of private repositories) or 'user' (profile write)
+  const scope = "public_repo,read:user,user:email";
   const state = crypto.randomUUID();
 
   const authUrl = new URL("https://github.com/login/oauth/authorize");

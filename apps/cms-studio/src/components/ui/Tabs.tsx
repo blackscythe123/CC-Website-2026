@@ -5,6 +5,8 @@ import { useRef } from "react";
 export interface TabItem {
   id: string;
   label: string;
+  /** Shown instead of `label` on phones */
+  shortLabel?: string;
   count?: number;
 }
 
@@ -58,7 +60,14 @@ export default function Tabs({
               selected ? "border-accent font-semibold text-text" : "border-transparent font-medium text-muted hover:text-text"
             }`}
           >
-            {tab.label}
+            {tab.shortLabel ? (
+              <>
+                <span className="sm:hidden">{tab.shortLabel}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
+              </>
+            ) : (
+              tab.label
+            )}
             {tab.count !== undefined ? (
               <span className="rounded-full bg-neutral-bg px-1.5 text-[11px] font-semibold leading-5 text-neutral">{tab.count}</span>
             ) : null}

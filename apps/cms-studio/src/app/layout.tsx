@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "sw
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
 
 export const metadata: Metadata = {
-  title: { default: "Studio · SSN Coding Club", template: "%s · Studio" },
+  title: { default: "Studio Â· SSN Coding Club", template: "%s Â· Studio" },
   description: "Write, review and publish SSN Coding Club articles.",
 };
 

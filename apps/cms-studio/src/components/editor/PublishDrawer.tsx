@@ -1,12 +1,39 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, Sparkles, X } from "lucide-react";
+import { CircleAlert, CircleCheck, CircleDashed, GitPullRequest, Info, Send, X } from "lucide-react";
 import type { VerticalOption } from "@/lib/verticals";
+import { getVertical } from "@/lib/verticals";
+import { getSubmitChecklist, type ChecklistItem } from "@/lib/submitChecklist";
+import { addTag } from "@/lib/tags";
+import { Button, Drawer, Field, Input, Select, Textarea } from "@/components/ui";
+
+const SUMMARY_SOFT_LIMIT = 200;
+const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+
+function ChecklistRow({ item, verticalName }: { item: ChecklistItem; verticalName: string }) {
+  const Icon = item.ok ? CircleCheck : item.level === "required" ? CircleAlert : item.level === "recommended" ? CircleAlert : CircleDashed;
+  const tone = item.ok ? "text-success" : item.level === "required" ? "text-danger" : item.level === "recommended" ? "text-warning" : "text-subtle";
+  const label = item.id === "vertical" && item.ok ? `Vertical: ${verticalName}` : item.label;
+  const note = item.ok ? null : item.level === "required" ? item.hint || "Required" : item.hint;
+  return (
+    <li className="flex items-start gap-2 py-1 text-sm">
+      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${tone}`} aria-hidden />
+      <span>
+        {label}
+        <span className="sr-only">{item.ok ? " — done" : item.level === "required" ? " — required" : ` — ${item.level}`}</span>
+        {note ? <span className="text-muted"> — {note}</span> : null}
+      </span>
+    </li>
+  );
+}
 
 interface PublishDrawerProps {
+  open: boolean;
   onClose: () => void;
-  errorMessage: string;
+  title: string;
+  content: string;
+  coverImage: string;
   availableVerticals: VerticalOption[];
   selectedVertical: string;
   onVerticalChange: (slug: string) => void;
@@ -14,175 +41,154 @@ interface PublishDrawerProps {
   onSummaryChange: (value: string) => void;
   tags: string[];
   onTagsChange: (tags: string[]) => void;
-  revisionPrNumber: number | null;
+  revision: { number: number; feedback: string } | null;
   submitting: boolean;
+  serverError: string | null;
   onSubmit: () => void;
 }
 
-export default function PublishDrawer({
-  onClose,
-  errorMessage,
-  availableVerticals,
-  selectedVertical,
-  onVerticalChange,
-  summary,
-  onSummaryChange,
-  tags,
-  onTagsChange,
-  revisionPrNumber,
-  submitting,
-  onSubmit,
-}: PublishDrawerProps) {
+export default function PublishDrawer(props: PublishDrawerProps) {
+  const { open, onClose, availableVerticals, selectedVertical, summary, tags, revision, submitting } = props;
   const [tagInput, setTagInput] = useState("");
 
-  const handleAddTag = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      const val = tagInput.trim().replace(/^,/, "");
-      if (val && !tags.includes(val)) {
-        onTagsChange([...tags, val]);
-        setTagInput("");
-      }
-    }
+  const checklist = getSubmitChecklist({
+    title: props.title,
+    content: props.content,
+    summary,
+    coverImage: props.coverImage,
+    selectedVertical,
+    allowedVerticals: availableVerticals.map((v) => v.slug),
+  });
+  const vertical = getVertical(selectedVertical);
+
+  const commitTag = () => {
+    props.onTagsChange(addTag(tags, tagInput));
+    setTagInput("");
   };
 
-  const removeTag = (t: string) => {
-    onTagsChange(tags.filter((item) => item !== t));
-  };
+  const footer = (
+    <div className="space-y-2">
+      {!checklist.canSubmit ? <p className="text-center text-[13px] font-medium text-danger">{checklist.blockingReason}</p> : null}
+      <Button
+        variant="primary"
+        size="lg"
+        block
+        icon={revision ? GitPullRequest : Send}
+        loading={submitting}
+        disabled={!checklist.canSubmit}
+        onClick={props.onSubmit}
+      >
+        {submitting ? (revision ? "Pushing revisions…" : "Submitting…") : revision ? `Push revisions to PR #${revision.number}` : "Submit for review"}
+        {!submitting ? (
+          <kbd className="ml-1 hidden rounded border border-white/50 px-1 text-[11px] font-medium sm:inline">{isMac ? "⌘" : "Ctrl"} ↵</kbd>
+        ) : null}
+      </Button>
+    </div>
+  );
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition">
-      <div className="flex h-full w-full max-w-md flex-col justify-between bg-white p-6 shadow-2xl sm:p-8">
-        <div className="space-y-6 overflow-y-auto">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-            <h2 className="text-xl font-bold text-gray-900">Publishing Submission</h2>
-            <button
-              onClick={onClose}
-              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-              aria-label="Close"
-            >
-              <X className="h-5 w-5" />
-            </button>
+    <Drawer open={open} onClose={onClose} title={revision ? `Update PR #${revision.number}` : "Submit for review"} footer={footer}>
+      <div className="space-y-5 px-5 py-5">
+        {props.serverError ? (
+          <div role="alert" className="flex items-start gap-2 rounded-lg bg-danger-bg p-3 text-sm text-danger">
+            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <span>{props.serverError}</span>
           </div>
+        ) : null}
 
-          {errorMessage && (
-            <div className="flex items-center gap-2 rounded-xl bg-red-50 p-3 text-xs font-medium text-red-700">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
-          {/* Vertical Selection */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-              Article Vertical
-            </label>
-            <select
-              value={selectedVertical}
-              onChange={(e) => onVerticalChange(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-white p-2.5 text-sm font-medium text-gray-900 shadow-xs focus:border-blue-600 focus:outline-hidden"
-            >
-              {availableVerticals.map((v) => (
-                <option key={v.slug} value={v.slug}>
-                  {v.name}
-                </option>
-              ))}
-            </select>
-            <div className="mt-2.5 rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-xs text-blue-900">
-              <div className="font-semibold text-blue-950 flex items-center gap-1.5">
-                <span>🎯 Target Portal:</span>
-                <span className="font-mono text-blue-800">
-                  {selectedVertical === "club"
-                    ? "codingclub.tech (Main Portal)"
-                    : `${selectedVertical}.codingclub.tech (${selectedVertical} Portal)`}
-                </span>
-              </div>
-              <p className="text-blue-700/80 mt-1 text-[11px]">
-                Autonomous 1-to-1 vertical routing. This article will live strictly inside its designated vertical portal and codebase.
-              </p>
-            </div>
+        {revision?.feedback ? (
+          <div className="rounded-lg bg-warning-bg p-3 text-sm text-warning">
+            <p className="font-semibold">Reviewer feedback</p>
+            <p className="mt-1 whitespace-pre-wrap leading-relaxed">{revision.feedback}</p>
           </div>
+        ) : null}
 
-          {/* Summary / Subtitle */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-              Article Summary / Excerpt
-            </label>
-            <textarea
-              value={summary}
-              onChange={(e) => onSummaryChange(e.target.value)}
-              rows={3}
-              placeholder="A concise 2-sentence teaser for cards and social previews..."
-              className="w-full rounded-xl border border-gray-200 p-2.5 text-sm text-gray-800 shadow-xs focus:border-blue-600 focus:outline-hidden"
-            />
-          </div>
+        <section aria-labelledby="checklist-title" className="rounded-xl border border-border bg-surface px-4 py-3">
+          <h3 id="checklist-title" className="text-[13px] font-bold">
+            {checklist.canSubmit ? "Ready to submit" : "Before you submit"}
+          </h3>
+          <ul className="mt-1.5">
+            {checklist.items.map((item) => (
+              <ChecklistRow key={item.id} item={item} verticalName={vertical?.name || selectedVertical} />
+            ))}
+          </ul>
+        </section>
 
-          {/* Tags */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-              Tags (Press Enter or Comma)
-            </label>
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {tags.map((t) => (
-                <span
-                  key={t}
-                  className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700"
+        <Field
+          label="Vertical"
+          htmlFor="publish-vertical"
+          hint={
+            vertical ? (
+              <>
+                Publishes to <strong className="text-text">{vertical.domain}</strong>
+                {vertical.slug !== "club" ? " and codingclub.tech" : ""}
+              </>
+            ) : undefined
+          }
+        >
+          <Select id="publish-vertical" value={selectedVertical} onChange={(e) => props.onVerticalChange(e.target.value)}>
+            {availableVerticals.map((v) => (
+              <option key={v.slug} value={v.slug}>
+                {v.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <Field
+          label="Summary"
+          htmlFor="publish-summary"
+          hint={summary.length > SUMMARY_SOFT_LIMIT ? "Long summaries get cut off on cards" : "Recommended — shown on cards and link previews"}
+          counter={{ value: summary.length, max: SUMMARY_SOFT_LIMIT }}
+        >
+          <Textarea
+            id="publish-summary"
+            rows={3}
+            value={summary}
+            onChange={(e) => props.onSummaryChange(e.target.value)}
+            placeholder="Two sentences on what readers will learn…"
+          />
+        </Field>
+
+        <Field label="Tags" htmlFor="publish-tags" hint="Press Enter or comma to add a tag">
+          <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-lg border border-border-strong bg-bg px-2 py-1.5 focus-within:border-accent">
+            {tags.map((t) => (
+              <span key={t} className="inline-flex max-w-full items-center gap-1 rounded-full bg-surface-2 py-0.5 pl-2.5 pr-1 text-xs font-semibold">
+                <span className="truncate">#{t}</span>
+                <button
+                  type="button"
+                  onClick={() => props.onTagsChange(tags.filter((x) => x !== t))}
+                  aria-label={`Remove tag ${t}`}
+                  className="rounded-full p-0.5 text-muted hover:bg-bg hover:text-danger"
                 >
-                  #{t}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(t)}
-                    className="hover:text-red-600"
-                    aria-label={`Remove tag ${t}`}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-            <input
-              type="text"
+                  <X className="h-3 w-3" aria-hidden />
+                </button>
+              </span>
+            ))}
+            <Input
+              id="publish-tags"
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={handleAddTag}
-              placeholder="e.g. Nextjs, Turbopack, AI"
-              className="w-full rounded-xl border border-gray-200 p-2.5 text-sm text-gray-800 shadow-xs focus:border-blue-600 focus:outline-hidden"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === ",") {
+                  e.preventDefault();
+                  commitTag();
+                } else if (e.key === "Backspace" && !tagInput && tags.length) {
+                  props.onTagsChange(tags.slice(0, -1));
+                }
+              }}
+              onBlur={commitTag}
+              placeholder={tags.length ? "Add another…" : "e.g. nextjs, redis"}
+              className="h-7 min-w-[8rem] flex-1 border-none px-1 shadow-none focus:border-none"
             />
           </div>
+        </Field>
 
-          {/* Governance & Approval Policy Box */}
-          <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4 text-xs text-blue-900 space-y-1.5">
-            <div className="flex items-center gap-1.5 font-bold">
-              <Sparkles className="h-4 w-4 text-blue-600" />
-              <span>Club Governance Workflow</span>
-            </div>
-            <p className="leading-relaxed text-blue-800">
-              Submitting will create a dedicated Git draft branch and Pull Request. In
-              accordance with club rules, even Superadmins must review and approve posts before
-              they are merged to main.
-            </p>
-          </div>
-        </div>
-
-        <div className="border-t border-gray-100 pt-4">
-          <button
-            type="button"
-            onClick={onSubmit}
-            disabled={submitting}
-            className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white shadow-md transition disabled:opacity-50 ${
-              revisionPrNumber
-                ? "bg-red-600 hover:bg-red-700"
-                : "bg-emerald-600 hover:bg-emerald-700"
-            }`}
-          >
-            {submitting
-              ? "Pushing Revisions..."
-              : revisionPrNumber
-              ? `Update PR #${revisionPrNumber} with Revisions 🚀`
-              : "Submit for Editorial Review 🚀"}
-          </button>
-        </div>
+        <p className="flex items-start gap-2 text-[13px] leading-relaxed text-muted">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          Submitting opens a pull request on a draft branch. A deputy, head or superadmin must approve it before it goes live — even superadmins need another reviewer.
+        </p>
       </div>
-    </div>
+    </Drawer>
   );
 }

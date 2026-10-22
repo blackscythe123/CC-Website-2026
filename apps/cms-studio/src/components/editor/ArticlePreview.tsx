@@ -1,81 +1,76 @@
-"use client";
-
-import type { UserProfile } from "@/lib/hooks/useStudioSession";
 import { verticalLabel } from "@/lib/verticals";
 
 interface ArticlePreviewProps {
-  user: UserProfile | null;
+  authorName: string;
+  authorLogin: string;
+  authorAvatar?: string;
   selectedVertical: string;
   title: string;
   coverImage: string;
   /** Already-sanitized HTML of the article body */
   html: string;
-  wordCount: number;
-  readingTime: number;
+  wordCount?: number;
+  readingTime?: number;
+  summary?: string;
+  tags?: string[];
 }
 
+/** The article as readers will see it — always a light page, in every Studio theme. */
 export default function ArticlePreview({
-  user,
+  authorName,
+  authorLogin,
+  authorAvatar,
   selectedVertical,
   title,
   coverImage,
   html,
   wordCount,
   readingTime,
+  summary,
+  tags,
 }: ArticlePreviewProps) {
   return (
-    <article className="rounded-2xl border border-gray-100 bg-white p-6 sm:p-10 shadow-sm transition">
-      {/* Cover Image Banner */}
+    <article className="article-preview rounded-xl border border-border p-6 shadow-card sm:p-10">
       {coverImage ? (
-        <div className="mb-8 overflow-hidden rounded-2xl shadow-sm border border-gray-100">
-          <img
-            src={coverImage}
-            alt={title || "Cover Image"}
-            className="h-64 sm:h-96 w-full object-cover"
-          />
-        </div>
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={coverImage} alt="" className="!mt-0 mb-8 h-56 w-full rounded-xl object-cover sm:h-80" />
       ) : null}
 
-      {/* Metadata Bar */}
-      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-4">
-        <span className="rounded-full bg-blue-50 px-2.5 py-0.5 font-semibold text-blue-700">
-          {verticalLabel(selectedVertical)}
-        </span>
-        <span>•</span>
+      <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-[#4B5563]">
+        <span className="rounded-full bg-[#FFF1F2] px-2.5 py-0.5 font-semibold text-[#BE123C]">{verticalLabel(selectedVertical)}</span>
         <span>{new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
-        <span>•</span>
-        <span className="font-medium text-gray-600">{readingTime} min read</span>
-        <span>•</span>
-        <span>{wordCount} words</span>
+        {readingTime ? <span>· {readingTime} min read</span> : null}
+        {wordCount !== undefined ? <span>· {wordCount} words</span> : null}
       </div>
 
-      {/* Title */}
-      <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight mb-6">
-        {title.trim() ? title : <span className="text-gray-300 italic">Untitled Article</span>}
+      <h1 className="!mt-0 text-3xl font-extrabold leading-tight tracking-tight text-[#111827] sm:text-[2.6rem]">
+        {title.trim() ? title : <span className="italic text-[#6B7280]">Untitled article</span>}
       </h1>
 
-      {/* Author Card */}
-      {user && (
-        <div className="flex items-center gap-3.5 border-y border-gray-100 py-4 my-6">
-          <img
-            src={user.avatar_url}
-            alt={user.name || user.login}
-            className="h-10 w-10 rounded-full ring-2 ring-gray-100"
-          />
-          <div>
-            <div className="text-sm font-semibold text-gray-900">{user.name || user.login}</div>
-            <div className="text-xs text-gray-500">
-              @{user.login}
-            </div>
-          </div>
-        </div>
-      )}
+      {summary ? <p className="!text-lg !text-[#4B5563]">{summary}</p> : null}
 
-      {/* Rendered Markdown Body */}
-      <div
-        className="article-preview text-gray-800"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+      <div className="my-6 flex items-center gap-3 border-y border-[#E5E7EB] py-4">
+        {authorAvatar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={authorAvatar} alt="" className="!m-0 h-10 w-10 rounded-full !shadow-none" />
+        ) : null}
+        <div>
+          <div className="text-sm font-semibold text-[#111827]">{authorName}</div>
+          <div className="text-xs text-[#4B5563]">@{authorLogin}</div>
+        </div>
+      </div>
+
+      <div dangerouslySetInnerHTML={{ __html: html }} />
+
+      {tags && tags.length ? (
+        <div className="mt-8 flex flex-wrap gap-2 border-t border-[#E5E7EB] pt-5">
+          {tags.map((t) => (
+            <span key={t} className="rounded-full bg-[#F3F4F6] px-2.5 py-0.5 text-xs font-semibold text-[#374151]">
+              #{t}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </article>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { AlertTriangle, RefreshCw, LogOut } from "lucide-react";
+import { LogOut, RefreshCw, TriangleAlert } from "lucide-react";
+import { Button, buttonClasses } from "@/components/ui";
 
 export default function AdminError({
   error,
@@ -15,40 +16,26 @@ export default function AdminError({
   }, [error]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md rounded-2xl border border-red-200 bg-white p-8 text-center shadow-lg space-y-6">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-red-100 text-red-600 shadow-xs">
-          <AlertTriangle className="h-8 w-8" />
+    <div className="flex min-h-screen items-center justify-center bg-surface px-4">
+      <div role="alert" className="w-full max-w-md rounded-2xl border border-border bg-bg p-8 shadow-card">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-danger-bg text-danger">
+          <TriangleAlert className="h-6 w-6" aria-hidden />
         </div>
-        <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-800">
-            Client Error Encountered
-          </span>
-          <h1 className="mt-3 text-2xl font-extrabold text-gray-900">Something went wrong</h1>
-          <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-            The studio encountered an unexpected error while loading.
-          </p>
-          {error?.message && (
-            <div className="mt-4 rounded-xl border border-red-100 bg-red-50/70 p-3 text-xs text-red-800 text-left font-mono break-words">
-              {error.message}
-            </div>
-          )}
-        </div>
-        <div className="flex items-center justify-between gap-3 pt-2">
-          <a
-            href="/api/auth/logout"
-            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            <span>Sign Out</span>
+        <h1 className="mt-5 text-xl font-extrabold tracking-tight">Something went wrong</h1>
+        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+          Studio hit an unexpected error. Your draft is saved on this device — try again, and if it keeps happening, sign out and back in.
+        </p>
+        {error?.message ? (
+          <pre className="mt-4 overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-danger-bg p-3 font-mono text-xs text-danger">{error.message}</pre>
+        ) : null}
+        <div className="mt-6 flex flex-wrap gap-2">
+          <Button variant="primary" icon={RefreshCw} onClick={() => reset()}>
+            Try again
+          </Button>
+          <a href="/api/auth/logout" className={buttonClasses({ variant: "ghost" })}>
+            <LogOut className="h-4 w-4" aria-hidden />
+            Sign out
           </a>
-          <button
-            onClick={() => reset()}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-black transition"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span>Try Again</span>
-          </button>
         </div>
       </div>
     </div>

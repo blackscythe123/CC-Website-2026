@@ -45,3 +45,12 @@ Keep this project's Root Directory set to `apps/main-portal`. Use the repository
 pnpm workspace and existing build configuration. No new environment variables
 are required for this UI-only integration. Subdomain deployment and DNS still
 need to match the portal registry.
+
+## Shared vertical sections
+
+The Projects, Events and Blogs implementations and current sample data now live
+in `packages/scrapbook-ui`; the main portal re-exports them to preserve its
+existing imports. All eight vertical apps use the same components with category
+filtering from their canonical `portal.config.json` identities. Their local
+navbar contains only Projects, Events and Blogs. Existing published CMS articles
+remain linked under Blogs; their reader routes are unchanged.

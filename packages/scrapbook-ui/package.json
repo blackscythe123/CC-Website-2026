@@ -1,0 +1,42 @@
+{
+  "name": "@coding-club/scrapbook-ui",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./data/projects": "./src/data/projects.ts",
+    "./data/events": "./src/data/events.ts",
+    "./data/blogs": "./src/data/blogs.ts",
+    "./vertical-content": "./src/vertical-content.ts",
+    "./scrapbook.css": "./styles/scrapbook.css",
+    "./responsive.css": "./styles/responsive.css",
+    "./vertical-portal.css": "./styles/vertical-portal.css",
+    "./Projects": "./src/components/Projects.tsx",
+    "./EventsBooks": "./src/components/EventsBooks.tsx",
+    "./NewspaperBlogs": "./src/components/NewspaperBlogs.tsx",
+    "./SectionHeadingText": "./src/components/SectionHeadingText.tsx",
+    "./usePageScrub": "./src/components/usePageScrub.ts",
+    "./ProjectsIsolated": "./src/components/ProjectsIsolated.tsx",
+    "./BlogsIsolated": "./src/components/BlogsIsolated.tsx",
+    "./projectsStandaloneCSS": "./src/components/projectsStandaloneCSS.ts",
+    "./blogsStandaloneCSS": "./src/components/blogsStandaloneCSS.ts",
+    "./useSectionEntrances": "./src/components/useSectionEntrances.ts"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "next": "^16.4.0"
+  },
+  "dependencies": {
+    "gsap": "^3.14.0",
+    "lucide-react": "^0.468.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tsx": "^4.20.0"
+  },
+  "scripts": {
+    "test": "tsx --test tests/*.test.ts"
+  }
+}

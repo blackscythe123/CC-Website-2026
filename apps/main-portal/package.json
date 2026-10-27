@@ -19,7 +19,8 @@
     "remark-html": "^16.0.1",
     "sanitize-html": "^2.18.1",
     "gsap": "^3.14.0",
-    "lucide-react": "^0.468.0"
+    "lucide-react": "^0.468.0",
+    "@coding-club/scrapbook-ui": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",

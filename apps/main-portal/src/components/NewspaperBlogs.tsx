@@ -1,0 +1,56 @@
+'use client';
+import SectionHeadingText from './SectionHeadingText';
+import {useEffect,useMemo,useRef,useState} from 'react';
+import gsap from 'gsap';
+import usePageScrub from './usePageScrub';
+import {ArrowLeft,ArrowRight,BookOpen,ChevronLeft,ChevronRight,Code2,Globe2,Heart,MousePointer2,PenTool,Search,Star,X,BrainCircuit,ShieldCheck,Palette,Laptop2,GitBranch,Glasses,Megaphone,Server,Users,Sticker,Trophy,Rocket} from 'lucide-react';
+import type {Blog} from '../data/blogs';
+
+export default function NewspaperBlogs({blogs,title='FEATURED BLOGS'}:{blogs:Blog[];title?:string}){
+ const [category,setCategory]=useState('All'),[spread,setSpread]=useState(0),[selected,setSelected]=useState<Blog|null>(null),[query,setQuery]=useState('');
+ const [pageSize,setPageSize]=useState(4);
+ useEffect(()=>{const phone=window.matchMedia('(max-width:700px)'),tablet=window.matchMedia('(max-width:899px)');const update=()=>{setPageSize(phone.matches?1:tablet.matches?2:4);setSpread(0)};update();phone.addEventListener('change',update);tablet.addEventListener('change',update);return()=>{phone.removeEventListener('change',update);tablet.removeEventListener('change',update)}},[]);
+ const swipeRef=useRef<HTMLDivElement>(null);
+ const flipRef=useRef<HTMLDivElement>(null),paperRef=useRef<HTMLDivElement>(null),detailRef=useRef<HTMLDivElement>(null);
+ const categories=useMemo(()=>['All',...Array.from(new Set(blogs.map(b=>b.category)))],[blogs]);
+ const filtered=useMemo(()=>blogs.filter(b=>(category==='All'||b.category===category)&&(b.title+' '+b.category+' '+b.excerpt+' '+b.author).toLowerCase().includes(query.toLowerCase())),[blogs,query,category]);
+ const count=Math.max(1,Math.ceil(filtered.length/pageSize));
+ const current=Math.min(spread,count-1);
+ const items=filtered.slice(current*pageSize,current*pageSize+pageSize);
+ const split=Math.ceil(pageSize/2);
+ const pages=[items.slice(0,split),items.slice(split,pageSize)];
+ useEffect(()=>{const root=swipeRef.current?.getRootNode();const section=root instanceof ShadowRoot?root.host.closest<HTMLElement>('.ssn-scroll-panel'):swipeRef.current?.closest<HTMLElement>('.ssn-scroll-panel');if(!section||!selected)return;section.dataset.dialogOpen='true';return()=>{delete section.dataset.dialogOpen}},[selected]);
+ const [turnBase,setTurnBase]=useState(0);
+ const {turn,go}=usePageScrub({surface:swipeRef,sheet:flipRef,count,enabled:!selected,initial:current,resetKey:category+'|'+query,onIndex:setSpread,onBase:setTurnBase,horizontalOnly:true,paperCurl:true});
+ useEffect(()=>{if(!selected||!detailRef.current)return;gsap.fromTo(detailRef.current,{opacity:0,y:24,scale:.965},{opacity:1,y:0,scale:1,duration:.45,ease:'power3.out'})},[selected]);
+ useEffect(()=>{function key(e:KeyboardEvent){const target=e.composedPath()[0];if(target instanceof HTMLElement&&target.matches('input,textarea,select'))return;const rect=paperRef.current?.getBoundingClientRect();if(!selected&&(!rect||rect.bottom<0||rect.top>window.innerHeight||document.querySelector('.book-overlay')))return;if(e.key==='Escape')setSelected(null);if(e.key==='ArrowRight'&&!selected)turn(1);if(e.key==='ArrowLeft'&&!selected)turn(-1)}window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key)},[selected,current,count]);
+ return <div className="site-shell">
+ 
+ <main className="board" id="top" ref={swipeRef}>
+ <div className="top-meta"><span>ssn@codingclub:~$ <b>blogs</b><span className="caret">▌</span></span></div>
+ <section className="intro"><div><h1 className="section-blog-heading"><span>//</span> <SectionHeadingText text={title}/></h1><p>Ideas, stories and experiences from our community.<br/>Fresh perspectives, printed one page at a time.</p></div><div className="hand-note top-hand">made of <em>ideas,</em><br/>built by <em>people.</em> <span>↘</span></div></section>
+ <section className="archive-search" aria-label="Search and filter blog articles"><div className="archive-search-top"><div className="archive-heading"><Search size={23}/><div><strong>SEARCH THE CHRONICLE</strong><span>Find a story, explore a vertical, follow an idea.</span></div></div></div><div className="archive-search-row"><label className="archive-input"><Search size={22}/><input aria-label="Search blogs" placeholder="Search titles, topics, authors..." value={query} onChange={e=>{setQuery(e.target.value);setSpread(0)}}/>{query&&<button aria-label="Clear search" onClick={()=>{setQuery('');setSpread(0)}}><X size={18}/></button>}</label><div className="archive-filters" aria-label="Filter articles by category">{categories.map((c,i)=><button key={c} className={category===c?'selected':''} onClick={()=>{setCategory(c);setSpread(0)}} style={{'--chip-color':['#eed0a4','#a7d5ed','#b4dfc9','#d5c2ef','#f6c8a6','#f6d986','#e9b5ce'][i%7]} as React.CSSProperties}>{c}</button>)}</div></div></section>
+ <div className="doodle doodle-star"><Star/></div><div className="doodle doodle-pen"><PenTool/></div>
+ <section className="paper-stage" aria-label="Interactive newspaper">
+ <div className="newspaper" ref={paperRef}>
+ <div className="paper-header"><div className="masthead"><h2 className="type-reveal">THE SSN CHRONICLE</h2><p>Ideas. People. Projects. Perspectives.</p></div><div className="volume">VOL. {String(current+1).padStart(2,'0')} / {String(count).padStart(2,'0')}<br/>SSN CODING CLUB</div></div>
+ <div className="paper-rule"/><div className="newspaper-deck"><span>INDEPENDENT STUDENT JOURNALISM · IDEAS THAT SHAPE WHAT WE BUILD</span><span>ISSUE {String(current+1).padStart(2,'0')} · THE COMMUNITY EDITION</span></div>
+ <div className="spread"><div className="paper-page left-page"><div className="page-label">CAMPUS EDITION · FEATURES & TECHNOLOGY</div>{pages[0].map((b,i)=><Article key={b.id} blog={b} onClick={()=>setSelected(b)} index={i}/>)}{pages[0].length===0&&<div className="empty-page">No stories found. Try another search.</div>}</div><div className="gutter"/><div className="paper-page right-page"><div className="page-label">THE EDITORIAL DESK · PEOPLE & PERSPECTIVES</div>{pages[1].map((b,i)=><Article key={b.id} blog={b} onClick={()=>setSelected(b)} index={i}/>)}{pages[1].length===0&&<div className="empty-page">More stories coming soon.</div>}</div></div>
+ <div className="paper-bottom"><span>THE SSN CHRONICLE · COMMUNITY EDITION</span><span>{current*pageSize+1}—{Math.min(filtered.length,(current+1)*pageSize)} / {filtered.length}</span></div>
+ <div ref={flipRef} className="flip-sheet" aria-hidden="true" inert><div className="flip-front"><TurnFace blogs={filtered.slice(turnBase*pageSize,turnBase*pageSize+pageSize)} index={turnBase} count={count} total={filtered.length} pageSize={pageSize}/></div><div className="flip-back"><TurnFace blogs={[]} index={turnBase} count={count} total={filtered.length} pageSize={pageSize}/></div></div>
+ <button className="page-corner page-corner-left" onClick={()=>turn(-1)} disabled={current===0} aria-label="Turn to previous newspaper spread"><ChevronLeft/><span>PREV</span></button>
+ <button className="page-corner page-corner-right" onClick={()=>turn(1)} disabled={current===count-1} aria-label="Turn to next newspaper spread"><span>NEXT</span><ChevronRight/></button>
+ </div>
+ 
+ <p className="edition-instruction">Drag sideways · click a page corner · scroll horizontally</p>
+ <div className="pagination">{Array.from({length:count},(_,i)=><button key={i} aria-label={`Open spread ${i+1}`} className={current===i?'current':''} onClick={()=>{go(i)}}/>)}</div>
+ </section>
+ 
+ </main>
+ {selected&&<div className="reader-overlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setSelected(null)}}><section className="reader" ref={detailRef} role="dialog" aria-modal="true" aria-label={selected.title}><button className="reader-close" onClick={()=>setSelected(null)} aria-label="Close article"><X size={24}/></button><div className="reader-label" style={{background:selected.accent}}>{selected.category} / THE SSN CHRONICLE</div><div className="reader-layout"><div className="reader-main"><h2 className="type-reveal" key={selected.id}>{selected.title}</h2><p className="reader-byline">BY {selected.author.toUpperCase()} · {selected.date.toUpperCase()} · {selected.readTime.toUpperCase()} READ</p><p className="reader-lead">{selected.excerpt}</p>{selected.content.map((paragraph,i)=><p key={i}>{paragraph}</p>)}<div className="reader-end">✳ END OF STORY ✳</div></div><aside className="reader-aside"><img src={selected.image} alt={selected.imageAlt}/><div className="reader-sticky" style={{background:selected.accent}}>keep reading.<br/>keep building. ↗</div></aside></div><div className="reader-bottom"><span>THE SSN CHRONICLE</span><button onClick={()=>setSelected(null)}><ArrowLeft size={17}/> BACK TO NEWSPAPER</button></div></section></div>}
+ </div>
+}
+const articleDoodles:Record<string,typeof Code2>={'AI / ML':BrainCircuit,'Cybersecurity':ShieldCheck,'Design':Palette,'Full Stack':Laptop2,'Open Source':GitBranch,'AR / VR':Glasses,'PR':Megaphone,'CP':Trophy,'SSN Hacks':Rocket};
+function Article({blog,onClick,index}:{blog:Blog;onClick:()=>void;index:number}){const Doodle=articleDoodles[blog.category]||Code2;return <article className={'article article-'+index}><div className="article-copy"><span className="article-tag" style={{background:blog.accent,'--article-color':blog.accent} as React.CSSProperties}>{blog.category.toUpperCase()}</span><h3>{blog.title}</h3><p className="article-excerpt">{blog.excerpt}</p><div className="article-meta">{blog.readTime} read <span>|</span> {blog.date}</div><button onClick={onClick}>CONTINUE READING <ArrowRight size={16}/></button></div><button className="article-picture" onClick={onClick} aria-label={`Read ${blog.title}`}><img draggable={false} src={blog.image} alt={blog.imageAlt}/><span className="picture-caption">ILLUSTRATION / SSN ARCHIVES</span><span className="article-doodle" style={{color:blog.accent}}><Doodle size={36} strokeWidth={2.3}/></span></button></article>}
+
+function TurnFace({blogs,index,count,total,pageSize=4}:{blogs:Blog[];index:number;count:number;total:number;pageSize?:number}){return <><div className="paper-header"><div className="masthead"><h2>THE SSN CHRONICLE</h2><p>Ideas. People. Projects. Perspectives.</p></div><div className="volume">VOL. {String(index+1).padStart(2,'0')} / {String(count).padStart(2,'0')}<br/>SSN CODING CLUB</div></div><div className="paper-rule"/><div className="newspaper-deck"><span>INDEPENDENT STUDENT JOURNALISM · IDEAS THAT SHAPE WHAT WE BUILD</span><span>ISSUE {String(index+1).padStart(2,'0')} · THE COMMUNITY EDITION</span></div><div className="spread"><div className="paper-page"><div className="page-label">CAMPUS EDITION · FEATURES &amp; TECHNOLOGY</div>{blogs.slice(0,Math.ceil(pageSize/2)).map((blog,i)=><Article key={blog.id} blog={blog} index={i} onClick={()=>{}}/>)}</div><div className="gutter"/><div className="paper-page"><div className="page-label">THE EDITORIAL DESK · PEOPLE &amp; PERSPECTIVES</div>{blogs.slice(Math.ceil(pageSize/2),pageSize).map((blog,i)=><Article key={blog.id} blog={blog} index={i} onClick={()=>{}}/>)}</div></div><div className="paper-bottom"><span>THE SSN CHRONICLE · COMMUNITY EDITION</span><span>{index*pageSize+1}—{Math.min(total,(index+1)*pageSize)} / {total}</span></div></>}

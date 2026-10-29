@@ -19,7 +19,7 @@ isWipDraft: true
 ---
 
 
-![logo](/uploads/1793298071019-logo.webp)
+![logo](/uploads/1793298084869-logo.webp)
 
 
 
@@ -31,7 +31,7 @@ Today, we’re taking a step forward in that journey with the launch of the **Co
 
 This website is more than just a dig
 
-![schrodinger-e1556772151207](/uploads/1793298068619-schrodinger-e1556772151207.png)
+![schrodinger-e1556772151207](/uploads/1793298082171-schrodinger-e1556772151207.png)
 
 ital presence. It is a space for our community to share knowledge, explore technology, showcase ideas, and grow together.
 
@@ -107,11 +107,5 @@ Explore. Experiment. Contribute. Collaborate.
 *Built around curiosity. Driven by collaboration. Powered by code.*
 
 
-
-![schrodinger-e1556772151207](/uploads/1793298070122-schrodinger-e1556772151207.gif)
-
-
-
-![schrodinger-e1556772151207](/uploads/1793298071866-schrodinger-e1556772151207.gif)
 
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { githubAvatarUrl } from "@/lib/avatar";
 
 const FALLBACK_COLORS = ["#2563EB", "#7C3AED", "#BE123C", "#C2410C", "#047857", "#0E7490", "#4F46E5"];
 
@@ -13,19 +14,23 @@ export default function Avatar({ src, login, size = 28, className = "" }: { src?
   const [failed, setFailed] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
   const style = { width: size, height: size };
+  // Fall back to the login's GitHub avatar (mock personas keep their initials).
+  const url = src || (login && !login.startsWith("mock-") ? githubAvatarUrl(login.replace(/^@/, ""), size) : "");
+
+  useEffect(() => setFailed(false), [url]);
 
   // The image can fail before hydration attaches onError; check once mounted.
   useEffect(() => {
     const img = imgRef.current;
     if (img && img.complete && img.naturalWidth === 0) setFailed(true);
-  }, [src]);
+  }, [url]);
 
-  if (src && !failed) {
+  if (url && !failed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         ref={imgRef}
-        src={src}
+        src={url}
         alt=""
         aria-hidden
         onError={() => setFailed(true)}

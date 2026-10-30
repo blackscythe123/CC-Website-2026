@@ -5,121 +5,121 @@
 
 /* Theme tokens — values must match src/lib/theme/tokens.ts (theme.css.test.ts). */
 :root, [data-theme="light"] {
-  --bg: #FFFFFF;
-  --surface: #FAFAFA;
-  --surface-2: #F4F4F5;
-  --border: #E4E4E7;
-  --border-strong: #D4D4D8;
-  --text: #18181B;
-  --muted: #52525B;
-  --subtle: #71717A;
-  --accent: #E11D48;
-  --accent-strong: #BE123C;
-  --accent-soft: #FFF1F2;
-  --on-accent: #FFFFFF;
-  --primary: #E11D48;
-  --primary-2: #E11D48;
-  --info: #1D4ED8;
-  --info-bg: #EFF6FF;
-  --success: #047857;
-  --success-bg: #ECFDF5;
-  --warning: #B45309;
-  --warning-bg: #FFFBEB;
-  --danger: #B91C1C;
-  --danger-bg: #FEF2F2;
-  --neutral: #3F3F46;
-  --neutral-bg: #F4F4F5;
-  --shadow-sm: 0 1px 2px rgb(24 24 27 / 0.06), 0 1px 3px rgb(24 24 27 / 0.04);
-  --shadow-lg: 0 12px 32px rgb(24 24 27 / 0.14);
-  --scrim: rgb(24 24 27 / 0.4);
+  --cc-bg: #FFFFFF;
+  --cc-surface: #FAFAFA;
+  --cc-surface-2: #F4F4F5;
+  --cc-border: #E4E4E7;
+  --cc-border-strong: #D4D4D8;
+  --cc-text: #18181B;
+  --cc-muted: #52525B;
+  --cc-subtle: #71717A;
+  --cc-accent: #E11D48;
+  --cc-accent-strong: #BE123C;
+  --cc-accent-soft: #FFF1F2;
+  --cc-on-accent: #FFFFFF;
+  --cc-primary: #E11D48;
+  --cc-primary-2: #E11D48;
+  --cc-info: #1D4ED8;
+  --cc-info-bg: #EFF6FF;
+  --cc-success: #047857;
+  --cc-success-bg: #ECFDF5;
+  --cc-warning: #B45309;
+  --cc-warning-bg: #FFFBEB;
+  --cc-danger: #B91C1C;
+  --cc-danger-bg: #FEF2F2;
+  --cc-neutral: #3F3F46;
+  --cc-neutral-bg: #F4F4F5;
+  --cc-shadow-sm: 0 1px 2px rgb(24 24 27 / 0.06), 0 1px 3px rgb(24 24 27 / 0.04);
+  --cc-shadow-lg: 0 12px 32px rgb(24 24 27 / 0.14);
+  --cc-scrim: rgb(24 24 27 / 0.4);
   color-scheme: light;
 }
 
 [data-theme="dark"] {
-  --bg: #0B0B0F;
-  --surface: #131318;
-  --surface-2: #1C1C22;
-  --border: #2A2A31;
-  --border-strong: #3A3A42;
-  --text: #F4F4F5;
-  --muted: #A1A1AA;
-  --subtle: #8B8B94;
-  --accent: #FB7185;
-  --accent-strong: #FDA4AF;
-  --accent-soft: #2A0F17;
-  --on-accent: #FFFFFF;
-  --primary: #E11D48;
-  --primary-2: #9333EA;
-  --info: #93C5FD;
-  --info-bg: #172554;
-  --success: #86EFAC;
-  --success-bg: #052E16;
-  --warning: #FCD34D;
-  --warning-bg: #3A2405;
-  --danger: #FCA5A5;
-  --danger-bg: #3B0A0A;
-  --neutral: #D4D4D8;
-  --neutral-bg: #27272A;
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.5);
-  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
-  --scrim: rgb(0 0 0 / 0.6);
+  --cc-bg: #0B0B0F;
+  --cc-surface: #131318;
+  --cc-surface-2: #1C1C22;
+  --cc-border: #2A2A31;
+  --cc-border-strong: #3A3A42;
+  --cc-text: #F4F4F5;
+  --cc-muted: #A1A1AA;
+  --cc-subtle: #8B8B94;
+  --cc-accent: #FB7185;
+  --cc-accent-strong: #FDA4AF;
+  --cc-accent-soft: #2A0F17;
+  --cc-on-accent: #FFFFFF;
+  --cc-primary: #E11D48;
+  --cc-primary-2: #9333EA;
+  --cc-info: #93C5FD;
+  --cc-info-bg: #172554;
+  --cc-success: #86EFAC;
+  --cc-success-bg: #052E16;
+  --cc-warning: #FCD34D;
+  --cc-warning-bg: #3A2405;
+  --cc-danger: #FCA5A5;
+  --cc-danger-bg: #3B0A0A;
+  --cc-neutral: #D4D4D8;
+  --cc-neutral-bg: #27272A;
+  --cc-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.5);
+  --cc-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
+  --cc-scrim: rgb(0 0 0 / 0.6);
   color-scheme: dark;
 }
 
 @theme inline {
-  --color-bg: var(--bg);
-  --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-border: var(--border);
-  --color-border-strong: var(--border-strong);
-  --color-text: var(--text);
-  --color-muted: var(--muted);
-  --color-subtle: var(--subtle);
-  --color-accent: var(--accent);
-  --color-accent-strong: var(--accent-strong);
-  --color-accent-soft: var(--accent-soft);
-  --color-on-accent: var(--on-accent);
-  --color-primary: var(--primary);
-  --color-info: var(--info);
-  --color-info-bg: var(--info-bg);
-  --color-success: var(--success);
-  --color-success-bg: var(--success-bg);
-  --color-warning: var(--warning);
-  --color-warning-bg: var(--warning-bg);
-  --color-danger: var(--danger);
-  --color-danger-bg: var(--danger-bg);
-  --color-neutral: var(--neutral);
-  --color-neutral-bg: var(--neutral-bg);
-  --color-scrim: var(--scrim);
-  --shadow-card: var(--shadow-sm);
-  --shadow-float: var(--shadow-lg);
+  --color-bg: var(--cc-bg);
+  --color-surface: var(--cc-surface);
+  --color-surface-2: var(--cc-surface-2);
+  --color-border: var(--cc-border);
+  --color-border-strong: var(--cc-border-strong);
+  --color-text: var(--cc-text);
+  --color-muted: var(--cc-muted);
+  --color-subtle: var(--cc-subtle);
+  --color-accent: var(--cc-accent);
+  --color-accent-strong: var(--cc-accent-strong);
+  --color-accent-soft: var(--cc-accent-soft);
+  --color-on-accent: var(--cc-on-accent);
+  --color-primary: var(--cc-primary);
+  --color-info: var(--cc-info);
+  --color-info-bg: var(--cc-info-bg);
+  --color-success: var(--cc-success);
+  --color-success-bg: var(--cc-success-bg);
+  --color-warning: var(--cc-warning);
+  --color-warning-bg: var(--cc-warning-bg);
+  --color-danger: var(--cc-danger);
+  --color-danger-bg: var(--cc-danger-bg);
+  --color-neutral: var(--cc-neutral);
+  --color-neutral-bg: var(--cc-neutral-bg);
+  --color-scrim: var(--cc-scrim);
+  --shadow-card: var(--cc-shadow-sm);
+  --shadow-float: var(--cc-shadow-lg);
   --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 @layer base {
   html {
-    background: var(--bg);
-    color: var(--text);
+    background: var(--cc-bg);
+    color: var(--cc-text);
   }
   body {
     font-family: var(--font-sans);
-    background: var(--bg);
-    color: var(--text);
+    background: var(--cc-bg);
+    color: var(--cc-text);
   }
   :focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--cc-accent);
     outline-offset: 2px;
   }
   ::selection {
-    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    background: color-mix(in srgb, var(--cc-accent) 22%, transparent);
   }
 }
 
 /* Primary actions: solid rose in light, rose → purple gradient in dark. */
 .btn-primary-bg {
-  background-image: linear-gradient(135deg, var(--primary), var(--primary-2));
-  color: var(--on-accent);
+  background-image: linear-gradient(135deg, var(--cc-primary), var(--cc-primary-2));
+  color: var(--cc-on-accent);
 }
 
 /* Article previews always render on a light page, exactly as readers see them. */

@@ -480,53 +480,106 @@ export async function writeRolesAndSyncCodeowners(
 
       const commitMessage = authorAttestation?.message || "chore(governance): update roles hierarchy";
 
-      // Commit roles.json
-      let rolesSha: string | undefined;
       try {
-        const { data } = await octokit.repos.getContent({
+        // Atomic commit via Git Data API (Tree + Commit) so roles.json and CODEOWNERS are updated simultaneously in 1 commit
+        const { data: refData } = await octokit.git.getRef({
+          owner,
+          repo,
+          ref: "heads/main",
+        });
+        const latestCommitSha = refData.object.sha;
+
+        const { data: commitData } = await octokit.git.getCommit({
+          owner,
+          repo,
+          commit_sha: latestCommitSha,
+        });
+        const baseTreeSha = commitData.tree.sha;
+
+        const { data: newTree } = await octokit.git.createTree({
+          owner,
+          repo,
+          base_tree: baseTreeSha,
+          tree: [
+            {
+              path: "content/club/roles.json",
+              mode: "100644",
+              type: "blob",
+              content: rolesJsonContent,
+            },
+            {
+              path: ".github/CODEOWNERS",
+              mode: "100644",
+              type: "blob",
+              content: codeownersContent,
+            },
+          ],
+        });
+
+        const { data: newCommit } = await octokit.git.createCommit({
+          owner,
+          repo,
+          message: commitMessage,
+          tree: newTree.sha,
+          parents: [latestCommitSha],
+          ...(commitAuthor ? { author: commitAuthor } : {}),
+        });
+
+        await octokit.git.updateRef({
+          owner,
+          repo,
+          ref: "heads/main",
+          sha: newCommit.sha,
+        });
+      } catch (atomicErr) {
+        console.warn("Atomic Git Tree commit failed, falling back to sequential createOrUpdateFileContents:", atomicErr);
+        // Fallback to sequential commits if Git Tree API encounters an error
+        let rolesSha: string | undefined;
+        try {
+          const { data } = await octokit.repos.getContent({
+            owner,
+            repo,
+            path: "content/club/roles.json",
+          });
+          if (!Array.isArray(data) && data.sha) rolesSha = data.sha;
+        } catch {
+          // file doesn't exist yet
+        }
+
+        await octokit.repos.createOrUpdateFileContents({
           owner,
           repo,
           path: "content/club/roles.json",
+          message: commitMessage,
+          content: Buffer.from(rolesJsonContent, "utf-8").toString("base64"),
+          sha: rolesSha,
+          branch: "main",
+          ...(commitAuthor ? { author: commitAuthor } : {}),
         });
-        if (!Array.isArray(data) && data.sha) rolesSha = data.sha;
-      } catch {
-        // file doesn't exist yet
-      }
 
-      await octokit.repos.createOrUpdateFileContents({
-        owner,
-        repo,
-        path: "content/club/roles.json",
-        message: commitMessage,
-        content: Buffer.from(rolesJsonContent, "utf-8").toString("base64"),
-        sha: rolesSha,
-        branch: "main",
-        ...(commitAuthor ? { author: commitAuthor } : {}),
-      });
+        let codeownersSha: string | undefined;
+        try {
+          const { data } = await octokit.repos.getContent({
+            owner,
+            repo,
+            path: ".github/CODEOWNERS",
+          });
+          if (!Array.isArray(data) && data.sha) codeownersSha = data.sha;
+        } catch {
+          // file doesn't exist yet
+        }
 
-      // Commit .github/CODEOWNERS
-      let codeownersSha: string | undefined;
-      try {
-        const { data } = await octokit.repos.getContent({
+        await octokit.repos.createOrUpdateFileContents({
           owner,
           repo,
           path: ".github/CODEOWNERS",
+          message: "chore(governance): update CODEOWNERS review mapping",
+          content: Buffer.from(codeownersContent, "utf-8").toString("base64"),
+          sha: codeownersSha,
+          branch: "main",
+          ...(commitAuthor ? { author: commitAuthor } : {}),
         });
-        if (!Array.isArray(data) && data.sha) codeownersSha = data.sha;
-      } catch {
-        // file doesn't exist yet
       }
-
-      await octokit.repos.createOrUpdateFileContents({
-        owner,
-        repo,
-        path: ".github/CODEOWNERS",
-        message: "chore(governance): update CODEOWNERS review mapping",
-        content: Buffer.from(codeownersContent, "utf-8").toString("base64"),
-        sha: codeownersSha,
-        branch: "main",
-        ...(commitAuthor ? { author: commitAuthor } : {}),
-      });
     } catch (gitErr) {
       console.error("Error committing roles update to GitHub:", gitErr);
       throw gitErr;

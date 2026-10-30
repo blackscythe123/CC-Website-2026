@@ -7,8 +7,13 @@ import sanitizeHtml from "sanitize-html";
  *  - Inline event handlers: onload, onerror, onclick, onmouseover, etc.
  *  - javascript:, vbscript:, data: URIs in href and src
  */
-export function sanitizeArticleHtml(dirtyHtml: string): string {
+export function sanitizeArticleHtml(
+  dirtyHtml: string,
+  /** Exact blob: URLs of images the editor is holding in memory, so its own preview can show them. */
+  { allowedImageUrls = [] }: { allowedImageUrls?: string[] } = {}
+): string {
   if (!dirtyHtml) return "";
+  const allowedImages = new Set(allowedImageUrls.filter((u) => u.startsWith("blob:")));
 
   return sanitizeHtml(dirtyHtml, {
     allowedTags: [
@@ -29,7 +34,7 @@ export function sanitizeArticleHtml(dirtyHtml: string): string {
     },
     allowedSchemes: ["http", "https", "mailto"],
     allowedSchemesByTag: {
-      img: ["http", "https"],
+      img: allowedImages.size ? ["http", "https", "blob"] : ["http", "https"],
     },
     transformTags: {
       a: (tagName, attribs) => {
@@ -57,7 +62,8 @@ export function sanitizeArticleHtml(dirtyHtml: string): string {
         const isSafe =
           src.startsWith("https://") ||
           src.startsWith("http://") ||
-          (src.startsWith("/") && !src.startsWith("//"));
+          (src.startsWith("/") && !src.startsWith("//")) ||
+          allowedImages.has(src);
 
         if (!isSafe) {
           return { tagName: "span", attribs: {} };

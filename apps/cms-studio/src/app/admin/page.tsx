@@ -60,11 +60,13 @@ export default function AdminEditorPage() {
 
   const parsedHtml = useMemo(() => {
     try {
-      return sanitizeArticleHtml(marked.parse(draft.content || "*Start writing to see the preview…*", { gfm: true, breaks: true }) as string);
+      return sanitizeArticleHtml(marked.parse(draft.content || "*Start writing to see the preview…*", { gfm: true, breaks: true }) as string, {
+        allowedImageUrls: draft.pendingImages.map((img) => img.placeholderUrl),
+      });
     } catch {
       return "<p>Couldn't render this Markdown.</p>";
     }
-  }, [draft.content]);
+  }, [draft.content, draft.pendingImages]);
   const wordCount = draft.content.trim() ? draft.content.trim().split(/\s+/).length : 0;
   const readingTime = Math.max(1, Math.ceil(wordCount / 200));
 

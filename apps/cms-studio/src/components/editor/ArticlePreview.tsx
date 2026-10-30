@@ -32,8 +32,9 @@ export default function ArticlePreview({
   return (
     <article className="article-preview rounded-xl border border-border p-6 shadow-card sm:p-10">
       {coverImage ? (
+        // Same sizing as the published post (main-portal blog page), so the preview crops exactly like the live site.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={coverImage} alt="" className="!mt-0 mb-8 h-56 w-full rounded-xl object-cover sm:h-80" />
+        <img src={coverImage} alt="" className="!mt-0 mb-8 max-h-[480px] w-full rounded-xl object-cover" />
       ) : null}
 
       <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-[#4B5563]">

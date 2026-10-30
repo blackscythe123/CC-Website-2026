@@ -16,6 +16,8 @@ export default function PeoplePage() {
   const { user, roleInfo } = useStudio();
   const toast = useToast();
   const canManage = roleInfo?.role === "superadmin" || roleInfo?.role === "vertical_head" || roleInfo?.role === "deputy";
+  // Superadmins already hold every vertical, so there is nothing for them to apply to.
+  const canApply = roleInfo?.role !== "superadmin";
 
   const [roles, setRoles] = useState<ClubRoles | null>(null);
   const [candidates, setCandidates] = useState<CandidateUser[]>([]);
@@ -153,9 +155,11 @@ export default function PeoplePage() {
           <p className="mt-1 text-sm text-muted">Roles go Member → Deputy → Vertical head → Superadmin. Changes are saved to the repository.</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="ghost" icon={Send} onClick={() => setApplyOpen(true)}>
-            Apply
-          </Button>
+          {canApply ? (
+            <Button size="sm" variant="ghost" icon={Send} onClick={() => setApplyOpen(true)}>
+              Apply
+            </Button>
+          ) : null}
           <Button size="sm" icon={RefreshCw} loading={refreshing} onClick={refresh}>
             Refresh
           </Button>

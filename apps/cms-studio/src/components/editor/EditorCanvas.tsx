@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { Bold, Code, Heading2, Heading3, Image as ImageIcon, Italic, Link2, List, Minus, Quote, UploadCloud, X } from "lucide-react";
+import { Bold, Code, Heading2, Heading3, Image as ImageIcon, ImagePlus, Italic, Link2, List, Minus, Quote, UploadCloud, X } from "lucide-react";
 import type { UserRoleInfo } from "@/lib/roles";
 import type { UserProfile } from "@/lib/hooks/useStudioSession";
 import { applyCode, applyInline, applyLinePrefix, insertBlock, type EditResult } from "@/lib/markdownEditing";
 import { verticalLabel } from "@/lib/verticals";
-import { Avatar, Badge, IconButton, Spinner } from "@/components/ui";
+import { Avatar, Badge, Button, IconButton, Spinner } from "@/components/ui";
 import { roleLabel } from "@/components/shell/AccountMenu";
 
 type Transform = (text: string, start: number, end: number) => EditResult;
@@ -136,15 +136,34 @@ export default function EditorCanvas(props: EditorCanvasProps) {
     <div className="space-y-5">
       {/* Cover image */}
       {coverImage ? (
-        <div className="relative overflow-hidden rounded-xl border border-border">
+        <div
+          className={`relative overflow-hidden rounded-xl border ${coverDragOver ? "border-accent" : "border-border"}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setCoverDragOver(true);
+          }}
+          onDragLeave={() => setCoverDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setCoverDragOver(false);
+            const file = firstImageFile(e.dataTransfer.files);
+            if (file) setCover(file);
+          }}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={coverImage} alt="Cover" className="h-56 w-full object-cover sm:h-72" />
-          <IconButton
-            icon={X}
-            label="Remove cover image"
-            onClick={() => onCoverImageChange("")}
-            className="absolute right-3 top-3 bg-bg/90 shadow-card backdrop-blur"
-          />
+          <div className="absolute right-3 top-3 flex gap-2">
+            <Button
+              size="sm"
+              icon={ImagePlus}
+              loading={props.uploadingImage}
+              onClick={() => coverInputRef.current?.click()}
+              className="bg-bg/90 shadow-card backdrop-blur"
+            >
+              Change
+            </Button>
+            <IconButton icon={X} label="Remove cover image" onClick={() => onCoverImageChange("")} className="bg-bg/90 shadow-card backdrop-blur" />
+          </div>
         </div>
       ) : (
         <div
@@ -185,19 +204,21 @@ export default function EditorCanvas(props: EditorCanvasProps) {
             <span className="font-semibold text-text">Add a cover image</span>
             <span className="hidden sm:inline"> — click, drop or paste</span>
           </span>
-          <input
-            ref={coverInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              if (file) setCover(file);
-            }}
-          />
         </div>
       )}
+      <input
+        ref={coverInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        aria-hidden
+        tabIndex={-1}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) setCover(file);
+        }}
+      />
 
       {/* Title */}
       <textarea

@@ -54,3 +54,16 @@ existing imports. All eight vertical apps use the same components with category
 filtering from their canonical `portal.config.json` identities. Their local
 navbar contains only Projects, Events and Blogs. Existing published CMS articles
 remain linked under Blogs; their reader routes are unchanged.
+
+## Reviewed About and vertical navigation interactions
+
+About sits between the laptop and Verticals. Its envelope arrival, unfolding,
+full-letter pen reveal and departure follow scrolling in both directions.
+Reduced motion shows the complete readable letter without the animated pen.
+The About copy is draft UI copy for later editorial replacement.
+
+Technical sticky notes tear open to reveal their filtered shared UI before
+navigating to their deployed portal URL from `content/club/portals.json`.
+The local demo's localhost-only routes are not substituted for production
+portal destinations. PR continues to navigate to People. Modified clicks and
+opening links in a new tab retain native link behavior.

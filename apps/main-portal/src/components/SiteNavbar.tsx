@@ -2,7 +2,7 @@
 import Link from "next/link";
 import {usePathname} from "next/navigation";
 import {useEffect,useState} from "react";
-const pages=[['home','home'],['verticals','verticals'],['projects','projects'],['events','events'],['blogs','blogs'],['people','people'],['join','join us']];
+const pages=[['home','home'],['about','about'],['verticals','verticals'],['projects','projects'],['events','events'],['blogs','blogs'],['people','people'],['join','join us']];
 export default function SiteNavbar(){
  const path=usePathname();const [active,setActive]=useState('home');
  useEffect(()=>{
@@ -33,5 +33,5 @@ export default function SiteNavbar(){
   return()=>{cancelAnimationFrame(frame);window.removeEventListener('scroll',update);window.removeEventListener('resize',update);window.removeEventListener('ssn:section-change',explicit)};
  },[path]);
  const jump=(id:string)=>{if(path!=='/')return;const el=document.getElementById('section-'+id);if(!el)return;const nav=document.querySelector<HTMLElement>('.ssn-global-navbar');const offset=nav?.offsetHeight||66;window.scrollTo({top:Math.max(0,window.scrollY+el.getBoundingClientRect().top-offset),behavior:'instant'});setActive(id);window.dispatchEvent(new CustomEvent('ssn:section-change',{detail:{id}}));};
- return <header className="ssn-global-navbar" aria-label="Site navigation"><Link href="/#section-home" className="ssn-global-brand"><span className="ssn-global-terminal">● ● ●</span> ssn@codingclub:~</Link><nav aria-label="All pages">{pages.map(([id,label],i)=><Link key={id} href={path==='/'?'#section-'+id:id==='home'?'/':'/'+id} onClick={e=>{if(path==='/'){e.preventDefault();jump(id);}}} className={active===id?'ssn-global-active':''}>{String(i+1).padStart(2,'0')}. {label}</Link>)}</nav></header>;
+ return <header className="ssn-global-navbar" aria-label="Site navigation"><Link href="/#section-home" className="ssn-global-brand"><span className="ssn-global-terminal">● ● ●</span> ssn@codingclub:~</Link><nav aria-label="All pages">{pages.map(([id,label],i)=><Link key={id} href={path==='/'?'#section-'+id:id==='home'?'/':id==='about'?'/#section-about':'/'+id} onClick={e=>{if(path==='/'){e.preventDefault();jump(id);}}} className={active===id?'ssn-global-active':''}>{String(i+1).padStart(2,'0')}. {label}</Link>)}</nav></header>;
 }

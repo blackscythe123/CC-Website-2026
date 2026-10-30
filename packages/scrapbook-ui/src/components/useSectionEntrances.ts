@@ -2,8 +2,9 @@
 import {useEffect} from 'react';
 
 /** Scroll assembles objects on entry and returns them to their origins on exit. */
-export default function useSectionEntrances(){
+export default function useSectionEntrances(enabled=true){
  useEffect(()=>{
+  if(!enabled)return;
   if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   const touched=new Set<HTMLElement>(),observed=new Set<Node>(),cleanups:Array<()=>void>=[];
   const replay=new Map<string,number>();let frame=0;
@@ -113,5 +114,5 @@ export default function useSectionEntrances(){
   window.addEventListener('scroll',request,{passive:true});window.addEventListener('resize',request);window.addEventListener('ssn:section-change',navigation);
   request();const ready=setTimeout(request,400);
   return()=>{clearTimeout(ready);cancelAnimationFrame(frame);cleanups.forEach(clean=>clean());window.removeEventListener('scroll',request);window.removeEventListener('resize',request);window.removeEventListener('ssn:section-change',navigation);touched.forEach(el=>{for(const prop of ['translate','rotate','opacity','--assembly-offset','transition'])el.style.removeProperty(prop);delete el.dataset.scrollMotion})};
- },[]);
+ },[enabled]);
 }

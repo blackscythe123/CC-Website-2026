@@ -6,10 +6,10 @@ import EventsBooks from './EventsBooks';
 import BlogsIsolated from './BlogsIsolated';
 import {getVerticalContent,type VerticalSlug} from '../vertical-content';
 type PublishedPost={slug:string;title:string;summary:string;date:string;author:string};
-export default function VerticalPortalHome({slug,publishedPosts=[]}:{slug:VerticalSlug;publishedPosts?:PublishedPost[]}){
- useSectionEntrances();
+export default function VerticalPortalHome({slug,publishedPosts=[],preview=false}:{slug:VerticalSlug;publishedPosts?:PublishedPost[];preview?:boolean}){
+ useSectionEntrances(!preview);
  const content=getVerticalContent(slug);
- useEffect(()=>{const id=location.hash.slice(1);if(!['section-projects','section-events','section-blogs'].includes(id))return;const frame=requestAnimationFrame(()=>{const section=document.getElementById(id);if(section)window.scrollTo({top:scrollY+section.getBoundingClientRect().top-(document.querySelector<HTMLElement>('.vertical-nav')?.offsetHeight||64),behavior:'instant'})});return()=>cancelAnimationFrame(frame)},[]);
+ useEffect(()=>{if(preview)return;const id=location.hash.slice(1);if(!['section-projects','section-events','section-blogs'].includes(id))return;const frame=requestAnimationFrame(()=>{const section=document.getElementById(id);if(section)window.scrollTo({top:scrollY+section.getBoundingClientRect().top-(document.querySelector<HTMLElement>('.vertical-nav')?.offsetHeight||64),behavior:'instant'})});return()=>cancelAnimationFrame(frame)},[preview]);
  return <div className="ssn-scroll-site vertical-portal" data-vertical={slug}>
   <section id="section-projects" className="ssn-scroll-panel" aria-label={`${content.category} projects`}><ProjectsIsolated projects={content.projects}/></section>
   <section id="section-events" className="ssn-scroll-panel" aria-label={`${content.category} events`}><EventsBooks events={content.events}/></section>

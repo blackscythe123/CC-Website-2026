@@ -87,7 +87,7 @@ export default function AboutLetter(){
  },[]);
  return <div className="about-letter-scroll" ref={root}>
   <div className="about-letter-stage">
-   <header className="about-letter-heading"><p>ssn@codingclub:~$ <b>about us</b><span className="cursor"/></p><div><h1><em>//</em> <SectionHeadingText text="A NOTE FROM US"/></h1><span className="about-scroll-cue"><span className="about-scroll-cue-open">↓ scroll to open our letter</span><span className="about-scroll-cue-read">↓ keep scrolling to read</span></span></div></header>
+   <header className="about-letter-heading"><p>ssn@codingclub:~$ <b>about us</b><span className="cursor"/></p><div><h1><em>//</em> <SectionHeadingText text="A NOTE FROM US"/></h1><span className="about-scroll-cue"><span className="about-scroll-cue-open">↓ Scroll to unfold and read</span><span className="about-scroll-cue-read">↓ Keep scrolling to read</span></span></div></header>
    <div className="about-letter-desk">
     <div className="about-arrival"><div className="about-envelope about-envelope-entry" aria-hidden="true">
      <div className="about-envelope-back"/>

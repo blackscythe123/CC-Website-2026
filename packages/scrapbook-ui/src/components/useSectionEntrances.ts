@@ -100,13 +100,14 @@ export default function useSectionEntrances(enabled=true){
    }
    const b=section('blogs'),br=b?.querySelector('div')?.shadowRoot;
    if(b&&br){
-    observe(br);const ready=progress(b,'blogs'),distance=width*.55;
+    observe(br);const paper=br.querySelector<HTMLElement>('.newspaper');
+    const ready=width<=700&&paper?Math.min(progress(b,'blogs'),clamp((window.innerHeight*.70-baseRect(paper).top)/(window.innerHeight*.55))):progress(b,'blogs');
+    const distance=width<=700?window.innerHeight*.17:width*.55;
     // Keep the title steady while letters are typed.
     move(br.querySelector('.archive-search'),progress(b,'blogs'),-200,0);
-    const paper=br.querySelector<HTMLElement>('.newspaper');
     if(paper){paper.style.setProperty('--assembly-offset',`${distance*(1-ready)}px`);touched.add(paper);paper.querySelectorAll<HTMLElement>(':scope > .paper-rule,:scope > .newspaper-deck,:scope > .spread > .gutter').forEach(el=>{el.style.opacity=String(ready);touched.add(el)})}
-    for(const selector of ['.newspaper > .spread > .paper-page:first-child','.newspaper > .paper-header > .masthead'])move(br.querySelector(selector),ready,-distance,0);
-    for(const selector of ['.newspaper > .spread > .paper-page:last-child','.newspaper > .paper-header > .volume'])move(br.querySelector(selector),ready,distance,0);
+    for(const selector of ['.newspaper > .spread > .paper-page:first-child','.newspaper > .paper-header > .masthead'])move(br.querySelector(selector),ready,width<=700?0:-distance,width<=700?-distance:0);
+    for(const selector of ['.newspaper > .spread > .paper-page:last-child','.newspaper > .paper-header > .volume'])move(br.querySelector(selector),ready,width<=700?0:distance,width<=700?distance:0);
     move(br.querySelector('.newspaper > .paper-bottom'),ready,0,45);
    }
    const people=section('people');if(people){

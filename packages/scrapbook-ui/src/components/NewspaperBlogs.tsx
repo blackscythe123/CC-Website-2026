@@ -9,7 +9,7 @@ import type {Blog} from '../data/blogs';
 export default function NewspaperBlogs({blogs,title='FEATURED BLOGS'}:{blogs:Blog[];title?:string}){
  const [category,setCategory]=useState('All'),[spread,setSpread]=useState(0),[selected,setSelected]=useState<Blog|null>(null),[query,setQuery]=useState('');
  const [pageSize,setPageSize]=useState(4);
- useEffect(()=>{const phone=window.matchMedia('(max-width:700px)'),tablet=window.matchMedia('(max-width:899px)');const update=()=>{setPageSize(phone.matches?1:tablet.matches?2:4);setSpread(0)};update();phone.addEventListener('change',update);tablet.addEventListener('change',update);return()=>{phone.removeEventListener('change',update);tablet.removeEventListener('change',update)}},[]);
+ useEffect(()=>{const phone=window.matchMedia('(max-width:700px)'),tablet=window.matchMedia('(max-width:899px)');const update=()=>{setPageSize(tablet.matches?2:4);setSpread(0)};update();phone.addEventListener('change',update);tablet.addEventListener('change',update);return()=>{phone.removeEventListener('change',update);tablet.removeEventListener('change',update)}},[]);
  const swipeRef=useRef<HTMLDivElement>(null);
  const flipRef=useRef<HTMLDivElement>(null),paperRef=useRef<HTMLDivElement>(null),detailRef=useRef<HTMLDivElement>(null);
  const categories=useMemo(()=>['All',...Array.from(new Set(blogs.map(b=>b.category)))],[blogs]);
@@ -42,7 +42,7 @@ export default function NewspaperBlogs({blogs,title='FEATURED BLOGS'}:{blogs:Blo
  <button className="page-corner page-corner-right" onClick={()=>turn(1)} disabled={current===count-1} aria-label="Turn to next newspaper spread"><span>NEXT</span><ChevronRight/></button>
  </div>
  
- <p className="edition-instruction">Drag sideways · click a page corner · scroll horizontally</p>
+ <p className="edition-instruction"><span className="desktop-turn-hint">Drag sideways · click a page corner · scroll horizontally</span><span className="phone-turn-hint">Swipe left / right · tap a corner to turn</span></p>
  <div className="pagination">{Array.from({length:count},(_,i)=><button key={i} aria-label={`Open spread ${i+1}`} className={current===i?'current':''} onClick={()=>{go(i)}}/>)}</div>
  </section>
  

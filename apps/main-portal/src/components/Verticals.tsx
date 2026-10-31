@@ -1,6 +1,6 @@
 'use client';
 import SectionHeadingText from './SectionHeadingText';
-import {useRef,useState,useEffect} from 'react';
+import {useRef,useState,useEffect,useLayoutEffect} from 'react';
 import gsap from 'gsap';
 import {ArrowUpRight,ArrowRight,MousePointer2,Star,Globe2} from 'lucide-react';
 import {verticals} from '../lib/scrapbook-verticals';
@@ -20,7 +20,7 @@ export default function Verticals(){
   setOrigin({x:rect.left,y:rect.top,width:rect.width,height:rect.height});
   setActive(id);
  }
- useEffect(()=>{
+ useLayoutEffect(()=>{
   if(!active||!origin||!flying.current||!leftPiece.current||!rightPiece.current||!veil.current||!destination.current)return;
   const node=flying.current,L=leftPiece.current,R=rightPiece.current;
   gsap.set(node,{x:0,y:0,scale:1,rotation:0,opacity:1});
@@ -28,7 +28,7 @@ export default function Verticals(){
   gsap.set(veil.current,{opacity:0});
   gsap.set(destination.current,{autoAlpha:0});
   const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const tl=gsap.timeline({onComplete:()=>{const target=verticals.find(v=>v.id===active);if(target)window.location.assign(target.href)}});
+  const tl=gsap.timeline({onComplete:()=>{const target=verticals.find(v=>v.id===active);if(target){const url=new URL(target.href,window.location.origin);url.searchParams.set('from','sticky-note');window.location.assign(url.toString())}}});
   if(reduced){
    tl.to(destination.current,{autoAlpha:1,duration:.12}).to([L,R],{opacity:0,duration:.12},0);
   }else{
@@ -47,7 +47,7 @@ export default function Verticals(){
  },[active,origin]);
  return <div className={`verticals-shell ${active ? "board-transitioning" : ""}`} ref={stage}>
   <header className="topline"><span>ssn@codingclub:~$ <b>{typed}</b><i className="cursor"/></span><span className="top-motto">Different perspectives.<br/>One community.</span></header>
-  <section className="heading-row"><div><h1><em>//</em> <SectionHeadingText text="OUR VERTICALS"/></h1></div><div className="vertical-click-hint"><MousePointer2 size={22} aria-hidden="true"/><span>Click a sticky note<small>Explore its projects, events &amp; blogs</small></span><ArrowRight size={22} aria-hidden="true"/></div><p>Nine communities, each with its own<br/>focus, projects, events and a space to grow.</p></section>
+  <section className="heading-row"><div><h1><em>//</em> <SectionHeadingText text="OUR VERTICALS"/></h1></div><div className="vertical-click-hint"><span>Click a sticky note<small>find your vertical</small></span><svg viewBox="0 0 72 74" aria-hidden="true"><path d="M9 7C45 1 61 21 49 43Q43 54 30 63M28 47l1 18 19-5"/></svg></div><p>Nine communities, each with its own<br/>focus, projects, events and a space to grow.</p></section>
   <div className="notes-grid">
    {verticals.map((v,i)=><a key={v.id} href={v.href} className={`sticky-note note-${i+1} ${active===v.id?'chosen':''}`} style={{'--paper':v.color,'--ink-accent':v.accent,'--angle':`${v.angle}deg`} as React.CSSProperties} onClick={e=>go(v.id,e)} aria-label={`Explore ${v.name}`}>
     <span className="paper-grain" aria-hidden="true"/><span className="paper-edge" aria-hidden="true"/><span className="paper-curl" aria-hidden="true"/><span className="paper-crease" aria-hidden="true"/><span className={`fastener ${i%3===0?'tape':i%3===1?'pin pink-pin':'pin green-pin'}`}/>

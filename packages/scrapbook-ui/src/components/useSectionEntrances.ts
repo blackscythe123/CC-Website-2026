@@ -8,25 +8,26 @@ export default function useSectionEntrances(enabled=true){
   if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   const touched=new Set<HTMLElement>(),observed=new Set<Node>(),cleanups:Array<()=>void>=[];
   const replay=new Map<string,number>();let frame=0;
+  const noteProgress=new Map<HTMLElement,number>();let lastPaint=performance.now();
   const clamp=(v:number)=>Math.max(0,Math.min(1,v));
   const ease=(v:number)=>1-Math.pow(1-clamp(v),2);
   // Exit timing belongs to each reusable section, not a site-wide CSS override.
   // Values indicate the viewport fraction at which dismantling is complete / begins.
   const exitWindows:Record<string,{end:number;duration:number}>={
-   verticals:{end:.20,duration:.55},
+   verticals:{end:.12,duration:.63},
    projects:{end:.20,duration:.56},
    events:{end:.20,duration:.55},
    blogs:{end:.20,duration:.56},
   };
   const progress=(anchor:Element,id:string,delay=0)=>{
    const r=anchor.getBoundingClientRect(),h=window.innerHeight;
-   const entry=clamp((h*.78-r.top)/(h*.68));
+   const entry=id==='verticals'?clamp((h*.86-r.top)/(h*.76)):clamp((h*.78-r.top)/(h*.68));
    // Retain a short hold at full assembly, but start each section's exit
    // ~3-4% of a viewport earlier than V4. These values are per section.
    const exitWindow=exitWindows[id]??{end:.20,duration:.52};
    const exit=clamp((r.bottom-h*exitWindow.end)/(h*exitWindow.duration));
    const start=replay.get(id);
-   const arrival=start===undefined?1:clamp((performance.now()-start)/850);
+   const arrival=start===undefined?1:clamp((performance.now()-start)/(id==='verticals'?1100:850));
    if(start!==undefined&&arrival<1)request();
    if(arrival>=1)replay.delete(id);
    return ease(clamp((Math.min(entry,exit,arrival)-delay)/(1-delay)));
@@ -47,10 +48,19 @@ export default function useSectionEntrances(enabled=true){
   };
   const paint=()=>{
    frame=0;const width=window.innerWidth;
+   const now=performance.now(),dt=Math.min(64,Math.max(1,now-lastPaint));lastPaint=now;
+   const noteBlend=1-Math.exp(-dt/150);
    const section=(id:string)=>document.getElementById('section-'+id);
    const v=section('verticals');if(v){
     // Headings type in place rather than sliding from above.
-    v.querySelectorAll<HTMLElement>('.sticky-note').forEach((el,i)=>move(el,progress(v,'verticals',.09+(i%4)*.115),i%2===0?-width*.65:width*.65,i<4?-65:90));
+    v.querySelectorAll<HTMLElement>('.sticky-note').forEach((el,i)=>{
+     const target=progress(v,'verticals',.09+(i%4)*.115);
+     const previous=noteProgress.get(el)??target;
+     const next=Math.abs(target-previous)<.001?target:previous+(target-previous)*noteBlend;
+     noteProgress.set(el,next);
+     if(Math.abs(target-next)>=.001)request();
+     move(el,next,i%2===0?-width*.65:width*.65,i<4?-65:90);
+    });
     move(v.querySelector('.scribble'),progress(v,'verticals',.12),120,-30);
    }
    const p=section('projects'),pr=p?.querySelector('div')?.shadowRoot;

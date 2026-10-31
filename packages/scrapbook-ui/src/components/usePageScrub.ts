@@ -15,6 +15,7 @@ export default function usePageScrub({surface,sheet,count,enabled,initial,resetK
   let frame=0,lastIndex=-1,lastBase=-1;
   let lastMoving:boolean|null=null;
   position.current.value=latest.current.initial;
+  const phone=()=>window.matchMedia('(max-width:700px)').matches;
   const draw=()=>{
    const value=position.current.value,base=Math.floor(value),fraction=value-base;
    const index=Math.min(count-1,paperCurl?Math.ceil(value):commitAtEnd?base:Math.round(value));
@@ -48,19 +49,20 @@ export default function usePageScrub({surface,sheet,count,enabled,initial,resetK
    position.current.value=Math.max(0,Math.min(count-1,position.current.value+delta/distance));
    cancelAnimationFrame(frame);frame=requestAnimationFrame(draw);
   };
-  let drag:{pointer:number;x:number;value:number;moved:boolean;direction:1|-1;node:HTMLElement}|null=null;
+  let drag:{pointer:number;x:number;y:number;value:number;moved:boolean;direction:1|-1;node:HTMLElement}|null=null;
   const down=(e:PointerEvent)=>{
    const target=e.composedPath().find(node=>node instanceof HTMLElement) as HTMLElement|undefined;
    if(e.button!==0||!target||target.closest('a,button,input,select,textarea'))return;
    const page=target.closest<HTMLElement>('.book-spread,.newspaper');if(!page)return;
    e.preventDefault();tween.current?.kill();
    const rect=page.getBoundingClientRect();
-   drag={pointer:e.pointerId,x:e.clientX,value:position.current.value,moved:false,direction:e.clientX<rect.left+rect.width/2?-1:1,node:page};
+   drag={pointer:e.pointerId,x:e.clientX,y:e.clientY,value:position.current.value,moved:false,direction:e.clientX<rect.left+rect.width/2?-1:1,node:page};
    page.setPointerCapture(e.pointerId);
   };
   const pointerMove=(e:PointerEvent)=>{
    if(!drag||drag.pointer!==e.pointerId)return;
-   const dx=e.clientX-drag.x;if(Math.abs(dx)<5&&!drag.moved)return;
+   const dx=e.clientX-drag.x;
+   if(!drag.moved&&Math.abs(e.clientY-drag.y)>Math.abs(dx))return;if(Math.abs(dx)<5&&!drag.moved)return;
    drag.moved=true;e.preventDefault();
    const pageWidth=drag.node.getBoundingClientRect().width;
    position.current.value=Math.max(0,Math.min(count-1,drag.value-dx/Math.max(240,pageWidth*.48)));
@@ -71,7 +73,7 @@ export default function usePageScrub({surface,sheet,count,enabled,initial,resetK
    const d=drag;drag=null;
    if(d.node.hasPointerCapture(e.pointerId))d.node.releasePointerCapture(e.pointerId);
    if(e.type==='pointercancel')return;
-   if(d.moved){e.preventDefault();cancelAnimationFrame(frame);draw()}
+   if(d.moved){e.preventDefault();cancelAnimationFrame(frame);draw();if(phone()){const dx=e.clientX-d.x;moveTo.current(Math.abs(dx)>35?Math.round(d.value)+(dx<0?1:-1):Math.round(d.value))}}
    else moveTo.current(d.direction===1?Math.floor(position.current.value+.0001)+1:Math.ceil(position.current.value-.0001)-1);
   };
   frame=requestAnimationFrame(draw);el.addEventListener('wheel',wheel,{passive:false});

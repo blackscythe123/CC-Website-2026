@@ -1,3 +1,4 @@
+@import "./community-extras.css";
 /* Device-sized welcome scene. Desktop retains the original photographed laptop. */
 @media(max-width:1099px){
  #section-home .realistic-landing{height:auto;min-height:calc(100svh - var(--site-nav-height,66px));background:#eadbc6}

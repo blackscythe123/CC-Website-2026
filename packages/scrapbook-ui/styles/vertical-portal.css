@@ -7,3 +7,5 @@
 @media(max-width:700px){.vertical-nav{padding:10px 16px;gap:10px;flex-wrap:wrap}.vertical-brand small{font-size:7px}.vertical-brand strong{font-size:12px}.vertical-nav nav{width:100%;justify-content:space-between;gap:8px}.vertical-nav nav a{font-size:11px;padding:6px 4px}.vertical-published{padding:20px 18px}}
 
 @media(max-width:700px){.vertical-nav nav{overflow-x:auto;justify-content:flex-start;gap:20px;max-width:100%;padding-bottom:2px}.vertical-nav nav a{flex:none}.vertical-nav{overflow:hidden}}
+
+.vertical-portal,.vertical-portal>*{overflow-anchor:none}.vertical-project-surface{background:#f8e8d4;min-height:calc(100svh - var(--site-nav-height,60px));width:100%}

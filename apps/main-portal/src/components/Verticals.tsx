@@ -28,20 +28,20 @@ export default function Verticals(){
   gsap.set(veil.current,{opacity:0});
   gsap.set(destination.current,{autoAlpha:0});
   const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const tl=gsap.timeline({onComplete:()=>{const target=verticals.find(v=>v.id===active);if(target){const url=new URL(target.href,window.location.origin);url.searchParams.set('from','sticky-note');window.location.assign(url.toString())}}});
+  const tl=gsap.timeline({onComplete:()=>{const target=verticals.find(v=>v.id===active);if(target){const url=new URL(target.href,window.location.origin);url.searchParams.set('from','sticky-note');url.hash='section-projects';window.location.assign(url.toString())}}});
   if(reduced){
    tl.to(destination.current,{autoAlpha:1,duration:.12}).to([L,R],{opacity:0,duration:.12},0);
   }else{
    const scale=Math.min(Math.min(innerWidth*.48,500)/origin.width,Math.min(innerHeight*.66,580)/origin.height);
    const dx=innerWidth/2-(origin.x+origin.width/2),dy=innerHeight/2-(origin.y+origin.height/2);
    tl.to(veil.current,{opacity:1,duration:.3},0)
-     .to(node,{x:dx,y:dy,scale,duration:.55,ease:'power2.inOut'},0)
-     .to(L,{xPercent:-2,rotation:-1,duration:.18,ease:'sine.inOut'},.55)
-     .to(R,{xPercent:2,rotation:1,duration:.18,ease:'sine.inOut'},.55)
-     .to(destination.current,{autoAlpha:1,duration:.65,ease:'sine.inOut'},.7)
-     .to(L,{x:-innerWidth*.85,y:38,rotation:-15,duration:1.05,ease:'power2.inOut'},.72)
-     .to(R,{x:innerWidth*.85,y:-30,rotation:14,duration:1.05,ease:'power2.inOut'},.72)
-     .to(veil.current,{opacity:0,duration:.7},.8);
+     .to(node,{x:dx,y:dy,scale,duration:.7,ease:'power3.inOut'},0)
+     .to(L,{xPercent:-2,rotation:-1,duration:.24,ease:'sine.inOut'},.7)
+     .to(R,{xPercent:2,rotation:1,duration:.24,ease:'sine.inOut'},.7)
+     .to(destination.current,{autoAlpha:1,duration:.5,ease:'sine.out'},.78)
+     .to(L,{x:-innerWidth*.85,y:24,rotation:-10,duration:1.15,ease:'power2.inOut'},.88)
+     .to(R,{x:innerWidth*.85,y:-22,rotation:10,duration:1.15,ease:'power2.inOut'},.88)
+     .to(veil.current,{opacity:0,duration:.85},1.05);
   }
   return()=>{tl.kill()};
  },[active,origin]);

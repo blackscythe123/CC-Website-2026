@@ -13,7 +13,7 @@ import {events} from '../data/events';
 const ids=['home','about','verticals','projects','events','blogs','people','join'];
 export default function ScrollHome(){
  useSectionEntrances();
- useEffect(()=>{const id=window.location.hash.replace('#','');if(!id.startsWith('section-'))return;let frame=0;const align=()=>{const el=document.getElementById(id),nav=document.querySelector<HTMLElement>('.ssn-global-navbar');if(el)window.scrollTo({top:window.scrollY+el.getBoundingClientRect().top-(nav?.offsetHeight||46),behavior:'instant'})};frame=requestAnimationFrame(align);return()=>cancelAnimationFrame(frame)},[]);
+ useEffect(()=>{const reloaded=(performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming|undefined)?.type==='reload';if(reloaded){history.replaceState(history.state,'',location.pathname+location.search+'#section-home');history.scrollRestoration='manual'}const id=reloaded?'section-home':window.location.hash.replace('#','');if(!id.startsWith('section-'))return;let frame=0;const align=()=>{const el=document.getElementById(id),nav=document.querySelector<HTMLElement>('.ssn-global-navbar');if(el)window.scrollTo({top:window.scrollY+el.getBoundingClientRect().top-(nav?.offsetHeight||46),behavior:'instant'})};frame=requestAnimationFrame(align);return()=>cancelAnimationFrame(frame)},[]);
  const go=useCallback((route:string)=>{
   const id=route.replace(/^\//,'').replace(/^section-/,'')||'home';
   const el=document.getElementById('section-'+id);

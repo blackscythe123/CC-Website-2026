@@ -1,24 +1,15 @@
 "use client";
 import {useEffect,useLayoutEffect,useRef,useState,useId,type ReactNode} from 'react';
 import gsap from 'gsap';
-import {ScrollTrigger} from 'gsap/ScrollTrigger';
 import {Trophy,Medal,Star,Code2,ArrowUpRight,ArrowUp,ArrowDown,Search,Bookmark,BookOpen,Play,ExternalLink,X,ChevronRight,GitBranch,BrainCircuit,ChartNoAxesColumnIncreasing,Library,Check,ShieldCheck} from 'lucide-react';
 import SectionHeadingText from './SectionHeadingText';
 import type {Blog} from '../data/blogs';
 
-gsap.registerPlugin(ScrollTrigger);
 function useReveal(key:string=''){
  const ref=useRef<HTMLElement>(null);
  useLayoutEffect(()=>{const root=ref.current;if(!root||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
  let drawerAssembly:gsap.core.Timeline|null=null;let hallAssembly:gsap.core.Timeline|null=null;let leagueAssembly:gsap.core.Timeline|null=null;
  const ctx=gsap.context(()=>{
-  const wire=(node:HTMLElement,trigger:Element,from:gsap.TweenVars,order:number)=>{
-   gsap.set(node,from);
-   const show=()=>{gsap.to(node,{x:0,y:0,z:0,rotation:0,rotationX:0,rotationY:0,scale:1,autoAlpha:1,duration:.95,delay:order*.10,ease:'back.out(1.12)',overwrite:'auto'})};
-   const hide=()=>{gsap.to(node,{...from,duration:.55,delay:0,ease:'power2.inOut',overwrite:'auto'})};
-   ScrollTrigger.create({trigger,start:'top 91%',end:'bottom 9%',onEnter:show,onEnterBack:show,onLeave:hide,onLeaveBack:hide});
-  };
-  root.querySelectorAll<HTMLElement>('[data-extra-enter]').forEach((node,i)=>wire(node,node,{x:Number(node.dataset.x||0),y:Number(node.dataset.y||45),rotation:Number(node.dataset.r||0),autoAlpha:0},i%3));
   const drawers=Array.from(root.querySelectorAll<HTMLElement>('[data-shelf-part]'));if(drawers.length){drawerAssembly=gsap.timeline({paused:true});drawers.forEach((node,i)=>{gsap.set(node,{x:i%2?360:-360,y:i===1?-75:70,z:100,rotationY:i%2?-32:32,rotation:i%2?12:-12,autoAlpha:0});drawerAssembly!.to(node,{x:0,y:0,z:0,rotation:0,rotationY:0,autoAlpha:1,duration:1.05,ease:'power3.out'},i*.18)});const decor=root.querySelector('[data-cabinet-decor]');if(decor){gsap.set(decor,{x:-120,y:-95,rotation:-7,autoAlpha:0});drawerAssembly.to(decor,{x:0,y:0,rotation:0,autoAlpha:1,duration:1.25,ease:'power3.out'},.24)}}
   const scenes=Array.from(root.querySelectorAll<HTMLElement>('[data-honour-scene]'));if(scenes.length){hallAssembly=gsap.timeline({paused:true});scenes.forEach((scene,row)=>{const nodes=Array.from(scene.querySelectorAll<HTMLElement>('[data-award-part]'));if(row%2)nodes.reverse();nodes.forEach((node,i)=>{gsap.set(node,{x:row%2?190:-190,autoAlpha:0});hallAssembly!.to(node,{x:0,autoAlpha:1,duration:1.05,ease:'power2.out'},row*.1+i*.18)})})}
   const blocks=Array.from(root.querySelectorAll<HTMLElement>('.podium-block'));const medals=Array.from(root.querySelectorAll<HTMLElement>('.league-medal'));const board=root.querySelector('.league-score-sheet');if(blocks.length&&board){leagueAssembly=gsap.timeline({paused:true});blocks.forEach((block,i)=>{gsap.set(block,{scaleY:.035,autoAlpha:0,transformOrigin:'50% 100%'});leagueAssembly!.to(block,{scaleY:1,autoAlpha:1,duration:1.2,ease:'power3.out'},i*.14)});medals.forEach((medal,i)=>{gsap.set(medal,{y:65,scale:.6,autoAlpha:0});leagueAssembly!.to(medal,{y:0,scale:1,autoAlpha:1,duration:.8,ease:'back.out(1.2)'},.35+i*.14)});gsap.set(board,{x:160,autoAlpha:0});leagueAssembly.to(board,{x:0,autoAlpha:1,duration:1,ease:'power3.out'},.18);const rows=board.querySelectorAll('tbody tr');gsap.set(rows,{x:70,autoAlpha:0});leagueAssembly.to(rows,{x:0,autoAlpha:1,duration:.6,stagger:.1,ease:'power2.out'},.45)}
@@ -26,8 +17,7 @@ function useReveal(key:string=''){
  const cabinet=root.querySelector('.catalogue-cabinet');let cabinetVisible:boolean|null=null;const cabinetObserver=cabinet?new IntersectionObserver(entries=>{const visible=entries[0].intersectionRatio>=.84;if(visible===cabinetVisible)return;cabinetVisible=visible;if(visible)drawerAssembly?.timeScale(.8).play();else drawerAssembly?.timeScale(1.7).reverse()},{threshold:[0,.45,.7,.84,.95,1]}):null;if(cabinet)cabinetObserver?.observe(root);
  let hallVisible:boolean|null=null;const hallObserver=hallAssembly?new IntersectionObserver(entries=>{const visible=entries[0].intersectionRatio>=.84;if(visible===hallVisible)return;hallVisible=visible;if(visible)hallAssembly?.timeScale(1).play();else hallAssembly?.timeScale(2).reverse()},{threshold:[0,.45,.7,.84,.95,1]}):null;hallObserver?.observe(root);
  let leagueVisible:boolean|null=null;const leagueObserver=leagueAssembly?new IntersectionObserver(entries=>{const visible=entries[0].intersectionRatio>=.84;if(visible===leagueVisible)return;leagueVisible=visible;if(visible)leagueAssembly?.timeScale(.62).play();else leagueAssembly?.timeScale(1.5).reverse()},{threshold:[0,.45,.7,.84,.95,1]}):null;leagueObserver?.observe(root);
- const refresh=()=>ScrollTrigger.refresh();const update=()=>ScrollTrigger.update();const timer=setTimeout(refresh,700);let frame=0;const resize=new ResizeObserver(()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(refresh)});resize.observe(root);
- window.addEventListener('ssn:section-change',update);return()=>{clearTimeout(timer);cancelAnimationFrame(frame);resize.disconnect();cabinetObserver?.disconnect();hallObserver?.disconnect();leagueObserver?.disconnect();window.removeEventListener('ssn:section-change',update);ctx.revert()};
+ return()=>{cabinetObserver?.disconnect();hallObserver?.disconnect();leagueObserver?.disconnect();ctx.revert()};
  },[key]);return ref;
 }
 function Heading({command,title,children}:{command:string;title:string;children:ReactNode}){return <><div className="terminal-command extra-terminal">ssn@codingclub:~$ <b>{command}</b><i aria-hidden="true">▍</i></div><header className="extra-heading"><h2><em>//</em> <SectionHeadingText text={title}/></h2><p>{children}</p></header></>}

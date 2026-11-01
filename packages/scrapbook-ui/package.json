@@ -20,20 +20,23 @@
     "./BlogsIsolated": "./src/components/BlogsIsolated.tsx",
     "./projectsStandaloneCSS": "./src/components/projectsStandaloneCSS.ts",
     "./blogsStandaloneCSS": "./src/components/blogsStandaloneCSS.ts",
-    "./useSectionEntrances": "./src/components/useSectionEntrances.ts"
+    "./useSectionEntrances": "./src/components/useSectionEntrances.ts",
+    "./RoadmapLab": "./src/components/RoadmapLab.tsx"
   },
   "peerDependencies": {
+    "next": "^16.4.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "next": "^16.4.0"
+    "react-dom": "^19.0.0"
   },
   "dependencies": {
     "gsap": "^3.14.0",
-    "lucide-react": "^0.468.0"
+    "lucide-react": "^0.468.0",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.187.0",
     "tsx": "^4.20.0"
   },
   "scripts": {

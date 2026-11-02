@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Also include any legacy requests from roles.json
-    const roles = readRoles();
+    const roles = await getLiveClubRoles();
     const legacyRequests: RoleRequest[] = roles.pending_requests || [];
     const allRequests: RoleRequest[] = [
       ...issueRequests,
@@ -410,7 +410,8 @@ export async function PATCH(request: NextRequest) {
     const canEvaluate = canApproveRoleRequest(
       userData.login,
       targetReq.requestedRole,
-      targetReq.vertical
+      targetReq.vertical,
+      roles
     );
 
     if (!canEvaluate) {
@@ -447,7 +448,8 @@ export async function PATCH(request: NextRequest) {
       const canAssign = canApproveRoleRequest(
         userData.login,
         effectiveRole,
-        targetReq.vertical
+        targetReq.vertical,
+        roles
       );
 
       if (!canAssign) {

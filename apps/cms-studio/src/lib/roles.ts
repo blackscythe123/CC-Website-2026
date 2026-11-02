@@ -243,8 +243,12 @@ export async function getLiveUserRoleInfo(
   return getUserRoleInfo(username, roles);
 }
 
-export function canUserApproveVertical(username: string, vertical: string): boolean {
-  const roles = readRoles();
+export function canUserApproveVertical(
+  username: string,
+  vertical: string,
+  rolesOverride?: ClubRoles
+): boolean {
+  const roles = rolesOverride || readRoles();
   const normalized = username.toLowerCase().trim();
   if (roles.superadmins.some((u) => u.toLowerCase() === normalized)) return true;
 
@@ -253,8 +257,12 @@ export function canUserApproveVertical(username: string, vertical: string): bool
   return Boolean(isHead || isDep);
 }
 
-export function canDeletePost(username: string, vertical: string): boolean {
-  const roles = readRoles();
+export function canDeletePost(
+  username: string,
+  vertical: string,
+  rolesOverride?: ClubRoles
+): boolean {
+  const roles = rolesOverride || readRoles();
   const normalized = username.toLowerCase().trim();
   if (roles.superadmins.some((u) => u.toLowerCase() === normalized)) return true;
 
@@ -265,9 +273,10 @@ export function canDeletePost(username: string, vertical: string): boolean {
 export function canApproveRoleRequest(
   reviewerUsername: string,
   requestedRole: "member" | "deputy" | "vertical_head",
-  vertical: string
+  vertical: string,
+  rolesOverride?: ClubRoles
 ): boolean {
-  const roles = readRoles();
+  const roles = rolesOverride || readRoles();
   const normalized = reviewerUsername.toLowerCase().trim();
   if (roles.superadmins.some((u) => u.toLowerCase() === normalized)) return true;
 

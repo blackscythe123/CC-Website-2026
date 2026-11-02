@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createDraftAndPullRequest, getPRDetails } from "@/lib/github";
-import { getUserRoleInfo } from "@/lib/roles";
+import { getUserRoleInfo, getLiveClubRoles } from "@/lib/roles";
 import { getSessionToken } from "@/lib/session";
 
 export async function POST(request: NextRequest) {
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const roleInfo = getUserRoleInfo(userData.login);
+    const roleInfo = getUserRoleInfo(userData.login, await getLiveClubRoles());
 
     // Strictly enforce repository collaborator permission (Internal Tool)
     const repoRes = await fetch("https://api.github.com/repos/blackscythe123/CC-Website-2026", {

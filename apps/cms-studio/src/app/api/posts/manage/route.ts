@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
-import { getUserRoleInfo, canDeletePost } from "@/lib/roles";
+import { getUserRoleInfo, canDeletePost, getLiveClubRoles } from "@/lib/roles";
 import {
   deletePublishedPost,
   listAllPublishedPostsFromGitHub,
@@ -51,7 +51,8 @@ export async function GET(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const roleInfo = getUserRoleInfo(userData.login);
+    const liveRoles = await getLiveClubRoles();
+    const roleInfo = getUserRoleInfo(userData.login, liveRoles);
 
     // 1. Primary Source: Fetch live published posts tree directly from GitHub (Serverless/Vercel Safe)
     let gitHubPosts = await listAllPublishedPostsFromGitHub(token);
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
         date: p.date,
         author: p.author,
         summary: p.summary,
-        canDelete: canDeletePost(userData.login, p.vertical),
+        canDelete: canDeletePost(userData.login, p.vertical, liveRoles),
       }));
 
       return NextResponse.json({
@@ -95,7 +96,7 @@ export async function GET(request: NextRequest) {
             date: data.date ? String(data.date).split("T")[0] : "",
             author: data.author || "SSN Coding Club",
             summary: data.summary || "",
-            canDelete: canDeletePost(userData.login, "club"),
+            canDelete: canDeletePost(userData.login, "club", liveRoles),
           });
         } catch {
           // ignore
@@ -120,7 +121,7 @@ export async function GET(request: NextRequest) {
               date: data.date ? String(data.date).split("T")[0] : "",
               author: data.author || "Anonymous",
               summary: data.summary || "",
-              canDelete: canDeletePost(userData.login, vert),
+              canDelete: canDeletePost(userData.login, vert, liveRoles),
             });
           } catch {
             // ignore
@@ -190,7 +191,7 @@ export async function DELETE(request: NextRequest) {
     // Vertical Head can delete posts ONLY in their vertical.
     // Super Admin can delete posts in ANY vertical.
     // Deputies and Members cannot delete published posts.
-    const isAllowed = canDeletePost(userData.login, vertical);
+    const isAllowed = canDeletePost(userData.login, vertical, await getLiveClubRoles(true));
     if (!isAllowed) {
       return NextResponse.json(
         {

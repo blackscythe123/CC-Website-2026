@@ -5,7 +5,7 @@ import {
   getPersonalDraftBranch,
 } from "@/lib/github";
 import { getSessionToken } from "@/lib/session";
-import { getUserRoleInfo } from "@/lib/roles";
+import { getUserRoleInfo, getLiveClubRoles } from "@/lib/roles";
 
 export async function GET(request: NextRequest) {
   const token = getSessionToken(request);
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     const { vertical, slug, title, summary, coverImage, tags, markdownBody, pendingImages, targetPortals } = body;
 
     // Verify role assignment: Unassigned members cannot push branches
-    const roleInfo = getUserRoleInfo(userData.login);
+    const roleInfo = getUserRoleInfo(userData.login, await getLiveClubRoles());
     if (roleInfo.role === "member") {
       if (!roleInfo.verticals || roleInfo.verticals.length === 0) {
         return NextResponse.json(

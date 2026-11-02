@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserRoleInfo } from "@/lib/roles";
+import { getUserRoleInfo, getLiveClubRoles } from "@/lib/roles";
 import { getSessionToken } from "@/lib/session";
 
 // Sliding window rate limiter per client IP / user
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
   // Check cache first
   const cached = userLookupCache.get(username);
   if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
-    const currentRole = getUserRoleInfo(username);
+    const currentRole = getUserRoleInfo(username, await getLiveClubRoles());
     return NextResponse.json({
       exists: cached.exists,
       user: cached.user,
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
     }
 
     const ghUser = await res.json();
-    const currentRole = getUserRoleInfo(ghUser.login);
+    const currentRole = getUserRoleInfo(ghUser.login, await getLiveClubRoles());
     const userInfo = {
       login: ghUser.login,
       name: ghUser.name || ghUser.login,

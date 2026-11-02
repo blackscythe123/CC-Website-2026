@@ -6,7 +6,7 @@ import {
   getPRDetails,
   getPRArticleContent,
 } from "@/lib/github";
-import { getUserRoleInfo, canUserApproveVertical, readRoles } from "@/lib/roles";
+import { getUserRoleInfo, canUserApproveVertical, getLiveClubRoles } from "@/lib/roles";
 import { getSessionToken } from "@/lib/session";
 
 export async function GET(request: NextRequest) {
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const roleInfo = getUserRoleInfo(userData.login);
+    const roleInfo = getUserRoleInfo(userData.login, await getLiveClubRoles());
 
     const { searchParams } = new URL(request.url);
     const previewPullNumber = searchParams.get("previewPullNumber");
@@ -84,7 +84,9 @@ export async function POST(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const reviewerRoleInfo = getUserRoleInfo(userData.login);
+    // Authorization must use live roles.json from main, never the build-time copy or a stale cache
+    const allRoles = await getLiveClubRoles(true);
+    const reviewerRoleInfo = getUserRoleInfo(userData.login, allRoles);
     const body = await request.json();
     const { pullNumber, action = "approve", reason } = body;
 
@@ -128,7 +130,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify reviewer authority
-    if (!canUserApproveVertical(userData.login, actualVertical)) {
+    if (!canUserApproveVertical(userData.login, actualVertical, allRoles)) {
       return NextResponse.json(
         {
           error: `Access Denied: You are not authorized to review articles for '${actualVertical}'. Only designated Vertical Heads, Deputies, or Superadmins can review.`,
@@ -158,8 +160,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Handling Approval (Multi-Deputy Quorum check)
-    const authorRoleInfo = getUserRoleInfo(authorUsername);
-    const allRoles = readRoles();
+    const authorRoleInfo = getUserRoleInfo(authorUsername, allRoles);
     const deputiesInVertical = allRoles.deputies[actualVertical] || [];
 
     const result = await approveAndMergePR({

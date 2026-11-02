@@ -28,10 +28,10 @@ PR #17 has merged. This checklist includes the previously unpushed roadmap commi
 
 - [x] **Production navigation:** Main sticky notes and vertical links use the supplied Vercel deployments; vertical back links return to the production main portal, and CMS links use the production Studio.
 
-- [x] **Club roadmap:** Added the saved 3D Desk Railway to the main page after People, with club-wide learning stops, topic details, continuation controls, and navbar/terminal access.
+- [x] **Club roadmap:** Added the saved 3D Desk Railway to the main page after People, with website launch goals, future release directions, release-stage/scope details, continuation controls, and navbar/terminal access. Updated Scroll12 to match.
 
 ## Validation context
 
 Scroll12 production build passed. Desktop and phone layouts, arrival continuity, reversible assemblies, and roadmap continuation were checked locally. A local proxy tested cold loading at 1.6 Mbps with 150ms added latency and disabled cache; a separate failure test returned HTTP 503 for decorative artwork. Phones selected smaller assets, and failed artwork retained readable names/photos without broken-image icons. Third-party portrait/font services were outside the proxy; physical-device and production-CDN performance are not confirmed.
 
-Repository component tests (10), content validation (20 files), and all app TypeScript checks passed. The current monorepo production build stopped at the existing Next.js SecurityFatalError in the vertical portal template; a complete repository production build is not confirmed. Recheck before opening the next PR. Leaderboard scores and award records remain presentation data; roadmap topics are introductory content rather than a connected curriculum/CMS collection.
+Repository component tests (10), content validation (20 files), and all app TypeScript checks passed. The current monorepo production build stopped at the existing Next.js SecurityFatalError in the vertical portal template; a complete repository production build is not confirmed. Recheck before opening the next PR. Leaderboard scores and award records remain presentation data; CP and AI/ML roadmap topics are introductory content rather than a connected curriculum/CMS collection; the club roadmap describes proposed website goals without fixed release dates.

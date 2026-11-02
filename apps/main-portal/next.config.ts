@@ -17,12 +17,12 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/admin",
-        destination: "https://ssn-coding-club-cms.vercel.app/admin",
+        destination: "https://cc-cms-studio.vercel.app/admin",
         permanent: false,
       },
       {
         source: "/admin/:path*",
-        destination: "https://ssn-coding-club-cms.vercel.app/admin/:path*",
+        destination: "https://cc-cms-studio.vercel.app/admin/:path*",
         permanent: false,
       },
       {

@@ -189,7 +189,7 @@ export default async function BlogPostPage({
             </Link>
           )}
           <a
-            href="https://ssn-coding-club-cms.vercel.app/admin"
+            href="https://cc-cms-studio.vercel.app/admin"
             target="_blank"
             rel="noopener noreferrer"
             className="text-stone-500 hover:text-stone-900 transition"

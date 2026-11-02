@@ -101,7 +101,7 @@ export default function AboutSection() {
             <div className="mt-6 flex items-center justify-between pt-4 border-t border-stone-100 font-mono text-xs">
               <span className="text-stone-500">Decap Headless CMS + GitHub OAuth</span>
               <a
-                href="https://ssn-coding-club-cms.vercel.app/admin"
+                href="https://cc-cms-studio.vercel.app/admin"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[#F43F5E] font-bold hover:underline"

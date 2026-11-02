@@ -18,3 +18,5 @@ export const verticals=notes.map(note=>{
  const portal=portals.find(portal=>portal.vertical===slug);
  return {...note,href:note.id==='pr'?'/#section-people':portal?`https://${portal.domain}`:`/verticals/${slug}`};
 });
+
+export function verticalPortalHref(slug:string){const canonical=canonicalSlugs[slug]??slug;const portal=portals.find(portal=>portal.vertical===canonical);return portal?`https://${portal.domain}`:`/verticals/${canonical}`;}

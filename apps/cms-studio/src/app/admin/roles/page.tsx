@@ -104,7 +104,13 @@ export default function PeoplePage() {
       const res = await fetch("/api/roles/requests", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId, action, assignedRole }),
+        body: JSON.stringify({
+          requestId,
+          action,
+          assignedRole,
+          expectedRole: requests.find((r) => r.id === requestId)?.requestedRole,
+          expectedVertical: requests.find((r) => r.id === requestId)?.vertical,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Couldn't ${action} the application`);

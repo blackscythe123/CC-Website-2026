@@ -36,6 +36,8 @@ export function ApplicationsList({
         const options = assignableRoles(actorRoleIn(roleInfo, req.vertical)).filter((r): r is RequestRole => r !== "superadmin");
         const chosen = assigned[req.id] || req.requestedRole;
         const adjusted = chosen !== req.requestedRole;
+        // Mirror the server rule: you can only evaluate an application for a role you are allowed to grant
+        const canEvaluate = actorRoleIn(roleInfo, req.vertical) === "superadmin" || options.includes(req.requestedRole);
         return (
           <Card key={req.id} className="flex flex-col gap-3 sm:flex-row sm:items-start">
             <Avatar src={req.avatarUrl} login={req.username} size={36} />
@@ -58,7 +60,12 @@ export function ApplicationsList({
               {req.note ? <p className="mt-2 rounded-lg bg-surface px-3 py-2 text-sm">&ldquo;{req.note}&rdquo;</p> : null}
               {req.reviewedBy ? <p className="mt-1.5 text-xs text-muted">Reviewed by @{req.reviewedBy}</p> : null}
             </div>
-            {req.status === "pending" && options.length > 0 ? (
+            {req.status === "pending" && !canEvaluate ? (
+              <span className="text-xs text-muted sm:max-w-[16rem] sm:text-right">
+                Needs {req.requestedRole === "vertical_head" ? "a Superadmin" : "the Vertical Head or a Superadmin"}
+              </span>
+            ) : null}
+            {req.status === "pending" && canEvaluate && options.length > 0 ? (
               <div className="flex flex-wrap items-center gap-2 sm:max-w-[16rem] sm:justify-end">
                 {options.length > 1 ? (
                   <>

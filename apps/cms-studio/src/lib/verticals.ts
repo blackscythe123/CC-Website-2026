@@ -18,20 +18,20 @@ export interface VerticalOption {
 }
 
 export const ALL_VERTICALS: VerticalOption[] = [
-  { slug: "ai-ml", name: "AI / ML", domain: "ai.codingclub.tech", icon: "brain" },
-  { slug: "ar-vr-game-dev", name: "AR, VR & Game Dev", domain: "arvr.codingclub.tech", icon: "gamepad" },
-  { slug: "competitive-programming", name: "Competitive Programming", domain: "cp.codingclub.tech", icon: "trophy" },
-  { slug: "cybersecurity", name: "Cyber Security", domain: "cybersecurity.codingclub.tech", icon: "shield" },
-  { slug: "ssnhacks", name: "SSN Hacks", domain: "hacks.codingclub.tech", icon: "zap" },
-  { slug: "design-ui-ux", name: "Design & UI/UX", domain: "design.codingclub.tech", icon: "palette" },
-  { slug: "full-stack", name: "Full Stack", domain: "web.codingclub.tech", icon: "globe" },
-  { slug: "open-source", name: "Open Source (OSS)", domain: "oss.codingclub.tech", icon: "git-branch" },
+  { slug: "ai-ml", name: "AI / ML", domain: "cc-ai-ml-portal.vercel.app", icon: "brain" },
+  { slug: "ar-vr-game-dev", name: "AR, VR & Game Dev", domain: "cc-ar-vr-portal.vercel.app", icon: "gamepad" },
+  { slug: "competitive-programming", name: "Competitive Programming", domain: "cc-cp-portal.vercel.app", icon: "trophy" },
+  { slug: "cybersecurity", name: "Cyber Security", domain: "cc-cybersecurity-portal.vercel.app", icon: "shield" },
+  { slug: "ssnhacks", name: "SSN Hacks", domain: "cc-ssnhacks-portal.vercel.app", icon: "zap" },
+  { slug: "design-ui-ux", name: "Design & UI/UX", domain: "cc-design-portal.vercel.app", icon: "palette" },
+  { slug: "full-stack", name: "Full Stack", domain: "cc-full-stack-portal.vercel.app", icon: "globe" },
+  { slug: "open-source", name: "Open Source (OSS)", domain: "cc-oss-portal.vercel.app", icon: "git-branch" },
 ];
 
 export const CLUB_VERTICAL: VerticalOption = {
   slug: "club",
   name: "Club Announcements",
-  domain: "codingclub.tech",
+  domain: "cc-main-portal.vercel.app",
   icon: "megaphone",
 };
 

@@ -400,6 +400,90 @@ export async function listPendingReviewPRs(token: string): Promise<PendingPR[]> 
   return prsWithReviews;
 }
 
+// ---------------------------------------------------------------------------
+// Editorial governance helpers (pure, unit-tested)
+// ---------------------------------------------------------------------------
+
+const ARTICLE_PATH_RE = /^content\/(?:verticals\/([a-z0-9-]+)|(club))\/posts\/([a-z0-9-]+)\.md$/;
+const UPLOAD_PATH_RE = /^apps\/main-portal\/public\/uploads\/[A-Za-z0-9._-]+$/;
+
+export type PRFileCheck =
+  | { ok: true; articlePath: string; vertical: string }
+  | { ok: false; error: string };
+
+/** A CMS article PR may contain exactly one article file plus uploaded images, nothing else. */
+export function validateArticlePRFiles(filenames: string[]): PRFileCheck {
+  const articles = filenames.filter((f) => ARTICLE_PATH_RE.test(f));
+  const others = filenames.filter((f) => !ARTICLE_PATH_RE.test(f) && !UPLOAD_PATH_RE.test(f));
+  if (others.length > 0) {
+    return { ok: false, error: `PR modifies files outside article content and uploads: ${others.slice(0, 5).join(", ")}` };
+  }
+  if (articles.length !== 1) {
+    return { ok: false, error: `PR must contain exactly one article file (found ${articles.length}).` };
+  }
+  const m = articles[0].match(ARTICLE_PATH_RE)!;
+  return { ok: true, articlePath: articles[0], vertical: m[1] || m[2] };
+}
+
+export type EditorialRole = "superadmin" | "vertical_head" | "deputy" | "member" | "none";
+
+/** Role of a user *in a specific vertical*; superadmin applies everywhere. */
+export function roleInVertical(
+  info: { role: string; rolesByVertical?: Record<string, string> },
+  vertical: string
+): EditorialRole {
+  if (info.role === "superadmin") return "superadmin";
+  const r = info.rolesByVertical?.[vertical];
+  return (r as EditorialRole) || "none";
+}
+
+/**
+ * Quorum rules (CLAUDE.md):
+ *  - Member article:     2 Deputies OR 1 Vertical Head OR 1 Superadmin
+ *  - Deputy article:     1 Vertical Head OR 1 Superadmin
+ *  - Head article:       1 Superadmin
+ *  - Superadmin article: another Superadmin
+ * Returns "merge", "count-deputies", or an error message.
+ */
+export function evaluateReviewerAuthority(
+  reviewerRole: EditorialRole,
+  authorRole: EditorialRole
+): "merge" | "count-deputies" | string {
+  if (reviewerRole === "superadmin") return "merge";
+  if (reviewerRole === "vertical_head") {
+    if (authorRole === "member" || authorRole === "deputy" || authorRole === "none") return "merge";
+    return `Articles by a ${authorRole} must be approved by a Superadmin.`;
+  }
+  if (reviewerRole === "deputy") {
+    if (authorRole === "member" || authorRole === "none") return "count-deputies";
+    return `Articles by a ${authorRole} must be approved by the Vertical Head or a Superadmin.`;
+  }
+  return "You are not authorized to review articles in this vertical.";
+}
+
+/** Distinct deputies whose latest decisive review approves the given head commit. */
+export function countDeputyApprovals(
+  reviews: { user?: { login?: string } | null; state: string; commit_id?: string | null }[],
+  headSha: string,
+  deputyUsernames: string[],
+  excludeUsers: string[]
+): number {
+  const deputies = new Set(deputyUsernames.map((d) => d.toLowerCase()));
+  const excluded = new Set(excludeUsers.map((u) => u.toLowerCase()));
+  const latest = new Map<string, { state: string; commit: string | null | undefined }>();
+  for (const r of reviews) {
+    const u = r.user?.login?.toLowerCase();
+    if (!u || excluded.has(u)) continue;
+    if (r.state !== "APPROVED" && r.state !== "CHANGES_REQUESTED" && r.state !== "DISMISSED") continue;
+    latest.set(u, { state: r.state, commit: r.commit_id });
+  }
+  let n = 0;
+  for (const [u, v] of latest) {
+    if (deputies.has(u) && v.state === "APPROVED" && v.commit === headSha) n++;
+  }
+  return n;
+}
+
 export async function getPRDetails(token: string, pullNumber: number) {
   const octokit = getOctokit(token);
   const { data: prData } = await octokit.pulls.get({
@@ -412,16 +496,18 @@ export async function getPRDetails(token: string, pullNumber: number) {
 
 export async function getPRArticleContent(token: string, pullNumber: number) {
   const octokit = getOctokit(token);
-  const { data: files } = await octokit.pulls.listFiles({
+  const files = await octokit.paginate(octokit.pulls.listFiles, {
     owner: REPO_OWNER,
     repo: REPO_NAME,
     pull_number: pullNumber,
+    per_page: 100,
   });
 
-  const mdFile = files.find((f) => f.filename.endsWith(".md") || f.filename.endsWith(".mdx"));
-  if (!mdFile) {
-    throw new Error("No article file found in this draft PR.");
+  const check = validateArticlePRFiles(files.map((f) => f.filename));
+  if (!check.ok) {
+    throw new Error(check.error);
   }
+  const mdFile = { filename: check.articlePath };
 
   const { data: prData } = await octokit.pulls.get({
     owner: REPO_OWNER,
@@ -439,6 +525,10 @@ export async function getPRArticleContent(token: string, pullNumber: number) {
   if ("content" in fileRes && typeof fileRes.content === "string") {
     const raw = Buffer.from(fileRes.content, "base64").toString("utf-8");
     const parsed = matter(raw);
+    const fmVertical = typeof parsed.data.vertical === "string" ? parsed.data.vertical.toLowerCase() : "";
+    if (fmVertical && fmVertical !== check.vertical) {
+      throw new Error(`Frontmatter vertical '${fmVertical}' does not match file location '${check.vertical}'.`);
+    }
     return {
       filePath: mdFile.filename,
       frontmatter: parsed.data,
@@ -448,8 +538,10 @@ export async function getPRArticleContent(token: string, pullNumber: number) {
       coverImage: (parsed.data.coverImage as string) || "",
       summary: (parsed.data.summary as string) || "",
       tags: (parsed.data.tags as string[]) || [],
-      vertical: (parsed.data.vertical as string) || "general",
+      vertical: check.vertical,
       author: (parsed.data.author as string) || prData.user?.login || "unknown",
+      authorUsername: typeof parsed.data.authorUsername === "string" ? parsed.data.authorUsername : "",
+      headSha: prData.head.sha,
       pullNumber,
     };
   }
@@ -504,6 +596,8 @@ export interface ApproveAndMergeOptions {
   targetVertical: string;
   authorRole: string;
   deputyUsernames?: string[];
+  /** authorUsername from the article frontmatter (excluded from approving). */
+  articleAuthorUsername?: string;
 }
 
 export async function approveAndMergePR(
@@ -527,99 +621,88 @@ export async function approveAndMergePR(
       pull_number: pullNumber,
     });
     const headBranch = prData.head.ref;
+    const headSha = prData.head.sha;
     const prAuthor = (prData.user?.login || "author").toLowerCase();
     const cleanReviewer = reviewerUsername.toLowerCase();
+    const fail = (message: string) => ({ success: false, merged: false, message });
 
-    // STRICT GOVERNANCE CHECK: Authors can NEVER approve their own articles under any role
-    if (prAuthor === cleanReviewer) {
-      return {
-        success: false,
-        merged: false,
-        message: "Self-approval is forbidden. An author cannot approve their own pull request.",
-      };
+    if (prData.state !== "open") return fail("This pull request is not open.");
+    if (prData.base.ref !== MAIN_BRANCH) return fail(`Only PRs targeting '${MAIN_BRANCH}' can be merged here.`);
+
+    // 2. The PR may only contain one article (in the vertical being reviewed) plus uploads
+    const files = await octokit.paginate(octokit.pulls.listFiles, {
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      pull_number: pullNumber,
+      per_page: 100,
+    });
+    const fileCheck = validateArticlePRFiles(files.map((f) => f.filename));
+    if (!fileCheck.ok) return fail(fileCheck.error);
+    if (fileCheck.vertical !== options.targetVertical) {
+      return fail(
+        `Article location '${fileCheck.vertical}' does not match the reviewed vertical '${options.targetVertical}'.`
+      );
     }
 
-    // 2. Submit approving review for this reviewer
+    // 3. STRICT anti-self-review: PR opener, frontmatter author and every commit author are excluded
+    const commits = await octokit.paginate(octokit.pulls.listCommits, {
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      pull_number: pullNumber,
+      per_page: 100,
+    });
+    const contributors = new Set<string>([prAuthor]);
+    for (const c of commits) {
+      const login = c.author?.login?.toLowerCase();
+      if (login) contributors.add(login);
+    }
+    if (options.articleAuthorUsername) contributors.add(options.articleAuthorUsername.toLowerCase());
+    if (contributors.has(cleanReviewer)) {
+      return fail("Self-approval is forbidden. You authored or edited this article, so you cannot approve it.");
+    }
+
+    // 4. Authority check BEFORE recording any GitHub review
+    const decision = evaluateReviewerAuthority(reviewerRole as EditorialRole, authorRole as EditorialRole);
+    if (decision !== "merge" && decision !== "count-deputies") return fail(decision);
+
+    // 5. Record the approval pinned to the reviewed commit
     try {
       await octokit.pulls.createReview({
         owner: REPO_OWNER,
         repo: REPO_NAME,
         pull_number: pullNumber,
+        commit_id: headSha,
         event: "APPROVE",
         body: `Approved by @${reviewerUsername} (${reviewerRole}) via SSN Coding Club CMS Studio`,
       });
     } catch {
-      // Continue to evaluation
+      // Quorum below uses our own count of reviews on this exact commit
     }
 
-    // 3. Evaluate Quorum Requirements:
-    // If author is Member:
-    //   - Requires 2 Deputy approvals OR 1 Vertical Head OR 1 Superadmin
-    let isQuorumReached = false;
-
-    if (reviewerRole === "superadmin" || reviewerRole === "vertical_head") {
-      isQuorumReached = true;
-    } else if (reviewerRole === "deputy") {
-      if (authorRole === "member") {
-        // Fetch all current reviews on PR and compute latest state per reviewer
-        const { data: allReviews } = await octokit.pulls.listReviews({
-          owner: REPO_OWNER,
-          repo: REPO_NAME,
-          pull_number: pullNumber,
-        });
-
-        // Compute latest state per distinct user (excluding the PR author)
-        const latestReviewByUser = new Map<string, string>();
-        for (const r of allReviews) {
-          const u = r.user?.login?.toLowerCase();
-          if (u && u !== prAuthor) {
-            latestReviewByUser.set(u, r.state);
-          }
-        }
-
-        // Include current reviewer's approval
-        latestReviewByUser.set(cleanReviewer, "APPROVED");
-
-        // Filter valid approvers: latest state must be strictly APPROVED
-        const validApprovers = Array.from(latestReviewByUser.entries())
-          .filter(([, state]) => state === "APPROVED")
-          .map(([user]) => user);
-
-        const deputyApproverCount = validApprovers.filter((u) =>
-          deputyUsernames.map((d) => d.toLowerCase()).includes(u)
-        ).length;
-
-        if (deputyApproverCount >= 2) {
-          isQuorumReached = true;
-        } else {
-          return {
-            success: true,
-            merged: false,
-            message: `Deputy approval recorded! (${deputyApproverCount}/2 Deputy Approvals). Awaiting second Deputy or Vertical Head approval.`,
-          };
-        }
-      } else {
+    if (decision === "count-deputies") {
+      const reviews = await octokit.paginate(octokit.pulls.listReviews, {
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        pull_number: pullNumber,
+        per_page: 100,
+      });
+      const withCurrent = [...reviews, { user: { login: cleanReviewer }, state: "APPROVED", commit_id: headSha }];
+      const deputyApproverCount = countDeputyApprovals(withCurrent, headSha, deputyUsernames, [...contributors]);
+      if (deputyApproverCount < 2) {
         return {
-          success: false,
+          success: true,
           merged: false,
-          message: `Articles by ${authorRole}s must be approved by the Vertical Head or a Superadmin.`,
+          message: `Deputy approval recorded! (${deputyApproverCount}/2 Deputy Approvals on the latest revision). Awaiting second Deputy or Vertical Head approval.`,
         };
       }
     }
 
-    if (!isQuorumReached) {
-      return {
-        success: false,
-        merged: false,
-        message: "Approval quorum not met.",
-      };
-    }
-
-    // 4. Merge PR with Crystal-Clear Commit Provenance in git log
+    // 6. Merge exactly the reviewed commit (GitHub rejects if the author pushed after review)
     const { data: mergeResult } = await octokit.pulls.merge({
       owner: REPO_OWNER,
       repo: REPO_NAME,
       pull_number: pullNumber,
+      sha: headSha,
       merge_method: "squash",
       commit_title: `${prData.title} (#${pullNumber})`,
       commit_message: `Authored-by: @${prAuthor} <${prAuthor}@users.noreply.github.com>\nApproved-by: @${reviewerUsername} <${reviewerUsername}@users.noreply.github.com> (${reviewerRole})`,
@@ -1032,17 +1115,18 @@ export async function getPersonalDraftBranch(token: string, branchName: string) 
       ref: branchName,
     });
 
-    const treeSha = commit.commit.tree.sha;
-    const { data: tree } = await octokit.git.getTree({
+    // The branch is cut from main, so its tree contains every published post. Only the article
+    // this branch actually changed is the draft.
+    const { data: comparison } = await octokit.repos.compareCommits({
       owner: REPO_OWNER,
       repo: REPO_NAME,
-      tree_sha: treeSha,
-      recursive: "true",
+      base: MAIN_BRANCH,
+      head: commit.sha,
     });
-
-    const postFile = tree.tree.find(
-      (item) => item.path && item.path.startsWith("content/") && item.path.endsWith(".md")
+    const changed = (comparison.files || []).filter(
+      (f) => f.status !== "removed" && /^content\/.+\/posts\/[a-z0-9-]+\.md$/.test(f.filename)
     );
+    const postFile = changed.length > 0 ? { path: changed[changed.length - 1].filename, sha: changed[changed.length - 1].sha } : null;
 
     if (!postFile || !postFile.sha) {
       throw new Error("No article file found in draft branch");

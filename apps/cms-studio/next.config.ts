@@ -12,10 +12,6 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: "/legacy-admin",
-        destination: "/admin/index.html",
-      },
-      {
         source: "/uploads/:path*",
         destination:
           "https://raw.githubusercontent.com/blackscythe123/CC-Website-2026/main/apps/main-portal/public/uploads/:path*",

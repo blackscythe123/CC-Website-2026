@@ -5,8 +5,9 @@ import {
   rejectPR,
   getPRDetails,
   getPRArticleContent,
+  roleInVertical,
 } from "@/lib/github";
-import { getUserRoleInfo, canUserApproveVertical, readRoles } from "@/lib/roles";
+import { getUserRoleInfo, canUserApproveVertical, getLiveClubRoles } from "@/lib/roles";
 import { getSessionToken } from "@/lib/session";
 
 export async function GET(request: NextRequest) {
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const roleInfo = getUserRoleInfo(userData.login);
+    const roleInfo = getUserRoleInfo(userData.login, await getLiveClubRoles());
 
     const { searchParams } = new URL(request.url);
     const previewPullNumber = searchParams.get("previewPullNumber");
@@ -84,7 +85,9 @@ export async function POST(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const reviewerRoleInfo = getUserRoleInfo(userData.login);
+    // Authorization must use live roles.json from main, never the build-time copy or a stale cache
+    const allRoles = await getLiveClubRoles(true);
+    const reviewerRoleInfo = getUserRoleInfo(userData.login, allRoles);
     const body = await request.json();
     const { pullNumber, action = "approve", reason } = body;
 
@@ -106,29 +109,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Determine true vertical from PR article content to prevent PR title vertical spoofing
-    let actualVertical = "general";
+    // Determine the true vertical from the article file location (fail closed: no title/branch fallback)
+    let actualVertical: string;
+    let articleAuthorUsername = "";
     try {
       const article = await getPRArticleContent(token, pullNumber);
-      if (article.vertical) {
-        actualVertical = article.vertical.toLowerCase();
-      }
-    } catch {
-      // Fallback to title/branch parsing if content retrieval is unavailable
-      const titleMatch =
-        prData.title.match(/\[(?:Draft:\s*)?([a-zA-Z0-9_-]+)\]/i) ||
-        prData.title.match(/feat\(([a-zA-Z0-9_-]+)\)/i);
-      const branchMatch = prData.head.ref.match(/^(?:draft|cms)\/([a-zA-Z0-9_-]+)\//i);
-
-      if (titleMatch && titleMatch[1]) {
-        actualVertical = titleMatch[1].toLowerCase();
-      } else if (branchMatch && branchMatch[1]) {
-        actualVertical = branchMatch[1].toLowerCase();
-      }
+      actualVertical = article.vertical.toLowerCase();
+      articleAuthorUsername = article.authorUsername || "";
+    } catch (articleErr) {
+      const msg = articleErr instanceof Error ? articleErr.message : "Could not read the article in this PR.";
+      return NextResponse.json({ error: `Cannot review this PR: ${msg}` }, { status: 400 });
     }
 
     // Verify reviewer authority
-    if (!canUserApproveVertical(userData.login, actualVertical)) {
+    if (!canUserApproveVertical(userData.login, actualVertical, allRoles)) {
       return NextResponse.json(
         {
           error: `Access Denied: You are not authorized to review articles for '${actualVertical}'. Only designated Vertical Heads, Deputies, or Superadmins can review.`,
@@ -158,18 +152,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Handling Approval (Multi-Deputy Quorum check)
-    const authorRoleInfo = getUserRoleInfo(authorUsername);
-    const allRoles = readRoles();
+    const authorRoleInfo = getUserRoleInfo(authorUsername, allRoles);
     const deputiesInVertical = allRoles.deputies[actualVertical] || [];
 
     const result = await approveAndMergePR({
       token,
       pullNumber,
       reviewerUsername: userData.login,
-      reviewerRole: reviewerRoleInfo.role,
+      reviewerRole: roleInVertical(reviewerRoleInfo, actualVertical),
       targetVertical: actualVertical,
-      authorRole: authorRoleInfo.role,
+      authorRole: roleInVertical(authorRoleInfo, actualVertical),
       deputyUsernames: deputiesInVertical,
+      articleAuthorUsername,
     });
 
     if (!result.success) {

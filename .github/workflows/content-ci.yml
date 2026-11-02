@@ -5,6 +5,12 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      deploy_all:
+        description: "Deploy every app to production, ignoring the change diff"
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -42,3 +48,88 @@ jobs:
         run: pnpm run build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
+
+  # ---------------------------------------------------------------------------
+  # CD: Vercel Git auto-deploys are disabled (apps/*/vercel.json). Production
+  # deploys happen here, only for apps whose files changed since the last fully
+  # successful deploy run, so one push no longer creates 10 Vercel deployments.
+  # Required: repo secret VERCEL_TOKEN. Optional: repo variable VERCEL_SCOPE.
+  # ---------------------------------------------------------------------------
+  detect-changed-apps:
+    name: "Detect Apps To Deploy"
+    needs: validate-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      apps: ${{ steps.detect.outputs.apps }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: "Find last successful deploy commit"
+        id: base
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Diff against the last fully successful run (not just the previous push),
+          # so an app whose deploy failed is retried on the next run.
+          sha=$(gh api "repos/${{ github.repository }}/actions/workflows/content-ci.yml/runs?branch=main&status=success&per_page=20"             --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")][0].head_sha // ""')
+          echo "Last successful deploy run commit: ${sha:-<none>}"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: "Compute changed apps"
+        id: detect
+        run: |
+          if [ "${{ inputs.deploy_all }}" = "true" ]; then
+            node scripts/detect-changed-apps.mjs "" "${{ github.sha }}" --all
+          else
+            node scripts/detect-changed-apps.mjs "${{ steps.base.outputs.sha }}" "${{ github.sha }}"
+          fi
+
+  deploy:
+    name: "Deploy ${{ matrix.app }}"
+    needs: detect-changed-apps
+    if: needs.detect-changed-apps.outputs.apps != '[]' && needs.detect-changed-apps.outputs.apps != ''
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(needs.detect-changed-apps.outputs.apps) }}
+    concurrency:
+      group: vercel-deploy-${{ matrix.app }}
+      cancel-in-progress: false
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_SCOPE: ${{ vars.VERCEL_SCOPE || 'team_GL82yxgeC9KMT665pOBeoAhx' }}
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: pnpm/action-setup@v4
+
+      - name: "Install Vercel CLI"
+        run: npm install --global vercel@latest
+
+      - name: "Link Vercel project cc-${{ matrix.app }}"
+        run: vercel link --yes --project "cc-${{ matrix.app }}" --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN"
+
+      - name: "Pull production settings and env"
+        run: vercel pull --yes --environment=production --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN"
+
+      - name: "Build"
+        run: vercel build --prod --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN"
+
+      - name: "Deploy to production"
+        run: vercel deploy --prebuilt --prod --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN"

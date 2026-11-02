@@ -94,45 +94,51 @@ export async function getLiveClubRoles(forceFresh = false): Promise<ClubRoles> {
     return inMemoryRoles;
   }
 
-  // 1. Attempt unauthenticated public fetch directly from raw GitHub
-  const rawUrl = "https://raw.githubusercontent.com/blackscythe123/CC-Website-2026/main/content/club/roles.json";
-  try {
-    const publicRes = await fetch(rawUrl, {
-      cache: "no-store",
-      headers: { "User-Agent": "coding-club-cms-studio" },
-    });
+  // 1. Live read through the GitHub Contents API. Unlike raw.githubusercontent.com (CDN-cached
+  //    for ~5 minutes), this returns the current file on main, so role removals apply immediately.
+  //    Uses the server PAT when configured; otherwise an unauthenticated call (60 requests/hour per IP).
+  const contentsUrl =
+    "https://api.github.com/repos/blackscythe123/CC-Website-2026/contents/content/club/roles.json?ref=main";
+  const pat = process.env.GITHUB_ADMIN_TOKEN || process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
+  const apiAttempts: Record<string, string>[] = [];
+  if (pat) apiAttempts.push({ Authorization: `Bearer ${pat}` });
+  apiAttempts.push({});
 
-    if (publicRes.ok) {
-      const data = await publicRes.json();
-      const normalized = normalizeClubRoles(data);
-      setCachedRoles(normalized);
-      return normalized;
-    }
-  } catch (publicErr) {
-    console.warn("Public raw fetch failed, trying authenticated fallback:", publicErr);
-  }
-
-  // 2. Fallback: Authenticated fetch using GITHUB_ADMIN_TOKEN (e.g. if repo is private or rate-limited)
-  const adminToken = process.env.GITHUB_ADMIN_TOKEN;
-  if (adminToken) {
+  for (const authHeader of apiAttempts) {
     try {
-      const authRes = await fetch(rawUrl, {
+      const res = await fetch(contentsUrl, {
         cache: "no-store",
         headers: {
-          Authorization: `token ${adminToken}`,
+          Accept: "application/vnd.github.raw+json",
+          "X-GitHub-Api-Version": "2022-11-28",
           "User-Agent": "coding-club-cms-studio",
+          ...authHeader,
         },
       });
-
-      if (authRes.ok) {
-        const data = await authRes.json();
-        const normalized = normalizeClubRoles(data);
+      if (res.ok) {
+        const normalized = normalizeClubRoles(await res.json());
         setCachedRoles(normalized);
         return normalized;
       }
-    } catch (authErr) {
-      console.warn("Authenticated GitHub fetch failed:", authErr);
+      console.warn(`GitHub Contents API roles fetch failed (${res.status})${authHeader.Authorization ? " with PAT" : ""}.`);
+    } catch (apiErr) {
+      console.warn("GitHub Contents API roles fetch errored:", apiErr);
     }
+  }
+
+  // 2. Last-resort network fallback: raw CDN copy (may lag main by a few minutes).
+  try {
+    const rawRes = await fetch(
+      "https://raw.githubusercontent.com/blackscythe123/CC-Website-2026/main/content/club/roles.json",
+      { cache: "no-store", headers: { "User-Agent": "coding-club-cms-studio" } }
+    );
+    if (rawRes.ok) {
+      const normalized = normalizeClubRoles(await rawRes.json());
+      setCachedRoles(normalized);
+      return normalized;
+    }
+  } catch (rawErr) {
+    console.warn("Raw GitHub roles fetch failed:", rawErr);
   }
 
   // Fallback to local file read
@@ -243,8 +249,12 @@ export async function getLiveUserRoleInfo(
   return getUserRoleInfo(username, roles);
 }
 
-export function canUserApproveVertical(username: string, vertical: string): boolean {
-  const roles = readRoles();
+export function canUserApproveVertical(
+  username: string,
+  vertical: string,
+  rolesOverride?: ClubRoles
+): boolean {
+  const roles = rolesOverride || readRoles();
   const normalized = username.toLowerCase().trim();
   if (roles.superadmins.some((u) => u.toLowerCase() === normalized)) return true;
 
@@ -253,8 +263,12 @@ export function canUserApproveVertical(username: string, vertical: string): bool
   return Boolean(isHead || isDep);
 }
 
-export function canDeletePost(username: string, vertical: string): boolean {
-  const roles = readRoles();
+export function canDeletePost(
+  username: string,
+  vertical: string,
+  rolesOverride?: ClubRoles
+): boolean {
+  const roles = rolesOverride || readRoles();
   const normalized = username.toLowerCase().trim();
   if (roles.superadmins.some((u) => u.toLowerCase() === normalized)) return true;
 
@@ -265,9 +279,10 @@ export function canDeletePost(username: string, vertical: string): boolean {
 export function canApproveRoleRequest(
   reviewerUsername: string,
   requestedRole: "member" | "deputy" | "vertical_head",
-  vertical: string
+  vertical: string,
+  rolesOverride?: ClubRoles
 ): boolean {
-  const roles = readRoles();
+  const roles = rolesOverride || readRoles();
   const normalized = reviewerUsername.toLowerCase().trim();
   if (roles.superadmins.some((u) => u.toLowerCase() === normalized)) return true;
 
@@ -290,6 +305,63 @@ export function canApproveRoleRequest(
   }
 
   return false;
+}
+
+const ROLE_RANK: Record<string, number> = { member: 1, deputy: 2, vertical_head: 3, superadmin: 4 };
+
+function rankIn(info: UserRoleInfo, vertical?: string): number {
+  if (info.role === "superadmin") return ROLE_RANK.superadmin;
+  if (!vertical) return 0;
+  return ROLE_RANK[info.rolesByVertical?.[vertical] || ""] || 0;
+}
+
+/**
+ * Server-side governance for assigning/removing roles. Returns an error message, or null if allowed.
+ * Authority is evaluated per vertical (never from the actor's highest role elsewhere), and a
+ * non-superadmin can only act on users ranked strictly below them in that vertical.
+ */
+export function checkRoleChangeAllowed(
+  roles: ClubRoles,
+  actorUsername: string,
+  targetUsername: string,
+  action: "assign" | "remove",
+  role: UserRoleType,
+  vertical?: string
+): string | null {
+  const actor = getUserRoleInfo(actorUsername, roles);
+  const target = getUserRoleInfo(targetUsername, roles);
+  const actorIsSuper = actor.role === "superadmin";
+
+  if (role === "superadmin" || role === "vertical_head") {
+    if (!actorIsSuper) {
+      return role === "superadmin"
+        ? "Only existing Superadmins can allocate the Super Admin role."
+        : "Only Superadmins can appoint or remove a Vertical Head.";
+    }
+  } else {
+    const required = role === "deputy" ? ROLE_RANK.vertical_head : ROLE_RANK.deputy;
+    if (rankIn(actor, vertical) < required) {
+      return role === "deputy"
+        ? `Only the Vertical Head of '${vertical}' or a Superadmin can manage Deputies there.`
+        : `Only Deputies or the Vertical Head of '${vertical}', or a Superadmin, can manage members there.`;
+    }
+  }
+
+  if (!actorIsSuper) {
+    const targetRank = target.role === "superadmin" ? ROLE_RANK.superadmin : rankIn(target, vertical);
+    if (targetRank >= rankIn(actor, vertical)) {
+      return "You cannot change the role of someone at or above your own rank in this vertical.";
+    }
+  }
+
+  if (role === "superadmin" && action === "remove") {
+    const remaining = roles.superadmins.filter(
+      (u) => u.toLowerCase() !== targetUsername.toLowerCase().trim().replace(/^@/, "")
+    );
+    if (remaining.length === 0) return "Cannot remove the last Superadmin.";
+  }
+
+  return null;
 }
 
 export function assignRole(
@@ -448,9 +520,6 @@ export async function writeRolesAndSyncCodeowners(
     codeownersContent += `content/verticals/${vertical}/** ${reviewers}\n`;
   }
 
-  // 0. Update in-memory cache immediately for real-time reads
-  setCachedRoles(roles);
-
   // 1. Try local write if filesystem is writable
   try {
     const rolesPath = getRolesFilePath();
@@ -585,4 +654,7 @@ export async function writeRolesAndSyncCodeowners(
       throw gitErr;
     }
   }
+
+  // Only cache after the write succeeded, so a failed commit never grants uncommitted roles
+  setCachedRoles(roles);
 }

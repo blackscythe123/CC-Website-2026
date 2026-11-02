@@ -8,6 +8,7 @@ import {
   getUserRoleInfo,
   assignRole,
   removeRole,
+  checkRoleChangeAllowed,
   ALL_VERTICAL_SLUGS,
   GITHUB_USERNAME_REGEX,
 } from "@/lib/roles";
@@ -188,46 +189,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Role Allocation Governance Check:
-    if (role === "superadmin") {
-      if (roleInfo.role !== "superadmin") {
-        return NextResponse.json(
-          { error: "Only existing Superadmins can allocate the Super Admin role." },
-          { status: 403 }
-        );
-      }
-    } else if (role === "vertical_head") {
-      if (roleInfo.role !== "superadmin") {
-        return NextResponse.json(
-          { error: "Only Superadmins can appoint a Vertical Head." },
-          { status: 403 }
-        );
-      }
-    } else if (role === "deputy") {
-      const isAuthorized =
-        roleInfo.role === "superadmin" ||
-        (roleInfo.role === "vertical_head" && vertical && roleInfo.verticals.includes(vertical));
-      if (!isAuthorized) {
-        return NextResponse.json(
-          { error: `Only the Vertical Head or a Superadmin can assign Deputies for '${vertical}'.` },
-          { status: 403 }
-        );
-      }
-    } else if (role === "member") {
-      const isAuthorized =
-        roleInfo.role === "superadmin" ||
-        ((roleInfo.role === "vertical_head" || roleInfo.role === "deputy") &&
-          vertical &&
-          roleInfo.verticals.includes(vertical));
-      if (!isAuthorized) {
-        return NextResponse.json(
-          { error: `Only Deputies, Vertical Heads, or Superadmins can manage members for '${vertical}'.` },
-          { status: 403 }
-        );
-      }
-    }
-
+    // Role Allocation Governance Check (per-vertical authority + target rank), on fresh roles
     let roles = await getLiveClubRoles(true);
+    const governanceError = checkRoleChangeAllowed(roles, userData.login, cleanUsername, action, role, vertical);
+    if (governanceError) {
+      return NextResponse.json({ error: governanceError }, { status: 403 });
+    }
 
     if (action === "assign") {
       roles = assignRole(roles, cleanUsername, role, vertical);

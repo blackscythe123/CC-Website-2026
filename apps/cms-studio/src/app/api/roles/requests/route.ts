@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Also include any legacy requests from roles.json
-    const roles = readRoles();
+    const roles = await getLiveClubRoles();
     const legacyRequests: RoleRequest[] = roles.pending_requests || [];
     const allRequests: RoleRequest[] = [
       ...issueRequests,
@@ -148,7 +148,7 @@ export async function GET(request: NextRequest) {
       if (roleInfo.role === "superadmin") return true;
       if (req.username.toLowerCase() === userData.login.toLowerCase()) return true;
 
-      const userRoleInVert = roleInfo.rolesByVertical?.[req.vertical] || roleInfo.role;
+      const userRoleInVert = roleInfo.rolesByVertical?.[req.vertical];
       if (userRoleInVert === "superadmin") return true;
       if (userRoleInVert === "vertical_head") {
         return req.requestedRole === "member" || req.requestedRole === "deputy";
@@ -345,7 +345,7 @@ export async function PATCH(request: NextRequest) {
     const userData = await userRes.json();
     const reviewerRoleInfo = await getLiveUserRoleInfo(userData.login, true);
     const body = await request.json();
-    const { requestId, action, assignedRole } = body;
+    const { requestId, action, assignedRole, expectedRole, expectedVertical } = body;
 
     if (!requestId || !action || !["approve", "reject"].includes(action)) {
       return NextResponse.json(
@@ -365,7 +365,19 @@ export async function PATCH(request: NextRequest) {
           repo: REPO_NAME,
           issue_number: issueNumber,
         });
+        // Only genuine role-application issues can be evaluated here (never PRs or unrelated issues)
+        if (issue.pull_request || !/^\[Role Application\]/i.test(issue.title || "")) {
+          return NextResponse.json({ error: "This issue is not a role application." }, { status: 400 });
+        }
         targetReq = parseRoleRequestIssue(issue);
+        // TOCTOU guard: the applicant can edit the issue after the reviewer opened it.
+        // The reviewer must confirm the exact role and vertical they saw.
+        if (targetReq && (targetReq.requestedRole !== expectedRole || targetReq.vertical !== expectedVertical)) {
+          return NextResponse.json(
+            { error: "This application changed since you opened it. Refresh and review it again." },
+            { status: 409 }
+          );
+        }
       } catch (err) {
         console.warn("Could not fetch issue:", err);
       }
@@ -410,7 +422,8 @@ export async function PATCH(request: NextRequest) {
     const canEvaluate = canApproveRoleRequest(
       userData.login,
       targetReq.requestedRole,
-      targetReq.vertical
+      targetReq.vertical,
+      roles
     );
 
     if (!canEvaluate) {
@@ -447,7 +460,8 @@ export async function PATCH(request: NextRequest) {
       const canAssign = canApproveRoleRequest(
         userData.login,
         effectiveRole,
-        targetReq.vertical
+        targetReq.vertical,
+        roles
       );
 
       if (!canAssign) {

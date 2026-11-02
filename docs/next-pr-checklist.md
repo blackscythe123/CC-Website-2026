@@ -28,7 +28,7 @@ PR #17 has merged. This checklist includes the previously unpushed roadmap commi
 
 - [x] **Production navigation:** Main sticky notes and vertical links use the supplied Vercel deployments; vertical back links return to the production main portal, and CMS links use the production Studio.
 
-- [x] **Club roadmap:** Added the saved 3D Desk Railway to the main page between Blogs and People, with club-wide learning stops, topic details, continuation controls, and navbar/terminal access.
+- [x] **Club roadmap:** Added the saved 3D Desk Railway to the main page after People, with club-wide learning stops, topic details, continuation controls, and navbar/terminal access.
 
 ## Validation context
 

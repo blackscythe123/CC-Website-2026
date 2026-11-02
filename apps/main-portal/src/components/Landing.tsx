@@ -3,7 +3,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {ArrowDown,ArrowUpRight,Code2,BookOpen,Lightbulb,Users,Terminal} from 'lucide-react';
 
-const commands=[['verticals','explore our verticals','#ef2d86'],['events','view upcoming events','#f07939'],['blogs','read our latest blogs','#d1a22e'],['projects','check out our projects','#13866d'],['roadmap','our club journey','#8877a0'],['people','meet the team','#5847bd'],['join','find your people','#13866d'],['about','know more about us','#74468b']];
+const commands=[['verticals','explore our verticals','#ef2d86'],['events','view upcoming events','#f07939'],['blogs','read our latest blogs','#d1a22e'],['projects','check out our projects','#13866d'],['people','meet the team','#5847bd'],['roadmap','our club journey','#8877a0'],['join','find your people','#13866d'],['about','know more about us','#74468b']];
 const headline=['A community','for curious minds','who build._'];
 function TypeLine({value,delay=0,className=''}:{value:string,delay?:number,className?:string}){
  const [length,setLength]=useState(0);

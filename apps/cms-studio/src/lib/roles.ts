@@ -94,45 +94,51 @@ export async function getLiveClubRoles(forceFresh = false): Promise<ClubRoles> {
     return inMemoryRoles;
   }
 
-  // 1. Attempt unauthenticated public fetch directly from raw GitHub
-  const rawUrl = "https://raw.githubusercontent.com/blackscythe123/CC-Website-2026/main/content/club/roles.json";
-  try {
-    const publicRes = await fetch(rawUrl, {
-      cache: "no-store",
-      headers: { "User-Agent": "coding-club-cms-studio" },
-    });
+  // 1. Live read through the GitHub Contents API. Unlike raw.githubusercontent.com (CDN-cached
+  //    for ~5 minutes), this returns the current file on main, so role removals apply immediately.
+  //    Uses the server PAT when configured; otherwise an unauthenticated call (60 requests/hour per IP).
+  const contentsUrl =
+    "https://api.github.com/repos/blackscythe123/CC-Website-2026/contents/content/club/roles.json?ref=main";
+  const pat = process.env.GITHUB_ADMIN_TOKEN || process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
+  const apiAttempts: Record<string, string>[] = [];
+  if (pat) apiAttempts.push({ Authorization: `Bearer ${pat}` });
+  apiAttempts.push({});
 
-    if (publicRes.ok) {
-      const data = await publicRes.json();
-      const normalized = normalizeClubRoles(data);
-      setCachedRoles(normalized);
-      return normalized;
-    }
-  } catch (publicErr) {
-    console.warn("Public raw fetch failed, trying authenticated fallback:", publicErr);
-  }
-
-  // 2. Fallback: Authenticated fetch using GITHUB_ADMIN_TOKEN (e.g. if repo is private or rate-limited)
-  const adminToken = process.env.GITHUB_ADMIN_TOKEN;
-  if (adminToken) {
+  for (const authHeader of apiAttempts) {
     try {
-      const authRes = await fetch(rawUrl, {
+      const res = await fetch(contentsUrl, {
         cache: "no-store",
         headers: {
-          Authorization: `token ${adminToken}`,
+          Accept: "application/vnd.github.raw+json",
+          "X-GitHub-Api-Version": "2022-11-28",
           "User-Agent": "coding-club-cms-studio",
+          ...authHeader,
         },
       });
-
-      if (authRes.ok) {
-        const data = await authRes.json();
-        const normalized = normalizeClubRoles(data);
+      if (res.ok) {
+        const normalized = normalizeClubRoles(await res.json());
         setCachedRoles(normalized);
         return normalized;
       }
-    } catch (authErr) {
-      console.warn("Authenticated GitHub fetch failed:", authErr);
+      console.warn(`GitHub Contents API roles fetch failed (${res.status})${authHeader.Authorization ? " with PAT" : ""}.`);
+    } catch (apiErr) {
+      console.warn("GitHub Contents API roles fetch errored:", apiErr);
     }
+  }
+
+  // 2. Last-resort network fallback: raw CDN copy (may lag main by a few minutes).
+  try {
+    const rawRes = await fetch(
+      "https://raw.githubusercontent.com/blackscythe123/CC-Website-2026/main/content/club/roles.json",
+      { cache: "no-store", headers: { "User-Agent": "coding-club-cms-studio" } }
+    );
+    if (rawRes.ok) {
+      const normalized = normalizeClubRoles(await rawRes.json());
+      setCachedRoles(normalized);
+      return normalized;
+    }
+  } catch (rawErr) {
+    console.warn("Raw GitHub roles fetch failed:", rawErr);
   }
 
   // Fallback to local file read

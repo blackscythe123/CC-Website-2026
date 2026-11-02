@@ -24,7 +24,7 @@
     "./RoadmapLab": "./src/components/RoadmapLab.tsx"
   },
   "peerDependencies": {
-    "next": "^16.4.0",
+    "next": "^16.4.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

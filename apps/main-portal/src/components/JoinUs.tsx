@@ -53,7 +53,7 @@ export default function JoinUs(){
  const chosen=communityLinks.find(link=>link.id===selected);
  return <div className={styles.join}>
   <div className={styles.terminal}>ssn@codingclub:~$ <b>join us</b><span aria-hidden="true">▍</span></div>
-  <header className={styles.heading}><div><h1><em>//</em> <SectionHeadingText text="FIND YOUR PEOPLE"/></h1><p>Good ideas start with a connection.<br/>Find yours in the Coding Club.</p></div><div className={styles.brand}><img src="/branding/ssn-coding-club.png" alt="SSN Coding Club official logo"/><span>SSN CODING CLUB<br/><small>learn. build. together.</small></span></div></header>
+  <header className={styles.heading}><div><h1><em>//</em> <SectionHeadingText text="FIND YOUR PEOPLE"/></h1><p>Good ideas start with a connection.<br/>Find yours in the Coding Club.</p></div><div className={styles.brand}><img src="/branding/ssn-coding-club.png" loading="lazy" decoding="async" width="280" height="280" alt="SSN Coding Club official logo"/><span>SSN CODING CLUB<br/><small>learn. build. together.</small></span></div></header>
   <div className={styles.garden} ref={stage} onMouseLeave={()=>setSelected(null)}>
    <JellyFlowers paused={paused} progress={progress}/>
    {communityLinks.map((link,i)=>{

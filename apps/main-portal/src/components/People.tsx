@@ -9,7 +9,7 @@ function Photo({person,index,x,width,onStart,dragging}:{person:Member;index:numb
  const [failed,setFailed]=useState(false);
  return <article className="people-polaroid people-draggable" data-dragging={dragging} onPointerDown={e=>onStart(e,index)} style={{left:x,width, '--twist':`${[-3,2,-2,3,-1][index%5]}deg`} as React.CSSProperties} aria-label={`${person.name}, ${person.role}. Drag sideways along the string.`}>
  <span className="people-clip" aria-hidden="true"><i/><i/></span>
- <div className="people-photo">{!failed?<img src={person.photo} alt={`Placeholder portrait for ${person.name}`} draggable={false} loading="lazy" onError={()=>setFailed(true)}/>:<span className="people-fallback">{person.name.slice(0,1)}</span>}</div>
+ <div className="people-photo">{!failed?<img src={person.photo} alt={`Placeholder portrait for ${person.name}`} draggable={false} loading="lazy" decoding="async" onError={()=>setFailed(true)}/>:<span className="people-fallback">{person.name.slice(0,1)}</span>}</div>
  <div className="people-caption"><strong>{person.name}</strong><span>{person.role}</span></div></article>
 }
 function HangingPhotos({members,rowIndex}:{members:Member[];rowIndex:number}){

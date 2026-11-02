@@ -9,3 +9,19 @@ body:has(.roadmap-lab)>.ssn-global-navbar,body:has(.roadmap-lab) .ssn-global-nav
 @media(max-width:700px){.roadmap-integrated .journey-heading h1{font-size:28px;max-width:250px;margin:9px 0}.roadmap-integrated .journey-heading p{font-size:9px;max-width:225px}.roadmap-integrated .journey-heading>span{font-size:7px}.roadmap-integrated .journey-chapter{max-width:260px}.roadmap-integrated .journey-path-name{display:none}}
 
 .journey-vignette{background:linear-gradient(180deg,#f6ecd945,transparent 28%,transparent 76%,#f4e9d440)}.journey-stage canvas{filter:none!important;image-rendering:auto}
+
+/* Phone journeys fill the usable viewport without the desktop-length travel runway. */
+@media(max-width:700px){
+ .roadmap-integrated .journey-stage{height:calc(100dvh - var(--site-nav-height,100px))}
+ .roadmap-integrated .journey-scroll-distance{height:340svh}
+ .roadmap-integrated .journey-heading{top:61px;left:16px;right:16px}
+ .roadmap-integrated .journey-heading h1{font-size:25px;max-width:220px;margin:7px 0}
+ .roadmap-integrated .journey-heading p{display:none}
+ .roadmap-integrated .journey-chapter{left:14px;right:14px;bottom:59px;max-width:240px;padding:12px 14px;background:#fff6e8b8;backdrop-filter:blur(3px);box-shadow:0 5px 18px #594e2c12}
+ .roadmap-integrated .journey-chapter h2{font-size:21px;margin:8px 0}
+ .roadmap-integrated .journey-chapter p{font-size:10px;line-height:1.45;margin:6px 0 9px}
+ .roadmap-integrated .journey-chapter>button{font-size:10px;padding-top:9px;min-height:35px;align-items:center}
+ .roadmap-integrated .journey-chapter .journey-next-topic{margin-top:5px;padding-top:7px}
+ .roadmap-integrated .journey-scroll-choice{display:none}
+ .roadmap-integrated .journey-footer{padding:13px 14px;gap:10px;min-height:45px;box-sizing:border-box}
+}

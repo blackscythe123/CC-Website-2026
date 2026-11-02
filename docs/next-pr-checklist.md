@@ -1,6 +1,6 @@
-# Next PR checklist — changes after 730d808
+# Next PR checklist — changes after PR #17
 
-Prepared for the next PR. PR #17 remains unchanged; these changes are committed locally only.
+PR #17 has merged. This checklist includes the previously unpushed roadmap commit and the subsequent approved Scroll12 improvements. No new PR has been opened yet.
 
 ## Completed
 
@@ -14,8 +14,18 @@ Prepared for the next PR. PR #17 remains unchanged; these changes are committed 
 - [x] **WebGL clarity:** Track container size, render up to 2x pixel density, and reduce excessive fog/haze.
 - [x] **Responsive performance:** Added phone layouts and continuation controls, reduced-motion handling, and suspended offscreen 3D rendering.
 
+- [x] **Scroll assemblies:** Resources, leaderboard, and Hall of Fame assemble with scroll progress, hold fully assembled, and visibly reverse on exit from either direction; navbar clicks replay assembly.
+- [x] **Arrival continuity:** Preserve the completed Projects heading during the sticky-note preview-to-page handoff and mount its shadow content before paint.
+- [x] **Mobile Hall of Fame:** Preserve native frame proportions, align awards to phone shelves, and show team photos in separate uncropped cells.
+- [x] **Mobile resources:** Widen the cabinet, compact resource cards, and show two or three cards according to available phone height.
+- [x] **Mobile roadmaps:** Shorten the scroll journey, fill the usable viewport, and reduce the topic panel's size and opacity.
+- [x] **Blog stamps:** Remove the stray black rule overlapping vertical category labels throughout the site.
+- [x] **Home terminal:** Keep the plain prompt below the shortcut list, make it fit on phone and laptop, and align the content with the photographed laptop screen.
+- [x] **Image delivery:** Use high-quality WebP assets, responsive phone variants, lazy artwork loading, asynchronous decoding, and a prioritized home background.
+- [x] **Image resilience:** Retain original masters outside deployed assets, defer the shelf background, and show fallback borders if decorative artwork fails.
+
 ## Validation context
 
-Scroll12 production build passed. All eight technical sticky-note arrivals were sampled frame by frame without incorrect section jumps. Roadmap panels and continuation controls were checked in desktop and phone viewports; physical-phone performance is not yet verified.
+Scroll12 production build passed. Desktop and phone layouts, arrival continuity, reversible assemblies, and roadmap continuation were checked locally. A local proxy tested cold loading at 1.6 Mbps with 150ms added latency and disabled cache; a separate failure test returned HTTP 503 for decorative artwork. Phones selected smaller assets, and failed artwork retained readable names/photos without broken-image icons. Third-party portrait/font services were outside the proxy; physical-device and production-CDN performance are not confirmed.
 
-Repository checks: 10 shared-component tests passed, content validation passed for 20 files, and all app TypeScript checks passed. The production build stopped at the existing Next.js SecurityFatalError in the vertical portal template; a full production build is not confirmed. Recheck before opening the next PR. Current leaderboard scores and award records remain presentation data. Roadmap topic content is introductory authored content, not a complete curriculum or connected CMS resource collection.
+Repository component tests (10), content validation (20 files), and all app TypeScript checks passed. The current monorepo production build stopped at the existing Next.js SecurityFatalError in the vertical portal template; a complete repository production build is not confirmed. Recheck before opening the next PR. Leaderboard scores and award records remain presentation data; roadmap topics are introductory content rather than a connected curriculum/CMS collection.

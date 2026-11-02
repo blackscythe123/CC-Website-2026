@@ -24,9 +24,9 @@ export default function VerticalPortalHome({slug,publishedPosts=[],preview=false
   const stop=()=>{stopped=true};window.addEventListener('wheel',stop,{passive:true,once:true});window.addEventListener('pointerdown',stop,{once:true});window.addEventListener('touchstart',stop,{passive:true,once:true});
   return()=>{cancelAnimationFrame(frame);window.removeEventListener('wheel',stop);window.removeEventListener('pointerdown',stop);window.removeEventListener('touchstart',stop)};
  },[preview,slug]);
- if(preview)return <div className="ssn-scroll-site vertical-portal"><section id="preview-projects" className="ssn-scroll-panel" aria-label={`${content.category} projects preview`}><ProjectsIsolated projects={content.projects}/></section></div>;
+ if(preview)return <div className="ssn-scroll-site vertical-portal"><section id="preview-projects" className="ssn-scroll-panel" aria-label={`${content.category} projects preview`}><ProjectsIsolated projects={content.projects} settled/></section></div>;
  return <div className="ssn-scroll-site vertical-portal" data-vertical={slug}>
-  <section id="section-projects" className="ssn-scroll-panel" aria-label={`${content.category} projects`}><div className="vertical-project-surface"><ProjectsIsolated projects={content.projects}/></div></section>
+  <section id="section-projects" className="ssn-scroll-panel" aria-label={`${content.category} projects`}><div className="vertical-project-surface"><ProjectsIsolated projects={content.projects} settled={arrived}/></div></section>
   <section id="section-events" className="ssn-scroll-panel" aria-label={`${content.category} events`}><EventsBooks events={content.events}/></section>
   <section id="section-blogs" className="ssn-scroll-panel" aria-label={`${content.category} blogs`}><BlogsIsolated items={content.blogs}/>
    {publishedPosts.length>0&&<div className="vertical-published"><h2>Published articles</h2><div>{publishedPosts.map(post=><article key={post.slug}><p>{post.date} · {post.author}</p><a href={`/posts/${post.slug}`}>{post.title} ↗</a><p>{post.summary}</p></article>)}</div></div>}

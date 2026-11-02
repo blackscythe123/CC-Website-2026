@@ -2,7 +2,7 @@
 import Link from "next/link";
 import {usePathname} from "next/navigation";
 import {useEffect,useState} from "react";
-const pages=[['home','home'],['about','about'],['verticals','verticals'],['projects','projects'],['events','events'],['blogs','blogs'],['roadmap','roadmap'],['people','people'],['join','join us']];
+const pages=[['home','home'],['about','about'],['verticals','verticals'],['projects','projects'],['events','events'],['blogs','blogs'],['people','people'],['roadmap','roadmap'],['join','join us']];
 export default function SiteNavbar(){
  const path=usePathname();const [active,setActive]=useState('home');
  useEffect(()=>{

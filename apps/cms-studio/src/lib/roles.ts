@@ -307,6 +307,63 @@ export function canApproveRoleRequest(
   return false;
 }
 
+const ROLE_RANK: Record<string, number> = { member: 1, deputy: 2, vertical_head: 3, superadmin: 4 };
+
+function rankIn(info: UserRoleInfo, vertical?: string): number {
+  if (info.role === "superadmin") return ROLE_RANK.superadmin;
+  if (!vertical) return 0;
+  return ROLE_RANK[info.rolesByVertical?.[vertical] || ""] || 0;
+}
+
+/**
+ * Server-side governance for assigning/removing roles. Returns an error message, or null if allowed.
+ * Authority is evaluated per vertical (never from the actor's highest role elsewhere), and a
+ * non-superadmin can only act on users ranked strictly below them in that vertical.
+ */
+export function checkRoleChangeAllowed(
+  roles: ClubRoles,
+  actorUsername: string,
+  targetUsername: string,
+  action: "assign" | "remove",
+  role: UserRoleType,
+  vertical?: string
+): string | null {
+  const actor = getUserRoleInfo(actorUsername, roles);
+  const target = getUserRoleInfo(targetUsername, roles);
+  const actorIsSuper = actor.role === "superadmin";
+
+  if (role === "superadmin" || role === "vertical_head") {
+    if (!actorIsSuper) {
+      return role === "superadmin"
+        ? "Only existing Superadmins can allocate the Super Admin role."
+        : "Only Superadmins can appoint or remove a Vertical Head.";
+    }
+  } else {
+    const required = role === "deputy" ? ROLE_RANK.vertical_head : ROLE_RANK.deputy;
+    if (rankIn(actor, vertical) < required) {
+      return role === "deputy"
+        ? `Only the Vertical Head of '${vertical}' or a Superadmin can manage Deputies there.`
+        : `Only Deputies or the Vertical Head of '${vertical}', or a Superadmin, can manage members there.`;
+    }
+  }
+
+  if (!actorIsSuper) {
+    const targetRank = target.role === "superadmin" ? ROLE_RANK.superadmin : rankIn(target, vertical);
+    if (targetRank >= rankIn(actor, vertical)) {
+      return "You cannot change the role of someone at or above your own rank in this vertical.";
+    }
+  }
+
+  if (role === "superadmin" && action === "remove") {
+    const remaining = roles.superadmins.filter(
+      (u) => u.toLowerCase() !== targetUsername.toLowerCase().trim().replace(/^@/, "")
+    );
+    if (remaining.length === 0) return "Cannot remove the last Superadmin.";
+  }
+
+  return null;
+}
+
 export function assignRole(
   roles: ClubRoles,
   targetUsername: string,
@@ -463,9 +520,6 @@ export async function writeRolesAndSyncCodeowners(
     codeownersContent += `content/verticals/${vertical}/** ${reviewers}\n`;
   }
 
-  // 0. Update in-memory cache immediately for real-time reads
-  setCachedRoles(roles);
-
   // 1. Try local write if filesystem is writable
   try {
     const rolesPath = getRolesFilePath();
@@ -600,4 +654,7 @@ export async function writeRolesAndSyncCodeowners(
       throw gitErr;
     }
   }
+
+  // Only cache after the write succeeded, so a failed commit never grants uncommitted roles
+  setCachedRoles(roles);
 }

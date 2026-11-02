@@ -28,6 +28,8 @@ PR #17 has merged. This checklist includes the previously unpushed roadmap commi
 
 - [x] **Production navigation:** Main sticky notes and vertical links use the supplied Vercel deployments; vertical back links return to the production main portal, and CMS links use the production Studio.
 
+- [x] **Club roadmap:** Added the saved 3D Desk Railway to the main page between Blogs and People, with club-wide learning stops, topic details, continuation controls, and navbar/terminal access.
+
 ## Validation context
 
 Scroll12 production build passed. Desktop and phone layouts, arrival continuity, reversible assemblies, and roadmap continuation were checked locally. A local proxy tested cold loading at 1.6 Mbps with 150ms added latency and disabled cache; a separate failure test returned HTTP 503 for decorative artwork. Phones selected smaller assets, and failed artwork retained readable names/photos without broken-image icons. Third-party portrait/font services were outside the proxy; physical-device and production-CDN performance are not confirmed.

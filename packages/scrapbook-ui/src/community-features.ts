@@ -1,2 +1,2 @@
 export const baseTabs=['projects','events','blogs'];
-export function verticalTabs(slug:string){return [...baseTabs,...((slug==='competitive-programming'||slug==='cybersecurity')?(slug==='competitive-programming'?['leaderboard','resources','roadmap']:['leaderboard','resources']):slug==='ssnhacks'?['hall-of-fame']:slug==='ai-ml'?['resources','roadmap']:[])];}
+export function verticalTabs(slug:string){return [...baseTabs,...((slug==='ai-ml'||slug==='cybersecurity')?['dispatches']:[]),...((slug==='competitive-programming'||slug==='cybersecurity')?(slug==='competitive-programming'?['leaderboard','resources','roadmap']:['leaderboard','resources']):slug==='ssnhacks'?['hall-of-fame']:slug==='ai-ml'?['resources','roadmap']:[])];}

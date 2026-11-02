@@ -2,6 +2,7 @@
 import {useEffect,useLayoutEffect,useState} from 'react';
 import dynamic from 'next/dynamic';
 const RoadmapJourney=dynamic(()=>import('./RoadmapLab'),{ssr:false});
+import ClubBroadcast,{type BroadcastItem} from './ClubBroadcast';
 import {CodingLeaderboard,HallOfFame,ResourceRoom} from './CommunityExtras';
 import {verticalTabs} from '../community-features';
 import useSectionEntrances from './useSectionEntrances';
@@ -11,7 +12,7 @@ import BlogsIsolated from './BlogsIsolated';
 import {getVerticalContent,type VerticalSlug} from '../vertical-content';
 let initialNavigationHandled=false;
 type PublishedPost={slug:string;title:string;summary:string;date:string;author:string};
-export default function VerticalPortalHome({slug,publishedPosts=[],preview=false}:{slug:VerticalSlug;publishedPosts?:PublishedPost[];preview?:boolean}){
+export default function VerticalPortalHome({slug,publishedPosts=[],broadcastItems=[],preview=false}:{slug:VerticalSlug;publishedPosts?:PublishedPost[];broadcastItems?:BroadcastItem[];preview?:boolean}){
  const [arrived]=useState(()=>{if(preview||typeof window==='undefined')return false;if(new URLSearchParams(location.search).get('from')==='sticky-note')return true;try{const saved=JSON.parse(sessionStorage.getItem('ssn:vertical-arrival')||'null');return saved?.slug===slug&&Date.now()-saved.at<10000}catch{return false}});
  const [motionReady,setMotionReady]=useState(!arrived);
  useSectionEntrances(!preview&&motionReady);
@@ -31,6 +32,7 @@ export default function VerticalPortalHome({slug,publishedPosts=[],preview=false
   <section id="section-blogs" className="ssn-scroll-panel" aria-label={`${content.category} blogs`}><BlogsIsolated items={content.blogs}/>
    {publishedPosts.length>0&&<div className="vertical-published"><h2>Published articles</h2><div>{publishedPosts.map(post=><article key={post.slug}><p>{post.date} · {post.author}</p><a href={`/posts/${post.slug}`}>{post.title} ↗</a><p>{post.summary}</p></article>)}</div></div>}
   </section>
+  {(slug==='ai-ml'||slug==='cybersecurity')&&<ClubBroadcast items={broadcastItems}/>}
   {(slug==='competitive-programming'||slug==='cybersecurity')&&<CodingLeaderboard vertical={slug==='cybersecurity'?'Cybersecurity':'CP'}/>}
   {slug==='ssnhacks'&&<HallOfFame/>}
   {(slug==='competitive-programming'||slug==='ai-ml'||slug==='cybersecurity')&&<ResourceRoom vertical={slug==='ai-ml'?'AI / ML':slug==='cybersecurity'?'Cybersecurity':'CP'} blogs={content.blogs}/>}

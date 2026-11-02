@@ -2,7 +2,17 @@
 const DB_NAME = "CodingClubCMS";
 const DB_VERSION = 1;
 const STORE_NAME = "canvas_drafts";
-const DRAFT_KEY = "active_draft";
+/** Pre-namespacing key shared by every user of this browser. Migrated once to the first signed-in user. */
+export const LEGACY_DRAFT_KEY = "active_draft";
+
+/** IndexedDB key for a user's draft. Logins are case-insensitive on GitHub. */
+export function draftKeyFor(login: string): string {
+  return `active_draft:${login.trim().toLowerCase()}`;
+}
+
+// Logins that signed out during this page's lifetime: late autosaves / unload flushes must not
+// write their draft back after sign-out cleared it.
+const signedOutLogins = new Set<string>();
 
 export interface PendingDraftImage {
   filename: string;
@@ -61,7 +71,12 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-export async function saveLocalDraft(draft: Omit<StoredDraft, "updatedAt">): Promise<void> {
+function usableLogin(login: string | null | undefined): login is string {
+  return typeof login === "string" && login.trim().length > 0;
+}
+
+export async function saveLocalDraft(login: string | null | undefined, draft: Omit<StoredDraft, "updatedAt">): Promise<void> {
+  if (!usableLogin(login) || signedOutLogins.has(draftKeyFor(login))) return;
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -71,7 +86,7 @@ export async function saveLocalDraft(draft: Omit<StoredDraft, "updatedAt">): Pro
         ...draft,
         updatedAt: Date.now(),
       };
-      const req = store.put(dataToSave, DRAFT_KEY);
+      const req = store.put(dataToSave, draftKeyFor(login));
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
@@ -80,15 +95,31 @@ export async function saveLocalDraft(draft: Omit<StoredDraft, "updatedAt">): Pro
   }
 }
 
-export async function getLocalDraft(): Promise<StoredDraft | null> {
+/**
+ * Reads this user's draft. If none exists but a pre-namespacing `active_draft` does, it is moved
+ * (once, in one transaction) to this user's key so the work isn't lost.
+ */
+export async function getLocalDraft(login: string | null | undefined): Promise<StoredDraft | null> {
+  if (!usableLogin(login)) return null;
+  const key = draftKeyFor(login);
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, "readonly");
+      const tx = db.transaction(STORE_NAME, "readwrite");
       const store = tx.objectStore(STORE_NAME);
-      const req = store.get(DRAFT_KEY);
-      req.onsuccess = () => resolve(req.result || null);
+      const req = store.get(key);
       req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        if (req.result) return resolve(req.result as StoredDraft);
+        // The pre-namespacing shared key can't be attributed to any user (on a shared lab PC it may
+        // belong to someone else), so it is discarded rather than handed to whoever signs in first.
+        try {
+          store.delete(LEGACY_DRAFT_KEY);
+        } catch {
+          // best-effort cleanup
+        }
+        resolve(null);
+      };
     });
   } catch (err) {
     console.warn("Failed to retrieve draft from IndexedDB:", err);
@@ -96,17 +127,42 @@ export async function getLocalDraft(): Promise<StoredDraft | null> {
   }
 }
 
-export async function clearLocalDraft(): Promise<void> {
+/**
+ * Removes this user's draft. With `onlyIfUpdatedAt`, removes it only if it is still that exact
+ * snapshot (so discarding an offered recovery never deletes something newer).
+ */
+export async function clearLocalDraft(login: string | null | undefined, opts: { onlyIfUpdatedAt?: number } = {}): Promise<void> {
+  if (!usableLogin(login)) return;
+  const key = draftKeyFor(login);
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, "readwrite");
       const store = tx.objectStore(STORE_NAME);
-      const req = store.delete(DRAFT_KEY);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+      if (opts.onlyIfUpdatedAt === undefined) {
+        const req = store.delete(key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+        return;
+      }
+      const get = store.get(key);
+      get.onerror = () => reject(get.error);
+      get.onsuccess = () => {
+        const current = get.result as StoredDraft | undefined;
+        if (!current || current.updatedAt !== opts.onlyIfUpdatedAt) return resolve();
+        const req = store.delete(key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      };
     });
   } catch (err) {
     console.warn("Failed to clear draft in IndexedDB:", err);
   }
+}
+
+/** On sign-out: delete this user's local draft and block any further writes for it on this page. */
+export async function clearLocalDraftOnSignOut(login: string | null | undefined): Promise<void> {
+  if (!usableLogin(login)) return;
+  signedOutLogins.add(draftKeyFor(login));
+  await clearLocalDraft(login);
 }

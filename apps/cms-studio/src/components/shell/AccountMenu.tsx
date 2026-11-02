@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { CircleAlert, Clock, LogOut, SquareCheck } from "lucide-react";
 import { Avatar, Menu } from "@/components/ui";
 import ThemeSwitch from "@/components/theme/ThemeSwitch";
+import { clearLocalDraftOnSignOut } from "@/lib/draftStorage";
 import type { UserProfile } from "@/lib/hooks/useStudioSession";
 import type { InboxItem } from "@/lib/hooks/useReviewQueue";
 import type { UserRoleInfo } from "@/lib/roles";
@@ -49,6 +50,12 @@ export default function AccountMenu({
   const router = useRouter();
 
   const signOut = async () => {
+    // Don't leave this user's unsaved draft on a shared browser.
+    try {
+      await clearLocalDraftOnSignOut(user.login);
+    } catch {
+      // ignore
+    }
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } catch {

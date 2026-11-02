@@ -109,7 +109,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Anti-IDOR: a branch may only be reused through a verified PR; never trust a bare client branch name
+    if (existingBranch && !pullNumber) {
+      return NextResponse.json(
+        { error: "existingBranch can only be used together with the pullNumber of your own open PR." },
+        { status: 400 }
+      );
+    }
+
     let verifiedPullNumber: number | undefined = undefined;
+    let verifiedBranch: string | undefined = undefined;
     if (pullNumber) {
       const parsedPull = parseInt(String(pullNumber), 10);
       if (isNaN(parsedPull) || parsedPull <= 0) {
@@ -135,7 +144,11 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
+        if (prDetails.state !== "open") {
+          return NextResponse.json({ error: `PR #${parsedPull} is not open.` }, { status: 400 });
+        }
         verifiedPullNumber = parsedPull;
+        verifiedBranch = prDetails.head.ref;
       } catch (prErr: unknown) {
         const errorMsg = prErr instanceof Error ? prErr.message : "Failed to verify Pull Request ownership";
         return NextResponse.json({ error: `Invalid PR #${parsedPull}: ${errorMsg}` }, { status: 404 });
@@ -230,7 +243,7 @@ export async function POST(request: NextRequest) {
       markdownBody,
       pendingImages: Array.isArray(pendingImages) ? pendingImages : [],
       pullNumber: verifiedPullNumber,
-      existingBranch: existingBranch || undefined,
+      existingBranch: verifiedBranch,
     });
 
     return NextResponse.json({

@@ -24,6 +24,8 @@ PR #17 has merged. This checklist includes the previously unpushed roadmap commi
 - [x] **Image delivery:** Use high-quality WebP assets, responsive phone variants, lazy artwork loading, asynchronous decoding, and a prioritized home background.
 - [x] **Image resilience:** Retain original masters outside deployed assets, defer the shelf background, and show fallback borders if decorative artwork fails.
 
+- [x] **Flying-card text:** Preserve computed responsive typography and layout on animation copies so text never briefly enlarges beyond the card during drawer entry or exchange; checked at 320, 390, 768, and 1440px widths.
+
 ## Validation context
 
 Scroll12 production build passed. Desktop and phone layouts, arrival continuity, reversible assemblies, and roadmap continuation were checked locally. A local proxy tested cold loading at 1.6 Mbps with 150ms added latency and disabled cache; a separate failure test returned HTTP 503 for decorative artwork. Phones selected smaller assets, and failed artwork retained readable names/photos without broken-image icons. Third-party portrait/font services were outside the proxy; physical-device and production-CDN performance are not confirmed.

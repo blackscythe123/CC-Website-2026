@@ -56,9 +56,9 @@ This document serves as the single source of truth for all human developers, ver
 4. **Media Deferred Upload & Draft Isolation**:
    - Images inserted in CMS Studio remain in browser memory / IndexedDB until final submission.
    - Upon draft submission, images are committed to `apps/main-portal/public/uploads/` on the **isolated draft branch**, never touching `main` without formal review.
-5. **Vercel Build Shielding (`ignore-build-step.mjs`)**:
-   - Documentation updates (`AGENTS.md`, `CLAUDE.md`, `README.md`, `*.md`), CI configurations, and administrative scripts are filtered by `scripts/ignore-build-step.mjs`.
-   - Modifying documentation files exits with code 0 in Vercel, consuming **0 build minutes** and skipping deployment entirely.
+5. **Changed-App Deploys (GitHub Actions CD)**:
+   - Vercel projects are not Git-connected; production deploys run from GitHub Actions via the Vercel CLI after CI passes on `main`.
+   - Each app deploys only when its files changed since its own last successful deploy (`scripts/lib/affected-apps.mjs`). Documentation, `docs/`, CI configuration and administrative scripts deploy nothing.
 
 ---
 

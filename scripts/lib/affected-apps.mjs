@@ -1,5 +1,5 @@
 // Single source of truth for "does this app need a new production deploy?"
-// Used by scripts/ignore-build-step.mjs (Vercel) and scripts/detect-changed-apps.mjs (GitHub Actions).
+// Used by scripts/detect-changed-apps.mjs (GitHub Actions CD).
 
 export const DEPLOYABLE_APPS = [
   "main-portal",

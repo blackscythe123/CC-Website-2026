@@ -123,10 +123,10 @@ The central hub connecting all 8 technical verticals, cross-vertical blog index 
 
 ---
 
-## 8. Vercel Build Shielding (Ignore Build Step)
-- Changes affecting only documentation (`AGENTS.md`, `CLAUDE.md`, `README.md`, `*.md`), CI workflows, or non-app scripts MUST NOT trigger Vercel builds.
-- This is enforced by `scripts/ignore-build-step.mjs` (forwarded via `apps/main-portal/scripts/ignore-build-step.mjs` and `apps/cms-studio/scripts/ignore-build-step.mjs`).
-- Commits modifying only docs exit with code 0 in Vercel, consuming **0 build minutes**.
+## 8. Deploys Only for Changed Apps (GitHub Actions CD)
+- Vercel projects are **not** Git-connected. Production deploys run from `.github/workflows/content-ci.yml` (Vercel CLI, `VERCEL_TOKEN` secret) after CI passes on `main`.
+- Each app deploys only if its files changed since **its own** last successful deploy (`scripts/find-deploy-bases.mjs` + `scripts/detect-changed-apps.mjs`; rules in `scripts/lib/affected-apps.mjs`).
+- Changes affecting only documentation (`AGENTS.md`, `CLAUDE.md`, `README.md`), `docs/`, CI workflows, or non-app scripts deploy nothing.
 
 ---
 

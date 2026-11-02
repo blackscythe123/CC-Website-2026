@@ -75,7 +75,7 @@
 /* One timeline owns drawer assembly; hover only changes the nested drawer face. */
 .resource-drawer-slot{will-change:transform,opacity}.resource-drawer-well{overflow:visible}.resource-drawer-box{transform:translate(calc(var(--drawer-pull)*10px),calc(var(--drawer-pull)*8px))}.resource-drawer-pull{transform:translateY(calc(var(--drawer-pull)*42px));height:calc(100% - var(--drawer-pull)*23px);transition:transform .38s cubic-bezier(.2,.7,.2,1),height .38s;z-index:3}.resource-drawer-tray{top:5px;height:38px;left:8px;right:8px;transform:none;opacity:clamp(0,var(--drawer-pull)*3,1);border:2px solid #785536;background:linear-gradient(#302116,#63472b);clip-path:inset(0);padding:0;z-index:2}.stacked-files{position:absolute;top:3px;left:7px;right:7px;bottom:auto;height:34px}.stacked-files span{top:calc(var(--file-order)*3px);bottom:auto;left:calc(7px - var(--file-order)*1px);right:calc(7px - var(--file-order)*1px);height:22px;background:var(--file-colour);border:1px solid #b09b7d;border-top:2px solid #fff5df;border-radius:3px 3px 0 0;transform:none;box-shadow:0 -1px 2px #35251055}.resource-drawer-slot:hover{--drawer-pull:.9}.resource-drawer-slot.is-chosen{--drawer-pull:.65}
 /* Photographic environment stays behind live, accessible achievement frames. */
-.realistic-ledges{position:relative;isolation:isolate;gap:0;padding:0;overflow:visible;border-radius:4px}.shelf-environment{position:absolute;inset:0;z-index:-1;background:url('/images/community/achievement-shelves-v1.png') center / 100% 100% no-repeat;pointer-events:none;border-radius:5px}.realistic-ledges .achievement-ledge{padding:0 0 3%;box-sizing:border-box;height:100%;justify-content:end}.realistic-ledges .ledge-objects{padding:0 16%;gap:clamp(10px,1.6vw,24px);height:89%;align-items:end}.realistic-ledges .wooden-ledge{display:none}.realistic-ledges .ledge-portrait,.realistic-ledges .ledge-team{height:100%;max-height:185px;background-image:repeating-linear-gradient(2deg,#5b341e22 0 .7px,transparent .7px 3px),linear-gradient(115deg,#956936,#d2ad73 12%,#76502c 85%);border:1px solid #6f4e2d;border-radius:1px;box-shadow:inset 0 0 0 1px #f0d5a366,2px 1px 0 #67482c,3px 5px 8px #3e2c2044;transform:perspective(800px) rotateY(-3deg) rotate(-.7deg);padding:7px}.realistic-ledges .ledge-portrait.frame-1{background-image:linear-gradient(120deg,#dac8a8,#f0e2c9 35%,#c2ab88);border-color:#a28c69;transform:rotate(.8deg)}.realistic-ledges .ledge-portrait.frame-2{transform:rotate(-1deg)}.realistic-ledges .ledge-photo,.realistic-ledges .ledge-team-photo{position:relative;border:4px solid #fbefd7;border-bottom:0;box-shadow:inset 0 0 5px #48382344}.realistic-ledges .ledge-photo:after,.realistic-ledges .ledge-team-photo:after{content:'';position:absolute;inset:0;background:linear-gradient(125deg,#fff2,transparent 38%,#fff2 40%,transparent 65%);pointer-events:none}.realistic-ledges .ledge-caption{background:linear-gradient(110deg,#f9ecd1,#ecddbf);box-shadow:inset 0 -2px 3px #9a7b4322;padding:7px 8px}.ledge-wall{background-color:#efe2cc}.ledge-wall .extra-heading{margin-bottom:8px}.ledge-wall .honours-controls{margin-bottom:10px}
+.realistic-ledges{position:relative;isolation:isolate;gap:0;padding:0;overflow:visible;border-radius:4px}.shelf-environment{position:absolute;inset:0;z-index:-1;background:url('/images/community/achievement-shelves-v1.webp') center / 100% 100% no-repeat;pointer-events:none;border-radius:5px}.realistic-ledges .achievement-ledge{padding:0 0 3%;box-sizing:border-box;height:100%;justify-content:end}.realistic-ledges .ledge-objects{padding:0 16%;gap:clamp(10px,1.6vw,24px);height:89%;align-items:end}.realistic-ledges .wooden-ledge{display:none}.realistic-ledges .ledge-portrait,.realistic-ledges .ledge-team{height:100%;max-height:185px;background-image:repeating-linear-gradient(2deg,#5b341e22 0 .7px,transparent .7px 3px),linear-gradient(115deg,#956936,#d2ad73 12%,#76502c 85%);border:1px solid #6f4e2d;border-radius:1px;box-shadow:inset 0 0 0 1px #f0d5a366,2px 1px 0 #67482c,3px 5px 8px #3e2c2044;transform:perspective(800px) rotateY(-3deg) rotate(-.7deg);padding:7px}.realistic-ledges .ledge-portrait.frame-1{background-image:linear-gradient(120deg,#dac8a8,#f0e2c9 35%,#c2ab88);border-color:#a28c69;transform:rotate(.8deg)}.realistic-ledges .ledge-portrait.frame-2{transform:rotate(-1deg)}.realistic-ledges .ledge-photo,.realistic-ledges .ledge-team-photo{position:relative;border:4px solid #fbefd7;border-bottom:0;box-shadow:inset 0 0 5px #48382344}.realistic-ledges .ledge-photo:after,.realistic-ledges .ledge-team-photo:after{content:'';position:absolute;inset:0;background:linear-gradient(125deg,#fff2,transparent 38%,#fff2 40%,transparent 65%);pointer-events:none}.realistic-ledges .ledge-caption{background:linear-gradient(110deg,#f9ecd1,#ecddbf);box-shadow:inset 0 -2px 3px #9a7b4322;padding:7px 8px}.ledge-wall{background-color:#efe2cc}.ledge-wall .extra-heading{margin-bottom:8px}.ledge-wall .honours-controls{margin-bottom:10px}
 @media(max-width:1000px) and (min-width:701px){.realistic-ledges .ledge-objects{padding:0 15%;gap:10px}.realistic-ledges .ledge-portrait,.realistic-ledges .ledge-team{padding:5px}.realistic-ledges .ledge-caption{padding:4px}.realistic-ledges .ledge-caption strong{font-size:8px}.realistic-ledges .ledge-caption span{font-size:6px}}
 @media(max-width:700px){.resource-drawer-pull{transform:translateY(calc(var(--drawer-pull)*25px));height:calc(100% - var(--drawer-pull)*14px)}.resource-drawer-tray{top:4px;left:4px;right:4px;height:24px}.stacked-files{left:3px;right:3px;top:1px;height:22px}.stacked-files span{top:calc(var(--file-order)*2px);height:15px;border-top-width:1px}.resource-drawer-slot:hover{--drawer-pull:.9}.realistic-ledges .shelf-environment{background-size:auto 100%;background-position:center;opacity:.72}.realistic-ledges .achievement-ledge{padding:8px 5px 25px}.realistic-ledges .ledge-objects{height:100%;padding:0;gap:17px 15px;position:relative;z-index:2}.realistic-ledges .ledge-portrait,.realistic-ledges .ledge-team{height:100%;max-height:none;padding:5px}.realistic-ledges .ledge-caption{padding:6px}.realistic-ledges .ledge-caption strong{font-size:10px}.realistic-ledges .ledge-caption span{font-size:8px}}
 
@@ -179,3 +179,82 @@
 .cabinet-lamp-glow{position:absolute;right:0;bottom:-11px;width:40%;height:105%;background:radial-gradient(ellipse at 55% 62%,#ffd58c35,transparent 70%);filter:blur(6px);z-index:-1}
 @media(max-width:700px){.cabinet-decor-arrival:after{height:3px;filter:blur(1px)}}
 @media(prefers-reduced-motion:reduce){.cabinet-decor-arrival{transform:none!important;opacity:1!important;visibility:visible!important}}
+
+/* Phone displays use real frame proportions and their own aligned shelf surfaces. */
+@media(max-width:700px){
+ .regal-gallery.ledge-wall{height:calc(100dvh - var(--site-nav-height,100px));min-height:520px}
+ .regal-gallery.ledge-wall>.shelf-environment{background:radial-gradient(ellipse at 15% 8%,#fff1c9a6,transparent 65%),linear-gradient(110deg,#d0b084,#edcfa2 38%,#ba8e5d);opacity:1}
+ .regal-gallery.ledge-wall>.extra-heading{top:34px;left:16px;margin:0;max-width:90%}
+ .regal-gallery.ledge-wall>.extra-heading h2{font-size:24px}
+ .regal-gallery.ledge-wall>.honours-controls{top:70px;left:16px;right:auto}
+ .regal-gallery.ledge-wall>.honours-controls label{font-size:0}
+ .regal-gallery.ledge-wall>.honours-controls select{font-size:10px;padding:5px 8px}
+ .regal-gallery.ledge-wall .realistic-ledges{top:109px;bottom:52px;left:14px;right:14px}
+ .regal-gallery .realistic-ledges .achievement-ledge{height:100%;padding:0;max-height:none}
+ .regal-gallery .realistic-ledges .ledge-objects{position:relative;width:100%;height:100%;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:22px 8px;padding:0 8px 8px;box-sizing:border-box;align-items:end;justify-items:center}
+ .regal-gallery .realistic-ledges .ledge-motion-slot,.regal-gallery .realistic-ledges .team-motion-slot{width:100%;height:100%;max-width:none;padding:0;overflow:visible;display:flex;align-items:end;justify-content:center}
+ .regal-gallery .realistic-ledges .ledge-motion-slot>.ledge-portrait{width:auto;height:auto;aspect-ratio:1122 / 1402;max-width:100%;max-height:100%;flex:none}
+ .regal-gallery .realistic-ledges .ledge-motion-slot>.regal-oval{aspect-ratio:1086 / 1448}
+ .regal-gallery .realistic-ledges .team-motion-slot>.ledge-team{width:auto;height:auto;aspect-ratio:1122 / 1402;max-width:100%;max-height:100%;flex:none}
+ .regal-gallery .ledge-photo>.honour-portrait img{object-fit:cover;object-position:center 25%}
+ .regal-gallery .ledge-team-photo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:2px;padding:2px;background:#d8c7a3}
+ .regal-gallery .ledge-team-photo[data-count="2"]{grid-template-columns:1fr 1fr;align-items:center}
+ .regal-gallery .team-portrait-cell{width:100%;height:100%;min-height:0;box-sizing:border-box;padding:0}
+ .regal-gallery .team-portrait-cell img{object-fit:contain;object-position:center;background:#e5dac3}
+ .regal-gallery .ledge-team-photo[data-count="3"] .team-portrait-cell:last-child{grid-column:1 / -1}
+ .regal-gallery .realistic-ledges:before,.regal-gallery .realistic-ledges:after{content:'';position:absolute;left:0;right:0;height:12px;z-index:0;background:repeating-linear-gradient(2deg,#3a1d111c 0 1px,transparent 1px 4px),linear-gradient(#b58550 0 3px,#6d4023 4px,#946039 11px);box-shadow:0 8px 12px #50301755,inset 0 1px #f1ca91;border-radius:1px;pointer-events:none}
+ .regal-gallery .realistic-ledges:before{top:calc(50% - 11px)}
+ .regal-gallery .realistic-ledges:after{bottom:-4px}
+ .regal-gallery .hall-string-lights{display:none}
+ .regal-gallery .ledge-paging{bottom:10px}
+ .resource-room.community-extra{height:calc(100dvh - var(--site-nav-height,100px));padding:13px 14px 12px;min-height:500px;box-sizing:border-box}
+ .resource-room>.extra-heading h2{font-size:clamp(22px,6vw,29px)}
+ .resource-room>.extra-heading p{display:none}
+ .resource-room>.resource-search{margin:6px 0 8px;min-height:32px}
+ .resource-room>.resource-tools{margin-bottom:8px}
+ .resource-room .resource-layout{grid-template-columns:minmax(132px,.85fr) minmax(0,1.15fr);gap:14px;min-height:0;align-items:center;flex:1}
+ .resource-room .catalogue-scene{width:100%;max-width:none;padding:28px 6px 18px 0;box-sizing:border-box;align-self:center}
+ .resource-room .catalogue-top{height:36px}
+ .resource-room .catalogue-cabinet{padding:10px 7px 12px}
+ .resource-room .resource-drawer-slot{height:63px;margin-bottom:8px}
+ .resource-room .resource-drawer-slot:last-child{margin-bottom:0}
+ .resource-room .drawer-click-cue{font-size:8px;line-height:1.4;margin:16px -3px 0}
+ .resource-room .drawer-click-cue span{font-size:16px}
+ .resource-room .drawer-interaction-hint{display:none}
+ .resource-room .resource-card-grid{grid-template-columns:1fr;gap:14px;grid-auto-rows:auto}
+ .resource-room .resource-index-card{min-height:0;padding:10px 8px 6px}
+ .resource-room .resource-card-meta{font-size:5px;letter-spacing:0;margin-bottom:0}
+ .resource-room .resource-card-title{margin:7px 0 4px;gap:3px}
+ .resource-room .resource-card-title>button{font-size:10px;line-height:1.3}
+ .resource-room .resource-card-title>svg{display:none}
+ .resource-room .resource-index-card>p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:8px;line-height:1.4;margin:5px 0 7px}
+ .resource-room .resource-index-card footer{min-height:25px;margin-top:2px;padding-top:3px}
+ .resource-room .resource-index-card footer>span{font-size:5px;max-width:65px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .resource-room .resource-index-card footer>div{gap:2px}
+ .resource-room .resource-index-card footer button{min-width:26px;min-height:28px}
+ .resource-room .resource-await{height:auto;padding:15px 8px;min-height:150px}
+ .resource-room .resource-await h3{font-size:16px}
+ .resource-room .resource-await p{font-size:8px}
+}
+@media(max-width:700px){
+ .regal-gallery .realistic-ledges .ledge-motion-slot{container-type:size}
+ .regal-gallery .realistic-ledges .ledge-motion-slot>.ledge-portrait,.regal-gallery .realistic-ledges .team-motion-slot>.ledge-team{width:min(100cqw,80cqh);height:auto}
+ .regal-gallery .realistic-ledges .ledge-motion-slot>.regal-oval{width:min(100cqw,75cqh)}
+ .regal-gallery .hall-string-lights{display:block;top:109px;bottom:52px;height:calc(100% - 161px);opacity:.8}
+ .regal-gallery .hall-string-lights>g:first-of-type{transform:translateY(175px)}
+ .regal-gallery .hall-string-lights>g:nth-of-type(2){transform:translateY(335px)}
+ .regal-gallery .hall-string-lights>g:nth-of-type(3){display:none}
+}
+
+@media(max-width:700px){
+ .resource-room .resource-layout{align-items:start;margin-top:22px}
+ .resource-room .catalogue-scene{align-self:start;padding-top:34px}
+ .resource-room .resource-catalogue{align-self:start;padding-top:8px}
+ .resource-room .resource-card-title>button{font-size:11px}
+ .resource-room .resource-index-card>p{font-size:9px}
+}
+
+/* Artwork below the viewport need not download before Projects can be used. */
+@media(min-width:701px){.regal-gallery:not([data-artwork-ready])>.shelf-environment{background-image:none}}
+.regal-gallery [data-artwork-fallback=true].ledge-photo:before,.regal-gallery .ledge-team[data-artwork-fallback=true]:before{content:'';position:absolute;inset:3% 10% 3%;border:8px ridge #ac8954;box-shadow:0 3px 7px #30211355;pointer-events:none}
+.regal-gallery [data-artwork-fallback=true] .ledge-caption{z-index:5}

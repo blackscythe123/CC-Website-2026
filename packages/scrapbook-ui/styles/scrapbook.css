@@ -47,7 +47,7 @@
 /* Photo-realistic reference scene: live React terminal positioned over the actual screen. */
 .realistic-landing{background:#f4e0ca}
 .realistic-landing .landing-nav{margin:15px 1.6% 8px;height:50px}
-.photo-hero{position:relative;width:100%;aspect-ratio:1536/775;background:#f3dfca url('/desk-scene.jpg') center/100% 100% no-repeat;container-type:inline-size;overflow:hidden}
+.photo-hero{position:relative;width:100%;aspect-ratio:1536/775;background:#f3dfca url('/desk-scene.webp') center/100% 100% no-repeat;container-type:inline-size;overflow:hidden}
 .photo-screen{position:absolute;left:23.45%;top:6.97%;width:56.65%;height:67.1%;display:grid;grid-template-columns:58% 42%;overflow:hidden;background:#ffebd4;background-image:linear-gradient(#b8997612 1px,transparent 1px),linear-gradient(90deg,#b8997612 1px,transparent 1px);background-size:1.55cqw 1.55cqw;border-radius:.35cqw;color:#101820;box-shadow:inset 0 0 16px #4b2b1718}
 .photo-screen .display-main{padding:2.1cqw 0 1cqw 1.8cqw;min-width:0}
 .photo-screen .terminal-welcome{font-size:.82cqw;margin-bottom:1.5cqw}
@@ -255,7 +255,7 @@
   z-index: 0;
   opacity: .48;
   mix-blend-mode: multiply;
-  background: url('/textures/paper-fibers.png') repeat;
+  background: url('/textures/paper-fibers.webp') repeat;
   background-size: 290px 290px;
 }
 .sticky-note::after {
@@ -266,7 +266,7 @@
 .paper-grain {
   opacity: .48;
   mix-blend-mode: soft-light;
-  background-image: url('/textures/paper-fibers.png');
+  background-image: url('/textures/paper-fibers.webp');
   background-size: 170px 170px;
 }
 .paper-edge {
@@ -301,7 +301,7 @@
 
 /* V6: bright original pastels with tactile matte grain, not dark pigment or metallic sheen */
 .sticky-note {background:var(--paper);box-shadow:1px 3px 2px #54433318,4px 11px 10px #54433320,9px 18px 19px #54433313;}
-.sticky-note::before {background-image:url('/textures/paper-fibers.png');background-size:320px 320px;mix-blend-mode:normal;opacity:.13;}
+.sticky-note::before {background-image:url('/textures/paper-fibers.webp');background-size:320px 320px;mix-blend-mode:normal;opacity:.13;}
 .paper-grain {mix-blend-mode:soft-light;opacity:.19;}
 .sticky-note:hover {box-shadow:3px 9px 8px #54433320,10px 24px 19px #54433329,16px 33px 24px #54433313;}
 /* The destination is already visible behind two full-viewport paper halves.
@@ -316,10 +316,10 @@
 .destination-inner p{font-size:clamp(16px,2vw,27px)}
 .destination-hint{display:block;margin-top:55px;font-size:14px;opacity:.6}
 .tear-half {position:absolute;top:-2%;height:104%;width:55%;background:#f8ecd9;background-image:linear-gradient(#86705113 1px,transparent 1px),linear-gradient(90deg,#86705113 1px,transparent 1px),radial-gradient(ellipse at 50% 45%,#fff4e2 0%,transparent 75%);background-size:24px 24px,24px 24px,100% 100%;will-change:transform;filter:drop-shadow(0 0 9px #55402e55);}
-.tear-half::before{content:'';position:absolute;inset:0;background:url('/textures/paper-fibers.png') repeat;background-size:280px;opacity:.22;pointer-events:none;}
+.tear-half::before{content:'';position:absolute;inset:0;background:url('/textures/paper-fibers.webp') repeat;background-size:280px;opacity:.22;pointer-events:none;}
 .tear-left{left:-4%;clip-path:polygon(0 0,100% 0,99% 5%,100% 10%,97% 15%,99% 21%,96% 27%,98% 34%,95% 40%,99% 46%,96% 53%,98% 59%,95% 66%,99% 72%,96% 78%,98% 85%,95% 92%,97% 100%,0 100%);}
 .tear-right{right:-4%;clip-path:polygon(4% 0,100% 0,100% 100%,3% 100%,5% 92%,2% 85%,4% 78%,1% 72%,4% 66%,2% 59%,5% 53%,2% 46%,5% 40%,2% 34%,4% 27%,1% 21%,3% 15%,0 10%,2% 5%);}
-.tear-fibres{position:absolute;inset:0;pointer-events:none;background-image:url('/textures/paper-fibers.png');background-size:160px;opacity:.12;}
+.tear-fibres{position:absolute;inset:0;pointer-events:none;background-image:url('/textures/paper-fibers.webp');background-size:160px;opacity:.12;}
 @media(prefers-reduced-motion:reduce){.tear-half{transition:none}}
 
 /* V7: only the chosen note flies to the centre and tears; never the entire board. */
@@ -327,7 +327,7 @@
 .rip-destination{position:absolute;inset:0;background:var(--destination-color);background-image:linear-gradient(#ffffffa6,#ffffffa6),linear-gradient(#71604c16 1px,transparent 1px),linear-gradient(90deg,#71604c16 1px,transparent 1px);background-size:100% 100%,25px 25px,25px 25px}
 .flying-sheet{position:fixed;z-index:2;transform-origin:center center;will-change:transform;filter:drop-shadow(12px 22px 15px #392e2c4a)}
 .rip-piece{position:absolute;inset:0;background:var(--paper);overflow:hidden;will-change:transform;filter:drop-shadow(1px 0 2px #2b251f55)}
-.rip-piece::before{content:'';position:absolute;inset:0;background:url('/textures/paper-fibers.png') repeat;background-size:240px;opacity:.2;pointer-events:none;z-index:2}
+.rip-piece::before{content:'';position:absolute;inset:0;background:url('/textures/paper-fibers.webp') repeat;background-size:240px;opacity:.2;pointer-events:none;z-index:2}
 .rip-piece-left{clip-path:polygon(0 0,51% 0,49% 8%,52% 15%,48% 22%,51% 30%,49% 38%,52% 46%,48% 54%,51% 62%,48% 70%,52% 78%,49% 87%,51% 94%,49% 100%,0 100%)}
 .rip-piece-right{clip-path:polygon(51% 0,100% 0,100% 100%,49% 100%,51% 94%,48% 87%,52% 78%,48% 70%,51% 62%,48% 54%,52% 46%,49% 38%,51% 30%,48% 22%,52% 15%,49% 8%)}
 .rip-copy{position:absolute;inset:0;padding:10% 10%;font-family:'IBM Plex Mono',monospace;color:#202321}
@@ -779,7 +779,7 @@
 .spread{min-height:clamp(570px,57vh,760px);grid-template-columns:minmax(0,1fr) 19px minmax(0,1fr)}.gutter{background:linear-gradient(90deg,#f3e9d8 0%,#7c63463a 35%,#40302235 50%,#f7f0e36b 75%,#f3e9d8 100%);box-shadow:inset 2px 0 7px #45322121}
 .paper-page{gap:10px;padding:0 clamp(10px,1.4vw,24px)}.page-label{font-weight:700;letter-spacing:.12em;color:#655341;border-bottom:2px solid #7d6b55;font-size:clamp(10px,.72vw,12px)}
 .article{grid-template-columns:minmax(0,1.13fr) minmax(0,.85fr);gap:clamp(12px,1.2vw,23px);padding:10px 0 17px;border-bottom:2px solid #77644c;position:relative}
-.article:last-child{border-bottom:0}.article:before{content:'';position:absolute;top:9px;left:0;width:33px;border-top:3px solid #322b22}
+.article:last-child{border-bottom:0}.article:before{content:none;display:none}
 .article-copy{padding-top:12px}.article-tag{font-size:clamp(10px,.73vw,12px);padding:3px 0;margin:0 0 10px;box-shadow:none;background:transparent!important;border-bottom:3px solid;font-weight:700;letter-spacing:.05em}
 .article h3{font-family:'Playfair Display',Georgia,serif;font-size:clamp(24px,2.05vw,36px);line-height:1.04;font-weight:900;letter-spacing:-.045em;text-wrap:balance;margin-bottom:12px}
 .article-excerpt{font-family:Georgia,'Times New Roman',serif;font-size:clamp(14px,1vw,17px)!important;line-height:1.42!important;text-align:justify;hyphens:auto;color:#352c23}
@@ -1274,8 +1274,8 @@ html,body{overscroll-behavior-x:none}
 .realistic-landing .photo-scroll{animation:none;bottom:0!important;width:52px;height:52px;background:#f5e5d3;box-shadow:0 0 0 7px #f5e5d3;border-radius:50%;transform:translateX(-50%)}
 @media(min-width:900px){.realistic-landing .photo-scroll{bottom:24px!important}}
 /* Natural desk variant. The original laptop remains a separate, unchanged image layer. */
-.realistic-landing .photo-hero{background-image:url('/desk-scene-natural-v2.png')}
-.realistic-landing .photo-hero::before{content:'';position:absolute;inset:0;pointer-events:none;background:url('/desk-scene.jpg') center/100% 100% no-repeat;clip-path:polygon(23% 2.8%,80.1% 2.8%,81.4% 3.2%,81.9% 4.5%,82.1% 7%,83% 75.2%,82.8% 77.5%,87.3% 89.8%,87.5% 91.3%,87.4% 93%,86.8% 94%,14.6% 94%,13.9% 93.3%,13.8% 91%,14.3% 89.6%,20.2% 77.2%,20.4% 74%,21.5% 6.5%,21.9% 4.4%,22.3% 3.5%)}
+.realistic-landing .photo-hero{background-image:url('/desk-scene-natural-v2.webp')}
+.realistic-landing .photo-hero::before{content:'';position:absolute;inset:0;pointer-events:none;background:url('/desk-scene.webp') center/100% 100% no-repeat;clip-path:polygon(23% 2.8%,80.1% 2.8%,81.4% 3.2%,81.9% 4.5%,82.1% 7%,83% 75.2%,82.8% 77.5%,87.3% 89.8%,87.5% 91.3%,87.4% 93%,86.8% 94%,14.6% 94%,13.9% 93.3%,13.8% 91%,14.3% 89.6%,20.2% 77.2%,20.4% 74%,21.5% 6.5%,21.9% 4.4%,22.3% 3.5%)}
 .realistic-landing .photo-screen{z-index:1}
 .realistic-landing .photo-scroll{z-index:2;background:#dec1a0;box-shadow:none}
 @media(max-width:750px){.realistic-landing .photo-hero::before{display:none}}
@@ -1285,9 +1285,9 @@ html,body{overscroll-behavior-x:none}
 .realistic-landing .photo-screen{z-index:2}
 .realistic-landing .photo-scroll{z-index:3}
 /* Reference-inspired mint and blush succulent pots. */
-.realistic-landing .photo-hero{background-image:url('/desk-scene-succulents-v3.png')}
+.realistic-landing .photo-hero{background-image:url('/desk-scene-succulents-v3.webp')}
 /* Lift the scene gently, with extra light on the shaded right wall. */
-.realistic-landing .photo-hero::after{background-image:linear-gradient(90deg,rgba(255,248,235,.025) 0%,rgba(255,248,235,.04) 55%,rgba(255,248,235,.16) 100%),url('/desk-scene-succulents-v3.png');background-size:100% 100%;background-position:center;filter:brightness(1.065) contrast(.92) saturate(1.1)}
+.realistic-landing .photo-hero::after{background-image:linear-gradient(90deg,rgba(255,248,235,.025) 0%,rgba(255,248,235,.04) 55%,rgba(255,248,235,.16) 100%),url('/desk-scene-succulents-v3.webp');background-size:100% 100%;background-position:center;filter:brightness(1.065) contrast(.92) saturate(1.1)}
 /* Keep assembling objects outside the viewport from creating sideways page scrolling. */
 .ssn-scroll-site{overflow-x:clip}
 /* Portrait entrances use movement, replacing the older team opacity reveal. */
@@ -1400,5 +1400,12 @@ html,body{overscroll-behavior-x:none}
 @media(min-width:600px) and (max-width:899px){.verticals-shell .notes-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:none;gap:28px 22px}.verticals-shell .sticky-note{grid-column:auto;grid-row:auto;width:100%;margin:0;min-height:220px}}
 @media(max-width:599px){.verticals-shell .notes-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.verticals-shell .sticky-note{grid-column:auto;grid-row:auto;width:100%;margin:0}.verticals-shell .note-9{grid-column:1 / -1;width:calc(50% - 8px);justify-self:center}}
 
-/* Sticky notes are real links to the registered vertical apps. */
-a.sticky-note{color:inherit;text-decoration:none}
+/* Keep long vertical names inside the enlarged paper rather than clipping at its edge. */
+.rip-copy{container-type:inline-size}.rip-copy strong{font-size:clamp(12px,10cqw,27px);letter-spacing:-.035em;max-width:100%;overflow-wrap:anywhere;line-height:1.12}.rip-copy p{max-width:100%}.rip-piece{transform-origin:50% 50%}.flying-sheet{perspective:1200px}
+
+/* Route handoff must not anchor the new document to a later-mounted section. */
+.vertical-portal,.vertical-portal>*{overflow-anchor:none}.note-rip-overlay .board-blur-veil{backdrop-filter:none;-webkit-backdrop-filter:none;background:#f8ecd9d9}.rip-piece::before{opacity:.12}.flying-sheet{filter:drop-shadow(5px 9px 8px #392e2c35)}
+
+.vertical-arrival-cover{position:fixed;top:var(--site-nav-height,60px);left:0;right:0;bottom:0;overflow:hidden;z-index:20;background:#f8e8d4;pointer-events:none}
+
+.vertical-project-surface{background:#f8e8d4;min-height:calc(100svh - var(--site-nav-height,60px));width:100%}

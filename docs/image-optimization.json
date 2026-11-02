@@ -1,0 +1,120 @@
+[
+  {
+    "asset": "desk-scene-natural-v2.png",
+    "originalBytes": 2205812,
+    "webpBytes": 267700,
+    "width": 1766,
+    "height": 891,
+    "quality": 92,
+    "apps": [
+      "apps/main-portal/public/desk-scene-natural-v2.webp"
+    ]
+  },
+  {
+    "asset": "desk-scene-succulents-v3.png",
+    "originalBytes": 2017633,
+    "webpBytes": 224026,
+    "width": 1766,
+    "height": 891,
+    "quality": 92,
+    "apps": [
+      "apps/main-portal/public/desk-scene-succulents-v3.webp"
+    ]
+  },
+  {
+    "asset": "desk-scene.jpg",
+    "originalBytes": 280042,
+    "webpBytes": 203728,
+    "width": 1536,
+    "height": 775,
+    "quality": 92,
+    "apps": [
+      "apps/main-portal/public/desk-scene.webp"
+    ]
+  },
+  {
+    "asset": "textures/paper-fibers.png",
+    "originalBytes": 202758,
+    "webpBytes": 117954,
+    "width": 512,
+    "height": 512,
+    "quality": 92,
+    "apps": [
+      "apps/main-portal/public/textures/paper-fibers.webp"
+    ]
+  },
+  {
+    "asset": "images/community/achievement-shelves-v1.png",
+    "originalBytes": 2145588,
+    "webpBytes": 203094,
+    "width": 1774,
+    "height": 887,
+    "quality": 92,
+    "apps": [
+      "apps/ssnhacks-portal/public/images/community/achievement-shelves-v1.webp",
+      "apps/main-portal/public/images/community/achievement-shelves-v1.webp"
+    ]
+  },
+  {
+    "asset": "images/community/real-trophy-v1.png",
+    "originalBytes": 1161915,
+    "webpBytes": 237042,
+    "width": 1222,
+    "height": 1287,
+    "quality": 92,
+    "apps": [
+      "apps/ssnhacks-portal/public/images/community/real-trophy-v1.webp",
+      "apps/main-portal/public/images/community/real-trophy-v1.webp"
+    ]
+  },
+  {
+    "asset": "images/community/integrated-rectangle-v1.png",
+    "originalBytes": 2057516,
+    "webpBytes": 464572,
+    "width": 1122,
+    "height": 1402,
+    "quality": 94,
+    "apps": [
+      "apps/ssnhacks-portal/public/images/community/integrated-rectangle-v1.webp",
+      "apps/main-portal/public/images/community/integrated-rectangle-v1.webp"
+    ]
+  },
+  {
+    "asset": "images/community/cabinet-study-decor-v1.png",
+    "originalBytes": 1622172,
+    "webpBytes": 359930,
+    "width": 1983,
+    "height": 793,
+    "quality": 92,
+    "apps": [
+      "apps/cybersecurity-portal/public/images/community/cabinet-study-decor-v1.webp",
+      "apps/ai-ml-portal/public/images/community/cabinet-study-decor-v1.webp",
+      "apps/main-portal/public/images/community/cabinet-study-decor-v1.webp",
+      "apps/cp-portal/public/images/community/cabinet-study-decor-v1.webp"
+    ]
+  },
+  {
+    "asset": "images/community/integrated-oval-v1.png",
+    "originalBytes": 1697641,
+    "webpBytes": 388312,
+    "width": 1086,
+    "height": 1448,
+    "quality": 94,
+    "apps": [
+      "apps/ssnhacks-portal/public/images/community/integrated-oval-v1.webp",
+      "apps/main-portal/public/images/community/integrated-oval-v1.webp"
+    ]
+  },
+  {
+    "asset": "images/community/framed-medal-v1.png",
+    "originalBytes": 2514413,
+    "webpBytes": 429122,
+    "width": 1214,
+    "height": 1295,
+    "quality": 92,
+    "apps": [
+      "apps/ssnhacks-portal/public/images/community/framed-medal-v1.webp",
+      "apps/main-portal/public/images/community/framed-medal-v1.webp"
+    ]
+  }
+]

@@ -1,21 +1,21 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 /** Reveal actual characters while reserving the full heading's layout. */
-export default function SectionHeadingText({text}:{text:string}){
+export default function SectionHeadingText({text,settled=false}:{text:string;settled?:boolean}){
  const ref=useRef<HTMLSpanElement>(null);
  const [length,setLength]=useState(text.length);
  useEffect(()=>{
   const node=ref.current;if(!node||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-  let timer:ReturnType<typeof setInterval>|undefined;
+  let timer:ReturnType<typeof setInterval>|undefined;let firstVisible=true;
   const type=()=>{clearInterval(timer);let count=0;setLength(0);timer=setInterval(()=>{count++;setLength(count);if(count>=text.length)clearInterval(timer)},42)};
   const observer=new IntersectionObserver(([entry])=>{
-   if(entry.isIntersecting)type();else{clearInterval(timer);setLength(0)}
+   if(entry.isIntersecting){if(firstVisible&&settled)setLength(text.length);else type();firstVisible=false}else if(!firstVisible){clearInterval(timer);setLength(0)}
   },{threshold:.22});
   const navigate=(event:Event)=>{const id=(event as CustomEvent<{id:string}>).detail?.id;const section=node.getRootNode() instanceof ShadowRoot?(node.getRootNode() as ShadowRoot).host.closest('.ssn-scroll-panel'):node.closest('.ssn-scroll-panel');if(section?.id==='section-'+id)type()};
   window.addEventListener('ssn:section-change',navigate);
   observer.observe(node);
   return()=>{observer.disconnect();clearInterval(timer);window.removeEventListener('ssn:section-change',navigate)};
- },[text]);
+ },[text,settled]);
  // The invisible copy reserves the full heading width; the visible typed copy
  // and cursor share one inline flow, so the cursor always follows the last letter.
  return <span ref={ref} data-section-typewriter="true" aria-label={text} style={{display:'inline-block',position:'relative',color:'inherit',letterSpacing:'inherit',margin:0}}>

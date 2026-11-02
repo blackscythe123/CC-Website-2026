@@ -3,7 +3,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {ArrowDown,ArrowUpRight,Code2,BookOpen,Lightbulb,Users,Terminal} from 'lucide-react';
 
-const commands=[['verticals','explore our verticals','#ef2d86'],['events','view upcoming events','#f07939'],['blogs','read our latest blogs','#d1a22e'],['projects','check out our projects','#13866d'],['people','meet the team','#5847bd'],['join','find your people','#13866d'],['about','know more about us','#74468b']];
+const commands=[['verticals','explore our verticals','#ef2d86'],['events','view upcoming events','#f07939'],['blogs','read our latest blogs','#d1a22e'],['projects','check out our projects','#13866d'],['roadmap','our club journey','#8877a0'],['people','meet the team','#5847bd'],['join','find your people','#13866d'],['about','know more about us','#74468b']];
 const headline=['A community','for curious minds','who build._'];
 function TypeLine({value,delay=0,className=''}:{value:string,delay?:number,className?:string}){
  const [length,setLength]=useState(0);
@@ -14,7 +14,7 @@ export default function Landing({onNavigate}:{onNavigate?:(route:string)=>void}=
  const router=useRouter();const screenRef=useRef<HTMLDivElement>(null);const [input,setInput]=useState('');const [message,setMessage]=useState('');
  const navigate=useCallback((route:string)=>{
   if(onNavigate){onNavigate(route);return}
-  router.push(route);
+  router.push(route==='/roadmap'?'/#section-roadmap':route);
  },[router,onNavigate]);
  useEffect(()=>{const trigger=(event:Event)=>{const route=(event as CustomEvent<string>).detail||'/verticals';navigate(route);};window.addEventListener('ssn:landing-escape',trigger);return()=>window.removeEventListener('ssn:landing-escape',trigger);},[navigate]);
  const goProjects=useCallback(()=>navigate('/projects'),[navigate]);
@@ -22,9 +22,9 @@ export default function Landing({onNavigate}:{onNavigate?:(route:string)=>void}=
  useEffect(()=>{['verticals','events','blogs','projects','people','join'].forEach(v=>router.prefetch('/'+v));},[router]);
  const submit=(e:React.FormEvent)=>{e.preventDefault();const command=input.trim().toLowerCase().replace(/^\//,'');
   const target=command==='project'?'projects':command;
-  if(['verticals','events','blogs','projects','people','join','about'].includes(target)){navigate('/'+target)}
-  else if(command==='help'){setMessage('available: verticals, events, blogs, projects, people, join')}
-  else{setMessage('type verticals, events, blogs, projects, people or join')}
+  if(['verticals','events','blogs','projects','roadmap','people','join','about'].includes(target)){navigate('/'+target)}
+  else if(command==='help'){setMessage('available: verticals, events, blogs, projects, roadmap, people, join, about')}
+  else{setMessage('type verticals, events, blogs, projects, roadmap, people, join or about')}
   setInput('');};
  return <main className='landing-shell realistic-landing'><link rel="preload" as="image" href="/desk-scene-succulents-v3.webp" media="(min-width:1100px)" fetchPriority="high"/><link rel="preload" as="image" href="/desk-scene-succulents-v3-mobile.webp" media="(max-width:1099px)" fetchPriority="high"/>
   <header className='landing-nav' style={{display:'none'}}><div className='traffic'><i/><i/><i/></div><span className='landing-brand'>ssn@codingclub:~</span><nav aria-label='Main navigation'><a className='active' href='/'>01. home</a><a href='/verticals' onClick={e=>{e.preventDefault();navigate('/verticals')}}>02. verticals</a><a href='/events' onClick={e=>{e.preventDefault();navigate('/events')}}>03. events</a><a href='/blogs' onClick={e=>{e.preventDefault();navigate('/blogs')}}>04. blogs</a><a href='/projects' onClick={e=>{e.preventDefault();goProjects();}}>05. projects</a><a href='/people' onClick={e=>{e.preventDefault();navigate('/people')}}>06. people</a><a href='/#verticals'>07. about</a></nav><a className='landing-join' href='mailto:hello@ssncodingclub.com'>join us ↗</a></header>

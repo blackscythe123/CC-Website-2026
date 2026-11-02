@@ -64,7 +64,24 @@ const PostSchema = z.object({
   targetPortals: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
   coverImage: z.string().optional(),
+  authorAvatar: z.string().optional(),
 });
+
+// Image URLs must be root-relative (e.g. /uploads/x.png) or absolute https.
+// blob:/data: URLs are browser-local leftovers from CMS Studio and never resolve.
+function isAllowedImageUrl(value) {
+  const v = String(value).trim();
+  if (v.startsWith("//")) return false;
+  return v.startsWith("/uploads/") || v.startsWith("/") || v.startsWith("https://");
+}
+const EPHEMERAL_URL = /^\s*(blob:|data:)/i;
+const MD_IMAGE_LINK = /!\[[^\]]*\]\(\s*<?\s*([^)\s>]+)/g;
+const HTML_IMG_SRC = /<img\b[^>]*\bsrc\s*=\s*["']?\s*([^"'\s>]+)/gi;
+
+// Real events directories (content/events and content/club/events).
+const EVENTS_PATH = /^content\/(club\/)?events\//;
+const SYNDICATION_PATH = /^content\/syndication\//;
+const POSTS_DIR_PATH = /^content\/(verticals\/[^/]+\/|club\/)?posts\//;
 
 const EventSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
@@ -112,9 +129,24 @@ console.log(`\nDiscovered ${allPostFiles.length} markdown post files in content/
 
 const seenSlugsByVertical = new Map();
 
+// Every folder under content/verticals must be a registered technical vertical.
+const VERTICALS_DIR = path.join(CONTENT_DIR, "verticals");
+const TECH_VERTICALS = VALID_VERTICALS.filter((v) => v !== "club");
+if (fs.existsSync(VERTICALS_DIR)) {
+  for (const entry of fs.readdirSync(VERTICALS_DIR, { withFileTypes: true })) {
+    if (entry.isDirectory() && !TECH_VERTICALS.includes(entry.name)) {
+      hasErrors = true;
+      errors.push({
+        file: `content/verticals/${entry.name}`,
+        issue: `Unknown vertical folder '${entry.name}'. Must be one of: [${TECH_VERTICALS.join(", ")}]`,
+      });
+    }
+  }
+}
+
 for (const filePath of allPostFiles) {
   validatedCount++;
-  const relativePath = path.relative(ROOT_DIR, filePath);
+  const relativePath = path.relative(ROOT_DIR, filePath).split(path.sep).join("/");
   const fileName = path.basename(filePath);
   const slug = fileName.replace(/\.mdx?$/, "");
 
@@ -124,6 +156,15 @@ for (const filePath of allPostFiles) {
     errors.push({
       file: relativePath,
       issue: `Invalid filename format '${fileName}'. Slugs must be lowercase kebab-case (e.g. my-post-title.md).`,
+    });
+  }
+
+  // Portals only read .md from posts directories; .mdx would be silently dropped.
+  if (fileName.endsWith(".mdx") && POSTS_DIR_PATH.test(relativePath)) {
+    hasErrors = true;
+    errors.push({
+      file: relativePath,
+      issue: "'.mdx' files are not rendered by the portals. Rename to '.md'.",
     });
   }
 
@@ -143,8 +184,8 @@ for (const filePath of allPostFiles) {
   }
 
   // Schema Validation based on content type
-  const isEvent = relativePath.includes("events");
-  const isSyndication = relativePath.includes("syndication");
+  const isEvent = EVENTS_PATH.test(relativePath);
+  const isSyndication = SYNDICATION_PATH.test(relativePath);
   const schemaResult = isEvent
     ? EventSchema.safeParse(parsed.data)
     : isSyndication
@@ -161,6 +202,19 @@ for (const filePath of allPostFiles) {
     }
   } else if (!isEvent && !isSyndication) {
     const data = schemaResult.data;
+
+    // Image URL validation (coverImage, authorAvatar)
+    for (const field of ["coverImage", "authorAvatar"]) {
+      const value = data[field];
+      if (value === undefined || value === null || String(value).trim() === "") continue;
+      if (EPHEMERAL_URL.test(String(value)) || !isAllowedImageUrl(value)) {
+        hasErrors = true;
+        errors.push({
+          file: relativePath,
+          issue: `Invalid ${field} '${String(value).slice(0, 80)}'. Must start with '/uploads/', '/' (root-relative) or 'https://'; blob:/data: URLs are not allowed.`,
+        });
+      }
+    }
 
     // Target Portals Validation
     if (data.targetPortals && data.targetPortals.length > 0) {
@@ -189,6 +243,22 @@ for (const filePath of allPostFiles) {
       });
     } else {
       slugsInVertical.add(slug);
+    }
+  }
+
+  // Body image links must not be browser-local blob:/data: URLs
+  const body = parsed.content || "";
+  for (const re of [MD_IMAGE_LINK, HTML_IMG_SRC]) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(body)) !== null) {
+      if (EPHEMERAL_URL.test(m[1])) {
+        hasErrors = true;
+        errors.push({
+          file: relativePath,
+          issue: `Body image uses a blob:/data: URL ('${m[1].slice(0, 60)}'). Upload the image so it resolves to /uploads/...`,
+        });
+      }
     }
   }
 

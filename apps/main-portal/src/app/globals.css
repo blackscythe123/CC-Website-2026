@@ -84,3 +84,10 @@ body {
 .animate-cursor {
   animation: terminal-blink 1s step-end infinite;
 }
+
+
+/* Isolate scroll panels so animated/translated elements cannot bleed across sections */
+.ssn-scroll-panel {
+  position: relative;
+  overflow: clip;
+}

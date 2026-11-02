@@ -23,6 +23,20 @@ export interface PostDetail extends PostSummary {
   contentHtml: string;
 }
 
+/**
+ * gray-matter parses unquoted YAML dates (`date: 2026-10-10`) into JS Date
+ * objects. Normalize both Date and string values to `YYYY-MM-DD`.
+ */
+export function normalizeDate(d: unknown): string {
+  if (d === null || d === undefined || d === "") return "";
+  if (d instanceof Date) {
+    return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+  }
+  return String(d).slice(0, 10);
+}
+
+const SAFE_SEGMENT = /^[a-z0-9-]+$/;
+
 export function isPostVisibleOnPortal(
   targetPortals: string[] | undefined,
   portalId: string = "main-portal"
@@ -76,7 +90,7 @@ export function getAllPosts(portalId: string = "main-portal"): PostSummary[] {
               slug,
               vertical: vFolder,
               title: data.title || slug,
-              date: data.date ? String(data.date).split("T")[0] : "",
+              date: normalizeDate(data.date),
               author: data.author || "Club Member",
               authorUsername: data.authorUsername || "",
               authorAvatar: data.authorAvatar || (data.authorUsername ? `https://github.com/${data.authorUsername}.png` : ""),
@@ -110,7 +124,7 @@ export function getAllPosts(portalId: string = "main-portal"): PostSummary[] {
           slug,
           vertical: "club",
           title: data.title || slug,
-          date: data.date ? String(data.date).split("T")[0] : "",
+          date: normalizeDate(data.date),
           author: data.author || "Coding Club Core",
           authorUsername: data.authorUsername || "",
           authorAvatar: data.authorAvatar || (data.authorUsername ? `https://github.com/${data.authorUsername}.png` : ""),
@@ -132,8 +146,13 @@ export function getPostsByVertical(verticalSlug: string): PostSummary[] {
 
 export async function getPost(
   verticalSlug: string,
-  postSlug: string
+  postSlug: string,
+  portalId: string = "main-portal"
 ): Promise<PostDetail | null> {
+  if (!SAFE_SEGMENT.test(verticalSlug) || !SAFE_SEGMENT.test(postSlug)) {
+    return null;
+  }
+
   const contentDir = resolveContentDir();
   let filePath = path.join(contentDir, "verticals", verticalSlug, "posts", `${postSlug}.md`);
 
@@ -147,6 +166,11 @@ export async function getPost(
 
   const fileContents = fs.readFileSync(filePath, "utf8");
   const { data, content } = matter(fileContents);
+
+  if (!isPostVisibleOnPortal(data.targetPortals, portalId)) {
+    return null;
+  }
+
   const authorUsername = data.authorUsername || "";
   const authorAvatar = data.authorAvatar || (authorUsername ? `https://github.com/${authorUsername}.png` : "");
   const processed = await remark().use(html).process(content);
@@ -222,7 +246,7 @@ export async function getPost(
     slug: postSlug,
     vertical: verticalSlug,
     title: data.title || postSlug,
-    date: data.date ? String(data.date).split("T")[0] : "",
+    date: normalizeDate(data.date),
     author: data.author || "Club Member",
     authorUsername,
     authorAvatar,

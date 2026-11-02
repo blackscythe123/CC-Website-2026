@@ -51,8 +51,8 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # CD: Vercel Git auto-deploys are disabled (apps/*/vercel.json). Production
-  # deploys happen here, only for apps whose files changed since the last fully
-  # successful deploy run, so one push no longer creates 10 Vercel deployments.
+  # deploys happen here, only for apps whose files changed since that app's
+  # last successful deploy, so one push no longer creates 10 Vercel deployments.
   # Required: repo secret VERCEL_TOKEN. Optional: repo variable VERCEL_SCOPE.
   # ---------------------------------------------------------------------------
   detect-changed-apps:
@@ -74,16 +74,12 @@ jobs:
         with:
           node-version: 24
 
-      - name: "Find last successful deploy commit"
-        id: base
+      - name: "Find each app's last successful deploy"
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # Diff against the last fully successful run (not just the previous push),
-          # so an app whose deploy failed is retried on the next run.
-          sha=$(gh api "repos/${{ github.repository }}/actions/workflows/content-ci.yml/runs?branch=main&status=success&per_page=20"             --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")][0].head_sha // ""')
-          echo "Last successful deploy run commit: ${sha:-<none>}"
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          GITHUB_TOKEN: ${{ github.token }}
+        # Per app, not per run: a partially failed run must not force already-live apps to redeploy,
+        # and an app whose deploy failed is retried until it succeeds.
+        run: node scripts/find-deploy-bases.mjs "$RUNNER_TEMP/deploy-bases.json"
 
       - name: "Compute changed apps"
         id: detect
@@ -91,7 +87,7 @@ jobs:
           if [ "${{ inputs.deploy_all }}" = "true" ]; then
             node scripts/detect-changed-apps.mjs "" "${{ github.sha }}" --all
           else
-            node scripts/detect-changed-apps.mjs "${{ steps.base.outputs.sha }}" "${{ github.sha }}"
+            node scripts/detect-changed-apps.mjs --bases "$RUNNER_TEMP/deploy-bases.json" "${{ github.sha }}"
           fi
 
   deploy:

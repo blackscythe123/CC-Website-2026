@@ -1,12 +1,14 @@
-// Usage: node scripts/detect-changed-apps.mjs <baseSha|""> <headSha> [--all]
+// Usage:
+//   node scripts/detect-changed-apps.mjs --bases <bases.json> <headSha>   (per-app base, used by CI)
+//   node scripts/detect-changed-apps.mjs <baseSha|""> <headSha>           (one base for every app)
+//   node scripts/detect-changed-apps.mjs "" <headSha> --all               (force every app)
 // Prints the apps that need a production deploy and writes `apps=<json array>` to $GITHUB_OUTPUT.
-// An empty/unknown base SHA (first run, force-push past history) deploys every app.
+// An app with no usable base (never deployed, or base not in history) is always deployed.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { DEPLOYABLE_APPS, shouldDeployApp } from "./lib/affected-apps.mjs";
 
-const [baseArg = "", headArg = "HEAD", flag] = process.argv.slice(2);
-const head = headArg || "HEAD";
+const args = process.argv.slice(2);
 
 function emit(apps) {
   const json = JSON.stringify(apps);
@@ -15,6 +17,7 @@ function emit(apps) {
 }
 
 function commitExists(sha) {
+  if (!sha || /^0+$/.test(sha)) return false;
   try {
     execFileSync("git", ["cat-file", "-e", `${sha}^{commit}`], { stdio: "ignore" });
     return true;
@@ -23,29 +26,45 @@ function commitExists(sha) {
   }
 }
 
-if (flag === "--all") {
+const diffCache = new Map();
+function changedFiles(base, head) {
+  const key = `${base}..${head}`;
+  if (!diffCache.has(key)) {
+    const out = execFileSync("git", ["diff", "--name-only", base, head], { encoding: "utf8" });
+    diffCache.set(key, out.split("\n").map((f) => f.trim()).filter(Boolean));
+  }
+  return diffCache.get(key);
+}
+
+function decide(app, base, head) {
+  if (!commitExists(base)) {
+    console.log(`[detect] ${app}: DEPLOY - no usable base commit ('${base || ""}').`);
+    return true;
+  }
+  const files = changedFiles(base, head);
+  const { build, reason } = shouldDeployApp(app, files);
+  console.log(`[detect] ${app}: ${build ? "DEPLOY" : "skip"} - ${files.length} file(s) since ${base.slice(0, 7)}. ${reason}`);
+  return build;
+}
+
+if (args.includes("--all")) {
   console.log("[detect] Forced full deploy requested.");
   emit(DEPLOYABLE_APPS);
   process.exit(0);
 }
 
-if (!baseArg || /^0+$/.test(baseArg) || !commitExists(baseArg)) {
-  console.log(`[detect] No usable base commit ('${baseArg}'). Deploying every app as a safe fallback.`);
-  emit(DEPLOYABLE_APPS);
+if (args[0] === "--bases") {
+  const [, basesFile, headArg] = args;
+  const head = headArg || "HEAD";
+  let bases = {};
+  try {
+    bases = JSON.parse(fs.readFileSync(basesFile, "utf8"));
+  } catch {
+    console.log(`[detect] Could not read ${basesFile}; every app will deploy.`);
+  }
+  emit(DEPLOYABLE_APPS.filter((app) => decide(app, bases[app], head)));
   process.exit(0);
 }
 
-const changed = execFileSync("git", ["diff", "--name-only", baseArg, head], { encoding: "utf8" })
-  .split("\n")
-  .map((f) => f.trim())
-  .filter(Boolean);
-
-console.log(`[detect] ${changed.length} file(s) changed between ${baseArg.slice(0, 7)} and ${head.slice(0, 7)}.`);
-
-const apps = DEPLOYABLE_APPS.filter((app) => {
-  const { build, reason } = shouldDeployApp(app, changed);
-  console.log(`[detect] ${app}: ${build ? "DEPLOY" : "skip"} - ${reason}`);
-  return build;
-});
-
-emit(apps);
+const [baseArg = "", headArg = "HEAD"] = args;
+emit(DEPLOYABLE_APPS.filter((app) => decide(app, baseArg, headArg || "HEAD")));

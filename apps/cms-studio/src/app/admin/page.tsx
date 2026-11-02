@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { marked } from "marked";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
-import { ALL_VERTICALS, CLUB_VERTICAL } from "@/lib/verticals";
-import { useArticleDraft } from "@/lib/hooks/useArticleDraft";
+import { ALL_VERTICALS, CLUB_VERTICAL, getVertical } from "@/lib/verticals";
+import { parseArticlePath, useArticleDraft } from "@/lib/hooks/useArticleDraft";
 import { useStudio } from "@/components/shell/StudioContext";
 import { useToast } from "@/components/toast/ToastProvider";
 import { ConfirmDialog } from "@/components/ui";
@@ -20,6 +20,17 @@ interface RevisionPr {
   branch: string;
   title: string;
   feedback: string;
+  /** The PR's existing article file (from the preview), so a revised title doesn't create a second .md. */
+  filePath: string | null;
+  slug: string | null;
+  vertical: string | null;
+}
+
+interface PendingConfirm {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  run: () => void | Promise<void>;
 }
 
 export default function AdminEditorPage() {
@@ -34,7 +45,7 @@ export default function AdminEditorPage() {
   );
   const isUnassignedMember = !isSuperadmin && availableVerticals.length === 0;
 
-  const editor = useArticleDraft(userVerticals[0] || "ai-ml");
+  const editor = useArticleDraft(userVerticals[0] || "ai-ml", user.login);
   const { draft, set } = editor;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -47,9 +58,38 @@ export default function AdminEditorPage() {
   const [draftsOpen, setDraftsOpen] = useState(false);
   const [remoteDrafts, setRemoteDrafts] = useState<RemoteDraftSummary[]>([]);
   const [loadingDrafts, setLoadingDrafts] = useState(false);
-  const [confirmNew, setConfirmNew] = useState(false);
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   const [revision, setRevision] = useState<RevisionPr | null>(null);
   const [loadingRevision, setLoadingRevision] = useState(false);
+
+  // While revising a PR the vertical is fixed by the PR's file path: only offer that one.
+  const revisionVertical = revision?.vertical ? getVertical(revision.vertical) : undefined;
+  const selectableVerticals = useMemo(() => (revisionVertical ? [revisionVertical] : availableVerticals), [revisionVertical, availableVerticals]);
+  const changeVertical = useCallback(
+    (v: string) => {
+      if (revision?.vertical) return;
+      set("selectedVertical", v);
+    },
+    [revision, set]
+  );
+
+  /** Ask before replacing unsaved work in the editor (same dialog "New post" uses). */
+  const hasContent = editor.hasContent;
+  const guardReplace = useCallback(
+    (what: string, run: () => void | Promise<void>) => {
+      if (!hasContent) {
+        void run();
+        return;
+      }
+      setPendingConfirm({
+        title: `Replace the editor with ${what}?`,
+        message: "The post in the editor will be replaced, including the copy saved on this device. Sync it to GitHub first if you want to keep it.",
+        confirmLabel: "Replace",
+        run,
+      });
+    },
+    [hasContent]
+  );
 
   // Keep the selected vertical one the user may post to.
   useEffect(() => {
@@ -78,12 +118,29 @@ export default function AdminEditorPage() {
         const data = await res.json();
         if (!res.ok || !data.article) throw new Error(data.error || `Couldn't load PR #${prNumber}`);
         const a = data.article;
+        const filePath = typeof a.filePath === "string" ? a.filePath : null;
+        const target = parseArticlePath(filePath);
         editor.loadFrom(
-          { title: a.title || "", content: a.markdownBody || "", coverImage: a.coverImage || "", selectedVertical: a.vertical, summary: a.summary || "", tags: a.tags || [] },
+          {
+            title: a.title || "",
+            content: a.markdownBody || "",
+            coverImage: a.coverImage || "",
+            selectedVertical: target?.vertical || a.vertical,
+            summary: a.summary || "",
+            tags: a.tags || [],
+          },
           `PR #${prNumber}`
         );
         const fromQueue = queue.mine.find((p) => p.number === prNumber);
-        setRevision({ number: prNumber, branch: a.branch, title: a.title || "", feedback: feedback || fromQueue?.latestFeedback || "" });
+        setRevision({
+          number: prNumber,
+          branch: a.branch,
+          title: a.title || "",
+          feedback: feedback || fromQueue?.latestFeedback || "",
+          filePath,
+          slug: target?.slug ?? null,
+          vertical: target?.vertical ?? null,
+        });
         setViewMode("write");
       } catch (err) {
         toast.error(err instanceof Error ? err.message : `Couldn't load PR #${prNumber}`);
@@ -94,16 +151,21 @@ export default function AdminEditorPage() {
     [editor, queue.mine, toast]
   );
 
+  const requestRevision = useCallback(
+    (prNumber: number, feedback = "") => guardReplace(`PR #${prNumber}`, () => loadRevision(prNumber, feedback)),
+    [guardReplace, loadRevision]
+  );
+
   // /admin?revise=<PR number> opens that PR for revision (used by Reviews and the inbox).
-  const reviseHandled = useRef(false);
+  // Tracks the handled number so a later inbox click (new ?revise) while on this page is honoured too.
+  const reviseHandled = useRef<number | null>(null);
   useEffect(() => {
-    if (reviseHandled.current) return;
     const n = Number(new URLSearchParams(window.location.search).get("revise"));
-    if (n > 0) {
-      reviseHandled.current = true;
-      loadRevision(n);
+    if (n > 0 && reviseHandled.current !== n) {
+      reviseHandled.current = n;
+      requestRevision(n);
     }
-  }, [loadRevision]);
+  }, [requestRevision]);
 
   const sync = useCallback(async () => {
     if (isUnassignedMember) {
@@ -156,7 +218,9 @@ export default function AdminEditorPage() {
     }
   };
 
-  const openRemoteDraft = async (branch: string) => {
+  const openRemoteDraft = (branch: string) => guardReplace(branch, () => loadRemoteDraft(branch));
+
+  const loadRemoteDraft = async (branch: string) => {
     setLoadingDrafts(true);
     try {
       const res = await fetch(`/api/posts/drafts/remote?branch=${encodeURIComponent(branch)}`);
@@ -178,7 +242,6 @@ export default function AdminEditorPage() {
   };
 
   const startNewPost = async () => {
-    setConfirmNew(false);
     await editor.reset();
     setRevision(null);
     setViewMode("write");
@@ -202,7 +265,9 @@ export default function AdminEditorPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          vertical: draft.selectedVertical,
+          // Revising: keep the PR's own vertical + slug so the existing file is updated, not duplicated.
+          vertical: revision?.vertical || draft.selectedVertical,
+          slug: revision?.slug || undefined,
           title: draft.title.trim(),
           summary: draft.summary.trim(),
           coverImage: draft.coverImage,
@@ -231,11 +296,16 @@ export default function AdminEditorPage() {
 
   const changeRequest = queue.myChangesRequested;
   const strip: StripState = editor.recovered
-    ? { kind: "recovered", updatedAt: editor.recovered.updatedAt, onRestore: () => { editor.restoreRecovered(); toast.info("Draft restored"); }, onDiscard: editor.discardRecovered }
+    ? { kind: "recovered", updatedAt: editor.recovered.updatedAt, onRestore: () => {
+          // The restored snapshot is unrelated to any PR open in the editor: don't push it into that PR.
+          editor.restoreRecovered();
+          setRevision(null);
+          toast.info("Draft restored");
+        }, onDiscard: editor.discardRecovered }
     : revision
     ? { kind: "revising", number: revision.number, title: revision.title, feedback: revision.feedback }
     : changeRequest
-    ? { kind: "changes-requested", number: changeRequest.number, title: changeRequest.title, feedback: changeRequest.latestFeedback, loading: loadingRevision, onRevise: () => loadRevision(changeRequest.number, changeRequest.latestFeedback) }
+    ? { kind: "changes-requested", number: changeRequest.number, title: changeRequest.title, feedback: changeRequest.latestFeedback, loading: loadingRevision, onRevise: () => requestRevision(changeRequest.number, changeRequest.latestFeedback) }
     : isUnassignedMember
     ? { kind: "no-role" }
     : null;
@@ -283,15 +353,24 @@ export default function AdminEditorPage() {
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         isUnassignedMember={isUnassignedMember}
-        availableVerticals={availableVerticals}
+        availableVerticals={selectableVerticals}
         selectedVertical={draft.selectedVertical}
-        onVerticalChange={(v) => set("selectedVertical", v)}
+        onVerticalChange={changeVertical}
         saveState={editor.saveState}
         syncing={syncing}
         onSync={sync}
         revisionPrNumber={revision?.number ?? null}
         onOpenPublish={openPublish}
-        onNewPost={() => (editor.hasContent ? setConfirmNew(true) : startNewPost())}
+        onNewPost={() =>
+          editor.hasContent
+            ? setPendingConfirm({
+                title: "Start a new post?",
+                message: "This clears the editor and the copy saved on this device. Anything you synced to GitHub stays there.",
+                confirmLabel: "Start new post",
+                run: startNewPost,
+              })
+            : startNewPost()
+        }
         onOpenFromGitHub={openDrafts}
         onStopRevising={() => {
           setRevision(null);
@@ -318,9 +397,9 @@ export default function AdminEditorPage() {
         title={draft.title}
         content={draft.content}
         coverImage={draft.coverImage}
-        availableVerticals={availableVerticals}
+        availableVerticals={selectableVerticals}
         selectedVertical={draft.selectedVertical}
-        onVerticalChange={(v) => set("selectedVertical", v)}
+        onVerticalChange={changeVertical}
         summary={draft.summary}
         onSummaryChange={(v) => set("summary", v)}
         tags={draft.tags}
@@ -334,12 +413,16 @@ export default function AdminEditorPage() {
       <CloudDraftsDialog open={draftsOpen} login={user.login} drafts={remoteDrafts} loading={loadingDrafts} onLoad={openRemoteDraft} onClose={() => setDraftsOpen(false)} />
       <SubmissionSuccessDialog result={submissionResult} onClose={() => setSubmissionResult(null)} />
       <ConfirmDialog
-        open={confirmNew}
-        title="Start a new post?"
-        message="This clears the editor and the copy saved on this device. Anything you synced to GitHub stays there."
-        confirmLabel="Start new post"
-        onConfirm={startNewPost}
-        onCancel={() => setConfirmNew(false)}
+        open={pendingConfirm !== null}
+        title={pendingConfirm?.title ?? ""}
+        message={pendingConfirm?.message ?? ""}
+        confirmLabel={pendingConfirm?.confirmLabel ?? "Confirm"}
+        onConfirm={() => {
+          const action = pendingConfirm;
+          setPendingConfirm(null);
+          if (action) void action.run();
+        }}
+        onCancel={() => setPendingConfirm(null)}
       />
     </div>
   );

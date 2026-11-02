@@ -34,7 +34,7 @@ export default function BlogIndexPage() {
 
           <div className="text-left md:text-right font-mono text-xs space-y-2">
             <a
-              href="https://ssn-coding-club-cms.vercel.app/admin"
+              href="https://cc-cms-studio.vercel.app/admin"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-4 py-2.5 font-bold text-white shadow-sm hover:bg-stone-800 transition"

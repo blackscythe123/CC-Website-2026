@@ -1,5 +1,6 @@
 "use client";
 
+import { verticalPortalHref } from '../lib/scrapbook-verticals';
 import { useState } from "react";
 import Link from "next/link";
 import type { VerticalMetadata } from "@/lib/verticals";
@@ -246,7 +247,7 @@ export default function VerticalsTabs({ verticals }: VerticalsTabsProps) {
                     {/* Navigation Actions */}
                     <div className="space-y-2.5">
                       <Link
-                        href={`/verticals/${activeVertical.slug}`}
+                        href={verticalPortalHref(activeVertical.slug)}
                         className="w-full flex items-center justify-center gap-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-white font-mono text-xs font-bold py-3.5 px-4 shadow-md transition"
                       >
                         <span>Visit {activeVertical.name} Hub</span>
@@ -254,7 +255,7 @@ export default function VerticalsTabs({ verticals }: VerticalsTabsProps) {
                       </Link>
 
                       <a
-                        href="https://ssn-coding-club-cms.vercel.app/admin"
+                        href="https://cc-cms-studio.vercel.app/admin"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-stone-300 bg-white hover:bg-stone-50 text-stone-700 font-mono text-xs font-semibold py-2.5 px-4 transition"
@@ -283,7 +284,7 @@ export default function VerticalsTabs({ verticals }: VerticalsTabsProps) {
               return (
                 <Link
                   key={v.slug}
-                  href={`/verticals/${v.slug}`}
+                  href={verticalPortalHref(v.slug)}
                   className={`group relative flex flex-col justify-between rounded-2xl border ${
                     color.border
                   } ${color.bg} p-6 shadow-sm hover:shadow-lg transition-all hover:-translate-y-1`}

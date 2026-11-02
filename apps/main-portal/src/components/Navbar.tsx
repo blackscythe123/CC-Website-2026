@@ -93,7 +93,7 @@ export default function Navbar({ verticals = [], posts = [] }: NavbarProps) {
 
             {/* Join Us Button matching mockup */}
             <a
-              href="https://ssn-coding-club-cms.vercel.app/admin"
+              href="https://cc-cms-studio.vercel.app/admin"
               target="_blank"
               rel="noopener noreferrer"
               className="rounded-md border border-zinc-700 bg-zinc-900/60 px-3 py-1.5 text-zinc-200 hover:border-zinc-500 hover:text-white hover:bg-zinc-800 transition inline-flex items-center gap-1 shadow-2xs"
@@ -151,7 +151,7 @@ export default function Navbar({ verticals = [], posts = [] }: NavbarProps) {
             ))}
             <div className="pt-2 border-t border-zinc-800 flex items-center justify-between">
               <a
-                href="https://ssn-coding-club-cms.vercel.app/admin"
+                href="https://cc-cms-studio.vercel.app/admin"
                 className="text-[#F43F5E] hover:underline"
                 target="_blank"
                 rel="noopener noreferrer"

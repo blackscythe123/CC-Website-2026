@@ -27,7 +27,7 @@ export default function Footer() {
             <Link href="/blog" className="hover:text-white transition">03. blogs</Link>
             <Link href="/#projects" className="hover:text-white transition">04. projects</Link>
             <a
-              href="https://ssn-coding-club-cms.vercel.app/admin"
+              href="https://cc-cms-studio.vercel.app/admin"
               target="_blank"
               rel="noopener noreferrer"
               className="text-[#F43F5E] hover:underline"

@@ -142,7 +142,7 @@ export default async function VerticalDynamicPage({
           </div>
 
           <a
-            href="https://ssn-coding-club-cms.vercel.app/admin"
+            href="https://cc-cms-studio.vercel.app/admin"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 self-start rounded-xl bg-stone-900 px-4 py-2 text-xs font-mono font-bold text-white shadow-xs hover:bg-stone-800 transition"
@@ -156,7 +156,7 @@ export default async function VerticalDynamicPage({
           <div className="rounded-2xl border-2 border-dashed border-stone-300 bg-white p-12 text-center text-sm text-stone-500 font-mono">
             No posts published in this vertical yet. Use{" "}
             <a
-              href="https://ssn-coding-club-cms.vercel.app/admin"
+              href="https://cc-cms-studio.vercel.app/admin"
               target="_blank"
               rel="noopener noreferrer"
               className="text-[#F43F5E] underline font-bold"

@@ -27,10 +27,14 @@ export function sanitizeArticleHtml(
       img: ["src", "alt", "title", "width", "height", "loading"],
       code: ["class"],
       span: ["class"],
-      div: ["class"],
       pre: ["class"],
-      th: ["class"],
-      td: ["class"],
+    },
+    // Only syntax-highlighting classes: arbitrary classes let author HTML reuse Studio's own
+    // utility classes to overlay the reviewer UI.
+    allowedClasses: {
+      code: ["language-*", "hljs", "hljs-*"],
+      pre: ["language-*", "hljs"],
+      span: ["hljs-*"],
     },
     allowedSchemes: ["http", "https", "mailto"],
     allowedSchemesByTag: {
@@ -62,7 +66,7 @@ export function sanitizeArticleHtml(
         const isSafe =
           src.startsWith("https://") ||
           src.startsWith("http://") ||
-          (src.startsWith("/") && !src.startsWith("//")) ||
+          src.startsWith("/uploads/") ||
           allowedImages.has(src);
 
         if (!isSafe) {

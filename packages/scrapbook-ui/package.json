@@ -21,7 +21,10 @@
     "./projectsStandaloneCSS": "./src/components/projectsStandaloneCSS.ts",
     "./blogsStandaloneCSS": "./src/components/blogsStandaloneCSS.ts",
     "./useSectionEntrances": "./src/components/useSectionEntrances.ts",
-    "./RoadmapLab": "./src/components/RoadmapLab.tsx"
+    "./RoadmapLab": "./src/components/RoadmapLab.tsx",
+    "./VerticalArrival": "./src/components/VerticalArrival.tsx",
+    "./VerticalArrivalBootstrap": "./src/components/VerticalArrivalBootstrap.tsx",
+    "./navigation-lifecycle": "./src/components/navigation-lifecycle.ts"
   },
   "peerDependencies": {
     "next": "^16.4.4",

@@ -23,8 +23,14 @@
 
 .club-broadcast{--nav:var(--site-nav-height,64px);height:190svh;position:relative;overflow-anchor:none;scroll-margin-top:var(--nav)}
 .club-broadcast .broadcast-stage{top:var(--nav);height:calc(100svh - var(--nav));min-height:0}
-.club-broadcast .report-body{overflow-y:auto;overscroll-behavior-y:contain;scrollbar-width:thin;scrollbar-color:#af9a72 transparent;padding-right:5px}
+.club-broadcast .report-body{overflow-y:auto;overscroll-behavior-y:auto;scrollbar-width:thin;scrollbar-color:#af9a72 transparent;padding-right:5px}
 .club-broadcast .article-content{min-height:0}.club-broadcast .report h3{min-height:0}
 .club-broadcast .report-body:focus-visible{outline:2px solid #ab5578;outline-offset:2px}
 .club-broadcast .empty-copy{font:16px/1.6 Georgia,serif}
 @media(max-width:700px){.club-broadcast{--nav:var(--site-nav-height,96px);height:180svh}.club-broadcast .broadcast-stage{min-height:0}.club-broadcast .speaker-side{min-height:0}}
+
+/* Follow the same normal document flow as Projects, Events and Blogs.
+   Long articles may scroll internally, then naturally chain back to the page. */
+.club-broadcast{height:auto;min-height:calc(100svh - var(--nav));scroll-behavior:auto}
+.club-broadcast .broadcast-stage{position:relative;top:auto;height:calc(100svh - var(--nav));min-height:0}
+.club-broadcast .report-body{overscroll-behavior:auto;touch-action:pan-y}

@@ -1,4 +1,5 @@
 'use client';
+import {replaceNavigationUrl} from './navigation-lifecycle';
 import {useEffect,useRef,useState,useMemo} from 'react';
 import {usePathname} from 'next/navigation';
 import {verticalTabs} from '../community-features';
@@ -14,7 +15,7 @@ export default function VerticalNavbar({name,preview=false,slug}:{name:string;pr
   const section=document.getElementById('section-'+id);if(!section)return;
   e.preventDefault();
   window.scrollTo({top:window.scrollY+section.getBoundingClientRect().top-(ref.current?.offsetHeight||64),behavior:'instant'});
-  window.history.replaceState(window.history.state,'','#section-'+id);
+  replaceNavigationUrl('#section-'+id);
   setActive(id);window.dispatchEvent(new CustomEvent('ssn:section-change',{detail:{id}}));
  };
  return <header className="vertical-nav" ref={ref}>

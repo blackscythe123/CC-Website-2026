@@ -1,3 +1,4 @@
+import VerticalArrivalBootstrap from '@coding-club/scrapbook-ui/VerticalArrivalBootstrap';
 import type { Metadata } from 'next';
 import SiteNavbar from '../components/SiteNavbar';
 import HeadingReveal from '../components/HeadingReveal';
@@ -19,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning><head><VerticalArrivalBootstrap/></head>
       <body>
         <HeadingReveal />
         <SiteNavbar />

@@ -14,5 +14,5 @@ export default function ClubBroadcast({items=empty}:{items?:BroadcastItem[]}){
   const observer=new IntersectionObserver(entries=>{if(!entries.some(e=>e.isIntersecting))return;observer.disconnect();import('./broadcast-megaphone').then(({mountMegaphone})=>{if(!disposed)cleanupMesh=mountMegaphone(root)}).catch(()=>{})},{rootMargin:'400px'});observer.observe(root);
   return()=>{disposed=true;observer.disconnect();clean();cleanupMesh?.()};
  },[items]);
- return <section ref={host} id="section-dispatches" className="club-broadcast" aria-label="Club announcements and latest news" dangerouslySetInnerHTML={{__html:broadcastMarkup}}/>;
+ return <section ref={host} id="section-dispatches" className="club-broadcast" aria-label="Announcements and latest news" dangerouslySetInnerHTML={{__html:broadcastMarkup}}/>;
 }

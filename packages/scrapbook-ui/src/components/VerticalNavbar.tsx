@@ -19,6 +19,6 @@ export default function VerticalNavbar({name,preview=false,slug}:{name:string;pr
  };
  return <header className="vertical-nav" ref={ref}>
   <a className="vertical-brand" href="https://cc-main-portal.vercel.app/#section-verticals" aria-label="Back to the main Coding Club verticals"><span aria-hidden="true">←</span><div><small>SSN CODING CLUB</small><strong>{name}</strong></div></a>
-  <nav aria-label={`${name} navigation`}>{tabs.map((id,i)=><a key={id} href={`${path.startsWith('/verticals/')?'':'/'}#section-${id}`} onClick={e=>go(e,id)} aria-current={active===id?'location':undefined}><span>{String(i+1).padStart(2,'0')}.</span> {id.replaceAll('-',' ')}</a>)}</nav>
+  <nav aria-label={`${name} navigation`}>{tabs.map((id,i)=><a key={id} href={`${path.startsWith('/verticals/')?'':'/'}#section-${id}`} onClick={e=>go(e,id)} aria-current={active===id?'location':undefined}><span>{String(i+1).padStart(2,'0')}.</span> {id==='dispatches'?'updates':id.replaceAll('-',' ')}</a>)}</nav>
  </header>;
 }

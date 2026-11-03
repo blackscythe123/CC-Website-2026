@@ -25,3 +25,20 @@ body:has(.roadmap-lab)>.ssn-global-navbar,body:has(.roadmap-lab) .ssn-global-nav
  .roadmap-integrated .journey-scroll-choice{display:none}
  .roadmap-integrated .journey-footer{padding:13px 14px;gap:10px;min-height:45px;box-sizing:border-box}
 }
+
+/* Direct access complements the scroll journey on desktop and phones. */
+.journey-header{flex-wrap:wrap}
+.journey-topic-jump{display:flex;align-items:center;gap:9px;min-width:0;font:9px 'DM Mono',monospace;color:#425e50}
+.journey-topic-jump>span{white-space:nowrap}
+.journey-topic-jump select{width:240px;max-width:32vw;min-width:0;border:1px solid #bda889;border-radius:4px;background:#fff7e8ed;color:#293c36;padding:8px 27px 8px 10px;font:10px 'DM Mono',monospace;cursor:pointer}
+.journey-topic-jump select:focus-visible{outline:2px solid var(--journey-accent);outline-offset:3px}
+.roadmap-integrated .journey-header>.journey-brand{width:auto;flex:1;min-width:0}
+@media(min-width:701px) and (max-width:1100px){.roadmap-integrated .journey-path-name{display:none}}
+@media(max-width:700px){
+ .journey-topic-jump{width:100%;gap:8px;font-size:8px}
+ .journey-topic-jump select{flex:1;width:0;max-width:none;font-size:9px;min-height:30px;padding:6px 22px 6px 8px}
+ .roadmap-integrated .journey-header{flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px}
+ .roadmap-integrated .journey-header>.journey-brand{width:100%;flex:none}
+ .roadmap-integrated .journey-heading{top:91px}
+ .roadmap-lab:not(.roadmap-integrated) .journey-heading{top:170px}
+}

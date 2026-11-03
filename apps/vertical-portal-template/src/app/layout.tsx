@@ -1,4 +1,3 @@
-import VerticalArrivalBootstrap from '@coding-club/scrapbook-ui/VerticalArrivalBootstrap';
 import type { Metadata } from "next";
 import "./globals.css";
 import portalConfig from "../../portal.config.json";
@@ -14,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning><head><VerticalArrivalBootstrap/></head>
+    <html lang="en">
       <body className="min-h-screen bg-white text-black antialiased selection:bg-black selection:text-white">
         <header className="border-b border-black">
           <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">

@@ -65,15 +65,15 @@ export default function usePageScrub({surface,sheet,count,enabled,initial,resetK
    if(!drag.moved&&Math.abs(e.clientY-drag.y)>Math.abs(dx))return;if(Math.abs(dx)<5&&!drag.moved)return;
    drag.moved=true;e.preventDefault();
    const pageWidth=drag.node.getBoundingClientRect().width;
-   position.current.value=Math.max(0,Math.min(count-1,drag.value-dx/Math.max(240,pageWidth*.48)));
+   position.current.value=Math.max(0,Math.min(count-1,drag.value-dx/(phone()?Math.max(90,pageWidth*.36):Math.max(240,pageWidth*.48))));
    cancelAnimationFrame(frame);frame=requestAnimationFrame(draw);
   };
   const up=(e:PointerEvent)=>{
    if(!drag||drag.pointer!==e.pointerId)return;
    const d=drag;drag=null;
    if(d.node.hasPointerCapture(e.pointerId))d.node.releasePointerCapture(e.pointerId);
-   if(e.type==='pointercancel')return;
-   if(d.moved){e.preventDefault();cancelAnimationFrame(frame);draw();if(phone()){const dx=e.clientX-d.x;moveTo.current(Math.abs(dx)>35?Math.round(d.value)+(dx<0?1:-1):Math.round(d.value))}}
+   if(e.type==='pointercancel'){moveTo.current(Math.round(d.value));return;}
+   if(d.moved){e.preventDefault();cancelAnimationFrame(frame);draw();if(phone()){const dx=e.clientX-d.x;moveTo.current(Math.abs(dx)>(phone()?22:35)?Math.round(d.value)+(dx<0?1:-1):Math.round(d.value))}}
    else moveTo.current(d.direction===1?Math.floor(position.current.value+.0001)+1:Math.ceil(position.current.value-.0001)-1);
   };
   frame=requestAnimationFrame(draw);el.addEventListener('wheel',wheel,{passive:false});

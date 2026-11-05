@@ -21,7 +21,7 @@ export default function useSectionEntrances(enabled=true){
   };
   const progress=(anchor:Element,id:string,delay=0)=>{
    const r=anchor.getBoundingClientRect(),h=window.innerHeight;
-   const entry=id==='verticals'?clamp((h*.86-r.top)/(h*.76)):clamp((h*.78-r.top)/(h*.68));
+   const entry=id==='verticals'?clamp((h*.86-r.top)/(h*.76)):id==='blogs'?clamp((h*.86-r.top)/(h*.56)):clamp((h*.78-r.top)/(h*.68));
    // Retain a short hold at full assembly, but start each section's exit
    // ~3-4% of a viewport earlier than V4. These values are per section.
    const exitWindow=exitWindows[id]??{end:.20,duration:.52};
@@ -101,13 +101,17 @@ export default function useSectionEntrances(enabled=true){
    const b=section('blogs'),br=b?.querySelector('div')?.shadowRoot;
    if(b&&br){
     observe(br);const paper=br.querySelector<HTMLElement>('.newspaper');
-    const ready=width<=700&&paper?Math.min(progress(b,'blogs'),clamp((window.innerHeight*.70-baseRect(paper).top)/(window.innerHeight*.55))):progress(b,'blogs');
-    const distance=width<=700?window.innerHeight*.17:width*.55;
+    // Measure the paper itself: the header/search can enter before the folios do.
+    // Keep both assembly and separation visible, rather than finishing offscreen.
+    const paperBox=paper?baseRect(paper):null,h=window.innerHeight;
+    const paperEntry=paperBox?clamp((h*.94-paperBox.top)/(h*.60)):1;
+    const paperExit=paperBox?clamp((paperBox.bottom-h*.08)/(h*.60)):1;
+    const ready=Math.min(progress(b,'blogs'),paperEntry,paperExit),distance=width*.55;
     // Keep the title steady while letters are typed.
     move(br.querySelector('.archive-search'),progress(b,'blogs'),-200,0);
     if(paper){paper.style.setProperty('--assembly-offset',`${distance*(1-ready)}px`);touched.add(paper);paper.querySelectorAll<HTMLElement>(':scope > .paper-rule,:scope > .newspaper-deck,:scope > .spread > .gutter').forEach(el=>{el.style.opacity=String(ready);touched.add(el)})}
-    for(const selector of ['.newspaper > .spread > .paper-page:first-child','.newspaper > .paper-header > .masthead'])move(br.querySelector(selector),ready,width<=700?0:-distance,width<=700?-distance:0);
-    for(const selector of ['.newspaper > .spread > .paper-page:last-child','.newspaper > .paper-header > .volume'])move(br.querySelector(selector),ready,width<=700?0:distance,width<=700?distance:0);
+    for(const selector of ['.newspaper > .spread > .paper-page:first-child','.newspaper > .paper-header > .masthead'])move(br.querySelector(selector),ready,-distance,0);
+    for(const selector of ['.newspaper > .spread > .paper-page:last-child','.newspaper > .paper-header > .volume'])move(br.querySelector(selector),ready,distance,0);
     move(br.querySelector('.newspaper > .paper-bottom'),ready,0,45);
    }
    const people=section('people');if(people){

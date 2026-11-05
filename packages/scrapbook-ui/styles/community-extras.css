@@ -258,3 +258,7 @@
 @media(min-width:701px){.regal-gallery:not([data-artwork-ready])>.shelf-environment{background-image:none}}
 .regal-gallery [data-artwork-fallback=true].ledge-photo:before,.regal-gallery .ledge-team[data-artwork-fallback=true]:before{content:'';position:absolute;inset:3% 10% 3%;border:8px ridge #ac8954;box-shadow:0 3px 7px #30211355;pointer-events:none}
 .regal-gallery [data-artwork-fallback=true] .ledge-caption{z-index:5}
+
+/* The medal supplies rank; the stand gives the member's name prominence. */
+.coding-league .podium-block{justify-content:center;padding:12px 6px}.coding-league .podium-block>span{font:600 clamp(17px,2vw,25px)/1.15 'Playfair Display',Georgia,serif;overflow-wrap:anywhere;width:94%;padding:9px 4px;color:#3b302b;text-shadow:0 1px #fff8}
+@media(max-width:700px){.coding-league .podium-block>span{font-size:clamp(15px,4vw,20px);padding:7px 2px}}

@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useLayoutEffect,useState,useRef} from 'react';
-import {consumeInitialReload,replaceNavigationUrl} from './navigation-lifecycle';
+import {consumeInitialReload,replaceNavigationUrl,rememberVisibleSection,reloadSection,finishSectionRestore} from './navigation-lifecycle';
 import dynamic from 'next/dynamic';
 import VerticalArrival,{isStickyArrival} from './VerticalArrival';
 const RoadmapJourney=dynamic(()=>import('./RoadmapLab'),{ssr:false});
@@ -20,12 +20,13 @@ export default function VerticalPortalHome({slug,publishedPosts=[],broadcastItem
  useSectionEntrances(!preview&&motionReady);
  useEffect(()=>{if(!arrived||motionReady)return;const enable=()=>{if((document.getElementById('section-projects')?.getBoundingClientRect().bottom??Infinity)<innerHeight*.6)setMotionReady(true)};window.addEventListener('scroll',enable,{passive:true});window.addEventListener('ssn:section-change',enable);return()=>{window.removeEventListener('scroll',enable);window.removeEventListener('ssn:section-change',enable)}},[arrived,motionReady]);
 
+ useEffect(()=>{if(preview)return;return rememberVisibleSection(verticalTabs(slug).map(tab=>'section-'+tab),'.vertical-nav')},[preview,slug]);
  const content=getVerticalContent(slug);
- useLayoutEffect(()=>{if(preview)return;const reloaded=reload.current??(reload.current=consumeInitialReload());if(reloaded)replaceNavigationUrl(location.pathname+location.search+'#section-projects');const requested=reloaded?'section-projects':location.hash.slice(1);const id=verticalTabs(slug).map(tab=>'section-'+tab).includes(requested)?requested:'section-projects';
+ useLayoutEffect(()=>{if(preview)return;const reloaded=reload.current??(reload.current=consumeInitialReload());const sectionIds=verticalTabs(slug).map(tab=>'section-'+tab);const requested=reloaded?reloadSection(sectionIds,'section-projects'):location.hash.slice(1);const id=sectionIds.includes(requested)?requested:'section-projects';if(reloaded){history.scrollRestoration='manual';replaceNavigationUrl(location.pathname+location.search+'#'+id)}
   let stopped=false;const align=()=>{if(stopped)return;const section=document.getElementById(id);if(section)window.scrollTo({top:scrollY+section.getBoundingClientRect().top-(document.querySelector<HTMLElement>('.vertical-nav')?.offsetHeight||64),behavior:'instant'})};
-  align();const frame=requestAnimationFrame(align);
+  align();let replayFrame=0;const frame=requestAnimationFrame(()=>{align();if(reloaded)replayFrame=requestAnimationFrame(()=>{finishSectionRestore();window.dispatchEvent(new CustomEvent('ssn:section-change',{detail:{id:id.replace('section-','')}}))})});const observer=new ResizeObserver(align);observer.observe(document.body);const nav=document.querySelector('.vertical-nav');if(nav)observer.observe(nav);const finish=window.setTimeout(()=>{stopped=true;observer.disconnect()},2500);
   const stop=()=>{stopped=true};window.addEventListener('wheel',stop,{passive:true,once:true});window.addEventListener('pointerdown',stop,{once:true});window.addEventListener('touchstart',stop,{passive:true,once:true});
-  return()=>{cancelAnimationFrame(frame);window.removeEventListener('wheel',stop);window.removeEventListener('pointerdown',stop);window.removeEventListener('touchstart',stop)};
+  return()=>{clearTimeout(finish);observer.disconnect();cancelAnimationFrame(frame);cancelAnimationFrame(replayFrame);window.removeEventListener('wheel',stop);window.removeEventListener('pointerdown',stop);window.removeEventListener('touchstart',stop)};
  },[preview,slug]);
  if(preview)return <div className="ssn-scroll-site vertical-portal"><section id="preview-projects" className="ssn-scroll-panel" aria-label={`${content.category} projects preview`}><ProjectsIsolated projects={content.projects} settled/></section></div>;
  return <div className="ssn-scroll-site vertical-portal" data-vertical={slug}>

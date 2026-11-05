@@ -33,3 +33,6 @@
 @keyframes about-cue-breathe{0%,100%{transform:scale(.97)}50%{transform:scale(1.055)}}
 @media(max-width:700px){.about-scroll-cue{width:100%;font-size:16px;margin-top:15px;transform-origin:left center}}
 @media(prefers-reduced-motion:reduce){.about-scroll-cue{animation:none}}
+
+/* The open lid sits behind the letter; the envelope pocket stays in front. */
+.about-lid-arrival{z-index:3}.about-envelope-lid{z-index:3;filter:none}

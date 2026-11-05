@@ -14,28 +14,29 @@ export default function AboutLetter(){
     const stage=root.current!.querySelector<HTMLElement>('.about-letter-stage')!;
     const letter=root.current!.querySelector<HTMLElement>('.about-letter')!;
     const navHeight=()=>document.querySelector<HTMLElement>('.ssn-global-navbar')?.offsetHeight||65;
-    gsap.set('.about-envelope-entry',{y:15,rotation:-4});
+    gsap.set('.about-envelope-entry,.about-envelope-lid',{y:15,rotation:-4});
     gsap.set('.about-pen',{autoAlpha:0,rotation:-22});
     gsap.set('.about-greeting-ink',{clipPath:'inset(0 100% 0 0)'});
     gsap.set('.about-ink-trail',{strokeDasharray:500,strokeDashoffset:500});
     const blocks=gsap.utils.toArray<HTMLElement>('.about-letter h2, .about-letter-lede, .about-copy-section h3, .about-copy-section p, .about-copy-index, .about-letter-values > div, .about-letter footer');
     gsap.set(blocks,{clipPath:'inset(0% 0% 100% 0%)'});
     gsap.fromTo('.about-arrival',{x:-95,y:95,rotation:-9,autoAlpha:0},{x:0,y:0,rotation:0,autoAlpha:1,ease:'power2.out',scrollTrigger:{trigger:root.current,start:'top bottom',end:()=>`top top+=${navHeight()+20}`,scrub:.45,invalidateOnRefresh:true}});
-    gsap.set(letter,{y:150,scale:.78,autoAlpha:0,clipPath:'inset(0% 0% 76% 0%)'});
+    gsap.set(letter,{y:()=>innerWidth<=700?145:180,scale:.72,autoAlpha:0,clipPath:'inset(0% 0% 76% 0%)'});
     gsap.set('.about-letter-fold',{rotationX:-85,autoAlpha:0,transformOrigin:'50% 0%'});
     const timeline=gsap.timeline({scrollTrigger:{trigger:stage,start:()=>`top top+=${navHeight()}`,end:()=>`+=${Math.min(innerHeight*.85,700)}`,pin:true,pinSpacing:true,scrub:.45,invalidateOnRefresh:true,anticipatePin:1}});
-    timeline.to('.about-envelope-entry',{rotation:0,duration:.12,ease:'power2.out'},0)
+    timeline.to('.about-envelope-entry,.about-envelope-lid',{rotation:0,duration:.12,ease:'power2.out'},0)
      .to('.about-envelope-entry .about-seal',{x:90,y:30,rotation:30,scale:.85,opacity:0,duration:.15},.06)
-     .to('.about-envelope-entry .about-envelope-flap',{rotationX:175,duration:.24,ease:'power2.inOut'},.15)
-     .set('.about-envelope-entry .about-envelope-flap',{zIndex:0},.32)
+     .to('.about-envelope-lid .about-envelope-flap',{rotationX:175,duration:.24,ease:'power2.inOut'},.15)
+     .set('.about-envelope-lid .about-envelope-flap',{zIndex:0},.32)
+     .set('.about-envelope-entry .about-envelope-back',{autoAlpha:0},.32)
      .to(letter,{autoAlpha:1,duration:.08},.32)
-     .to(letter,{y:0,scale:1,clipPath:'inset(0% 0% 0% 0%)',duration:.38,ease:'power2.inOut'},.35)
-     .set('.about-envelope-entry',{zIndex:2},.48)
-     .set('.about-arrival',{zIndex:2},.48)
+     // The front pocket remains in front of the paper throughout extraction.
+     .to(letter,{y:-100,clipPath:'inset(0% 0% 76% 0%)',duration:.30,ease:'power2.inOut'},.35)
+     .to(letter,{y:0,scale:1,clipPath:'inset(0% 0% 0% 0%)',duration:.24,ease:'power2.inOut'},.65)
      .to('.about-letter-fold',{rotationX:0,duration:.3,ease:'power2.inOut'},.49)
      .to('.about-letter-fold',{autoAlpha:1,duration:.14},.68)
-     .to('.about-envelope-entry',{y:300,scale:.92,duration:.25,ease:'power2.in'},.48)
-     .to('.about-envelope-entry',{autoAlpha:0,duration:.08},.71)
+     .to('.about-envelope-entry,.about-envelope-lid',{y:420,scale:.92,duration:.25,ease:'power2.in'},.59)
+     .to('.about-envelope-entry,.about-envelope-lid',{autoAlpha:0,duration:.08},.79)
      .to('.about-pen',{autoAlpha:1,duration:.07},.77)
      .to('.about-pen',{motionPath:{path:'.about-pen-path',align:'.about-pen-path',alignOrigin:[0,1]},duration:.24,ease:'none'},.8)
      .to('.about-greeting-ink',{clipPath:'inset(0 0% 0 0)',duration:.24,ease:'none'},.8)
@@ -91,12 +92,13 @@ export default function AboutLetter(){
    <div className="about-letter-desk">
     <div className="about-arrival"><div className="about-envelope about-envelope-entry" aria-hidden="true">
      <div className="about-envelope-back"/>
-     <div className="about-envelope-flap"><div/><div/></div>
+
      <div className="about-envelope-front"><span>TO: THE NEXT CURIOUS MIND</span><small>SSN CODING CLUB · OPEN WHEN CURIOUS</small></div>
      <div className="about-seal">&lt;/&gt;<small>SSN</small></div>
      <span className="about-envelope-note">Something good starts<br/>with a little curiosity.</span>
     </div>
     </div>
+    <div className="about-arrival about-lid-arrival" aria-hidden="true"><div className="about-envelope about-envelope-lid"><div className="about-envelope-flap"><div/><div/></div></div></div>
     <div className="about-letter-wrap"><article className="about-letter" aria-label="About SSN Coding Club">
      <div className="about-letter-top"><div className="about-letter-meta"><span>SSN CODING CLUB</span><span>AN OPEN INVITATION ↗</span></div><div className="about-writing"><p className="about-letter-salutation"><span className="about-greeting-ink">Hey, curious mind.</span></p><svg className="about-writing-guide" viewBox="0 0 310 40" aria-hidden="true"><path className="about-pen-path" d="M2 22Q12 2 22 21T42 20T62 22T82 18T102 22T122 20T142 22T162 18T182 22T202 20T222 22T242 18T262 22L280 24"/><path className="about-ink-trail" d="M2 35Q130 29 280 34"/></svg><svg className="about-pen" viewBox="0 0 100 160" aria-hidden="true"><defs><linearGradient id="about-pen-metal"><stop stopColor="#a6824d"/><stop offset=".45" stopColor="#f2dfad"/><stop offset="1" stopColor="#987644"/></linearGradient><linearGradient id="about-pen-barrel"><stop stopColor="#1c3433"/><stop offset=".4" stopColor="#50736b"/><stop offset="1" stopColor="#142727"/></linearGradient></defs><g transform="rotate(30 15 145)"><path d="M15 145 7 121 23 121Z" fill="url(#about-pen-metal)" stroke="#8e754c"/><path d="M15 145V126" stroke="#786442"/><rect x="6" y="27" width="18" height="96" rx="5" fill="url(#about-pen-barrel)"/><path d="M6 113H24M6 43H24" stroke="#d2ba82" strokeWidth="4"/><rect x="5" y="8" width="20" height="35" rx="9" fill="url(#about-pen-barrel)"/><path d="M20 14V51" stroke="#d9c492" strokeWidth="3" strokeLinecap="round"/></g></svg></div><h2>You don’t need to have it all figured out.<br/><span>Just bring your curiosity.</span></h2><svg className="about-underline" viewBox="0 0 440 16" aria-hidden="true"><path d="M4 10Q220 -2 435 7M40 14Q260 4 410 11"/></svg><p className="about-letter-lede">A place to learn something new, make something of your own, and find people to do it with.</p></div>
      <div className="about-letter-fold"><div className="about-letter-copy">

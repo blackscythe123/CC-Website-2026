@@ -115,9 +115,10 @@ export default function useSectionEntrances(enabled=true){
     move(br.querySelector('.newspaper > .paper-bottom'),ready,0,45);
    }
    const people=section('people');if(people){
+    const replayStart=replay.get('people');const arrival=replayStart===undefined?1:clamp((performance.now()-replayStart)/1000);if(arrival<1)request();else replay.delete('people');
     // Keep the title steady while letters are typed.
     people.querySelectorAll<HTMLElement>('.people-team').forEach(team=>{
-     const teamProgress=()=>{const rect=team.getBoundingClientRect(),h=window.innerHeight;return ease(Math.min(clamp((h*.97-rect.top)/(h*.35)),clamp((rect.bottom-h*.20)/(h*.55))));};
+     const teamProgress=()=>{const rect=team.getBoundingClientRect(),h=window.innerHeight;return ease(Math.min(arrival,clamp((h*.97-rect.top)/(h*.35)),clamp((rect.bottom-h*.20)/(h*.55))));};
      move(team.querySelector('.people-team-label'),teamProgress(),-180,0);
      team.querySelectorAll<HTMLElement>('.people-draggable').forEach((photo,i)=>move(photo,ease(clamp((teamProgress()-Math.min(i,4)*.055)/(1-Math.min(i,4)*.055))),width*.65+Math.min(i,4)*70,-15));
     });

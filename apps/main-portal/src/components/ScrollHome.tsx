@@ -1,6 +1,6 @@
 "use client";
 import {useCallback,useEffect,useRef} from 'react';
-import {consumeInitialReload,replaceNavigationUrl} from '@coding-club/scrapbook-ui/navigation-lifecycle';
+import {consumeInitialReload,replaceNavigationUrl,rememberVisibleSection,reloadSection,finishSectionRestore} from '@coding-club/scrapbook-ui/navigation-lifecycle';
 import Landing from './Landing';
 import dynamic from 'next/dynamic';
 const ClubRoadmap=dynamic(()=>import('@coding-club/scrapbook-ui/RoadmapLab'),{ssr:false});
@@ -17,7 +17,8 @@ const ids=['home','about','verticals','projects','events','blogs','people','road
 export default function ScrollHome(){
  const reload=useRef<boolean|null>(null);
  useSectionEntrances();
- useEffect(()=>{const reloaded=reload.current??(reload.current=consumeInitialReload());if(reloaded){replaceNavigationUrl(location.pathname+location.search+'#section-home');history.scrollRestoration='manual'}const id=reloaded?'section-home':window.location.hash.replace('#','');if(!id.startsWith('section-'))return;let frame=0;const align=()=>{const el=document.getElementById(id),nav=document.querySelector<HTMLElement>('.ssn-global-navbar');if(el)window.scrollTo({top:window.scrollY+el.getBoundingClientRect().top-(nav?.offsetHeight||46),behavior:'instant'})};frame=requestAnimationFrame(align);return()=>cancelAnimationFrame(frame)},[]);
+ useEffect(()=>rememberVisibleSection(ids.map(id=>'section-'+id),'.ssn-global-navbar'),[]);
+ useEffect(()=>{const reloaded=reload.current??(reload.current=consumeInitialReload());const requested=reloaded?reloadSection(ids.map(id=>'section-'+id),'section-home'):window.location.hash.slice(1);const id=ids.map(id=>'section-'+id).includes(requested)?requested:'section-home';if(reloaded){replaceNavigationUrl(location.pathname+location.search+'#'+id);history.scrollRestoration='manual'}if(!id.startsWith('section-'))return;let frame=0,stopped=false;const align=()=>{if(stopped)return;const el=document.getElementById(id),nav=document.querySelector<HTMLElement>('.ssn-global-navbar');if(el)window.scrollTo({top:window.scrollY+el.getBoundingClientRect().top-(nav?.offsetHeight||46),behavior:'instant'})};let replayFrame=0;frame=requestAnimationFrame(()=>{align();if(reloaded)replayFrame=requestAnimationFrame(()=>{finishSectionRestore();window.dispatchEvent(new CustomEvent('ssn:section-change',{detail:{id:id.replace('section-','')}}))})});const observer=new ResizeObserver(align);observer.observe(document.body);const nav=document.querySelector('.ssn-global-navbar');if(nav)observer.observe(nav);const stop=()=>{stopped=true;observer.disconnect()};const finish=setTimeout(stop,2500);window.addEventListener('wheel',stop,{passive:true,once:true});window.addEventListener('pointerdown',stop,{once:true});window.addEventListener('touchstart',stop,{passive:true,once:true});return()=>{clearTimeout(finish);observer.disconnect();window.removeEventListener('wheel',stop);window.removeEventListener('pointerdown',stop);window.removeEventListener('touchstart',stop);cancelAnimationFrame(frame);cancelAnimationFrame(replayFrame)}},[]);
  const go=useCallback((route:string)=>{
   const id=route.replace(/^\//,'').replace(/^section-/,'')||'home';
   const el=document.getElementById('section-'+id);

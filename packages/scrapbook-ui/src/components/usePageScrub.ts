@@ -13,6 +13,8 @@ export default function usePageScrub({surface,sheet,count,enabled,initial,resetK
  useEffect(()=>{
   const el=surface.current,node=sheet.current;if(!enabled||!el||!node)return;
   let frame=0,lastIndex=-1,lastBase=-1;
+  let settleTimer:ReturnType<typeof setTimeout>|undefined;
+  const settle=(direction:number)=>{clearTimeout(settleTimer);if(commitAtEnd)settleTimer=setTimeout(()=>{const value=position.current.value;moveTo.current(direction>0?Math.ceil(value-.0001):Math.floor(value+.0001))},160)};
   let lastMoving:boolean|null=null;
   position.current.value=latest.current.initial;
   const phone=()=>window.matchMedia('(max-width:700px)').matches;
@@ -47,14 +49,14 @@ export default function usePageScrub({surface,sheet,count,enabled,initial,resetK
    const delta=raw*(e.deltaMode===1?16:e.deltaMode===2?el.clientWidth:1);
    const distance=Math.max(360,Math.min(720,el.clientWidth*.65));
    position.current.value=Math.max(0,Math.min(count-1,position.current.value+delta/distance));
-   cancelAnimationFrame(frame);frame=requestAnimationFrame(draw);
+   cancelAnimationFrame(frame);frame=requestAnimationFrame(draw);settle(delta);
   };
   let drag:{pointer:number;x:number;y:number;value:number;moved:boolean;direction:1|-1;node:HTMLElement}|null=null;
   const down=(e:PointerEvent)=>{
    const target=e.composedPath().find(node=>node instanceof HTMLElement) as HTMLElement|undefined;
    if(e.button!==0||!target||target.closest('a,button,input,select,textarea'))return;
    const page=target.closest<HTMLElement>('.book-spread,.newspaper');if(!page)return;
-   e.preventDefault();tween.current?.kill();
+   e.preventDefault();clearTimeout(settleTimer);tween.current?.kill();
    const rect=page.getBoundingClientRect();
    drag={pointer:e.pointerId,x:e.clientX,y:e.clientY,value:position.current.value,moved:false,direction:e.clientX<rect.left+rect.width/2?-1:1,node:page};
    page.setPointerCapture(e.pointerId);
@@ -73,12 +75,12 @@ export default function usePageScrub({surface,sheet,count,enabled,initial,resetK
    const d=drag;drag=null;
    if(d.node.hasPointerCapture(e.pointerId))d.node.releasePointerCapture(e.pointerId);
    if(e.type==='pointercancel'){moveTo.current(Math.round(d.value));return;}
-   if(d.moved){e.preventDefault();cancelAnimationFrame(frame);draw();if(phone()){const dx=e.clientX-d.x;moveTo.current(Math.abs(dx)>(phone()?22:35)?Math.round(d.value)+(dx<0?1:-1):Math.round(d.value))}}
+   if(d.moved){e.preventDefault();cancelAnimationFrame(frame);draw();if(phone()||commitAtEnd){const dx=e.clientX-d.x;moveTo.current(Math.abs(dx)>(phone()?22:35)?Math.round(d.value)+(dx<0?1:-1):Math.round(d.value))}}
    else moveTo.current(d.direction===1?Math.floor(position.current.value+.0001)+1:Math.ceil(position.current.value-.0001)-1);
   };
   frame=requestAnimationFrame(draw);el.addEventListener('wheel',wheel,{passive:false});
   el.addEventListener('pointerdown',down);el.addEventListener('pointermove',pointerMove);el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);
-  return()=>{el.removeEventListener('wheel',wheel);el.removeEventListener('pointerdown',down);el.removeEventListener('pointermove',pointerMove);el.removeEventListener('pointerup',up);el.removeEventListener('pointercancel',up);cancelAnimationFrame(frame);tween.current?.kill();node.style.display='none'};
+  return()=>{clearTimeout(settleTimer);el.removeEventListener('wheel',wheel);el.removeEventListener('pointerdown',down);el.removeEventListener('pointermove',pointerMove);el.removeEventListener('pointerup',up);el.removeEventListener('pointercancel',up);cancelAnimationFrame(frame);tween.current?.kill();node.style.display='none'};
  },[enabled,count,resetKey,horizontalOnly,commitAtEnd,paperCurl,surface,sheet]);
  const go=(index:number)=>{
   tween.current?.kill();

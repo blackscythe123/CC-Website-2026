@@ -347,3 +347,11 @@
 .event-book-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:15;width:44px;height:52px;border:1px solid #d3bd96;border-radius:50%;background:#fff0dbe8;color:#28483f;box-shadow:0 4px 16px #130e0938;display:grid;place-items:center;touch-action:manipulation}
 .event-book-prev{left:max(10px,calc(50% - 500px))}.event-book-next{right:max(10px,calc(50% - 500px))}.event-book-nav:disabled{opacity:.3;cursor:default}
 @media(max-width:700px){.event-book-nav{width:30px;height:42px}.event-book-prev{left:2px}.event-book-next{right:2px}.events-page .book-photo-page{touch-action:none}.events-page .book-spread{overscroll-behavior:contain}.events-page .book-details-page{touch-action:pan-y}.events-page .date-scroll{touch-action:pan-x pan-y;scroll-behavior:auto;-webkit-overflow-scrolling:touch}}
+
+/* Reserve a genuine backdrop gutter for navigation, outside the book edges. */
+.events-page .open-book{max-width:calc(100vw - 136px)}
+.event-book-prev{left:12px}.event-book-next{right:12px}
+@media(max-width:700px){.events-page .open-book{width:calc(100vw - 80px);max-width:calc(100vw - 80px)}.event-book-prev{left:5px}.event-book-next{right:5px}}
+
+/* The navbar remains above the backdrop; keep dismissal below its lower edge. */
+.events-page .book-overlay>.close-book{position:fixed;top:calc(var(--site-nav-height,82px) + 16px + env(safe-area-inset-top,0px));right:16px;z-index:60;width:44px;height:44px}

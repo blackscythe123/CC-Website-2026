@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "@coding-club/content-render/styles/track-view.css";
 import portalConfig from "../../portal.config.json";
 
 export const metadata: Metadata = {
@@ -31,6 +32,9 @@ export default function RootLayout({
                 className="hover:underline font-bold uppercase tracking-wider"
               >
                 Index
+              </a>
+              <a href="/tracks" className="hover:underline font-bold uppercase tracking-wider">
+                Tracks
               </a>
               <a
                 href="https://codingclub.tech"

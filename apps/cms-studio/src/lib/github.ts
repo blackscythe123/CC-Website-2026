@@ -67,6 +67,26 @@ function isSafePendingImage(filename: string, base64: string): boolean {
   return isJpeg || isPng || isGif || isWebp;
 }
 
+/**
+ * blob:/data: URLs only exist in the author's browser. Every one in the body or cover must be backed
+ * by an uploaded pending image, or the article would publish dead links. Returns the unresolved URLs.
+ */
+export function findUnresolvedLocalImageUrls(
+  body: string,
+  coverImage: string | undefined,
+  pendingImages: { placeholderUrl?: string }[] | undefined
+): string[] {
+  const known = new Set((pendingImages || []).map((i) => i.placeholderUrl).filter(Boolean) as string[]);
+  const found = new Set<string>();
+  for (const m of body.matchAll(/(?:blob:https?:\/\/[^\s)"'<>]+|data:image\/[a-z+.-]+;base64,[A-Za-z0-9+/=]{16})/g)) {
+    if (m[0].startsWith("data:")) found.add("data:image/... (inline base64 image)");
+    else if (!known.has(m[0])) found.add(m[0]);
+  }
+  const cover = (coverImage || "").trim();
+  if ((cover.startsWith("blob:") && !known.has(cover)) || cover.startsWith("data:")) found.add(cover.slice(0, 80));
+  return [...found];
+}
+
 export async function createDraftAndPullRequest(params: CreateDraftParams): Promise<DraftResult> {
   const fallbackToken = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
   let octokit = getOctokit(params.token);
@@ -87,6 +107,13 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
 
   if (!ALLOWED_VERTICALS.includes(vertical)) {
     throw new Error(`Invalid technical vertical: '${vertical}'. Must be one of: ${ALLOWED_VERTICALS.join(", ")}`);
+  }
+  const unresolvedImages = findUnresolvedLocalImageUrls(markdownBody, params.coverImage, pendingImages);
+  if (unresolvedImages.length > 0) {
+    throw new Error(
+      `Some images were never uploaded (${unresolvedImages.length}); they only exist in your browser. ` +
+        "Re-add the cover image and any broken inline images, then submit again."
+    );
   }
 
   let branchName = existingBranch;
@@ -927,6 +954,14 @@ export async function savePersonalDraftBranch(params: PersonalDraftParams): Prom
 
   if (!ALLOWED_VERTICALS.includes(vertical)) {
     throw new Error(`Invalid technical vertical: '${vertical}'. Must be one of: ${ALLOWED_VERTICALS.join(", ")}`);
+  }
+
+  const unresolvedImages = findUnresolvedLocalImageUrls(markdownBody, params.coverImage, pendingImages);
+  if (unresolvedImages.length > 0) {
+    throw new Error(
+      `Some images were never uploaded (${unresolvedImages.length}); they only exist in your browser. ` +
+        "Re-add the cover image and any broken inline images, then sync again."
+    );
   }
 
   const cleanSlug = (slug || title || "untitled")

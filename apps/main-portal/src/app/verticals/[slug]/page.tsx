@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getVerticalBySlug, getAllVerticalSlugs } from "@/lib/verticals";
-import { getPostsByVertical } from "@/lib/posts";
+import { getPostsByVertical, resolveContentDir } from "@/lib/posts";
+import { loadTracks } from "@coding-club/content-render/server";
+import portals from "../../../../../../content/club/portals.json";
 import type { Metadata } from "next";
 
 export async function generateStaticParams() {
@@ -36,6 +38,9 @@ export default async function VerticalDynamicPage({
   }
 
   const posts = getPostsByVertical(slug);
+  // Tracks live on the vertical's own portal (progress is saved per site), so the hub links out.
+  const portalDomain = (portals as { vertical: string; domain: string }[]).find((p) => p.vertical === slug)?.domain;
+  const tracks = portalDomain ? loadTracks(resolveContentDir(), slug) : [];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8 space-y-12">
@@ -128,6 +133,30 @@ export default async function VerticalDynamicPage({
           </div>
         </div>
       </header>
+
+      {tracks.length > 0 ? (
+        <section className="space-y-4" aria-labelledby="vertical-tracks-heading">
+          <div className="border-b border-[#E8E1D2] pb-4">
+            <div className="font-mono text-xs text-stone-500">ssn@codingclub:~$ list-tracks --vertical {vertical.slug}</div>
+            <h2 id="vertical-tracks-heading" className="mt-1 text-2xl font-bold tracking-tight text-stone-900">
+              Learning tracks
+            </h2>
+          </div>
+          <ul className="grid gap-4 sm:grid-cols-2">
+            {tracks.map(({ slug: trackSlug, track }) => (
+              <li key={trackSlug} className="rounded-xl border border-[#E8E1D2] bg-white p-5">
+                <a
+                  href={`https://${portalDomain}/tracks/${trackSlug}`}
+                  className="text-lg font-bold text-stone-900 hover:text-[#F43F5E] underline underline-offset-4"
+                >
+                  {track.title}
+                </a>
+                {track.summary ? <p className="mt-2 text-sm text-stone-600">{track.summary}</p> : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* Vertical Articles Section */}
       <section className="space-y-6">

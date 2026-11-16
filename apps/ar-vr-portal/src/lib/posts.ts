@@ -52,7 +52,7 @@ function isVisibleOnThisPortal(rawTargetPortals: unknown): boolean {
   );
 }
 
-function resolveContentDir(): string {
+export function resolveContentDir(): string {
   const monorepoContent = path.resolve(process.cwd(), "../../content");
   if (fs.existsSync(/* turbopackIgnore: true */ monorepoContent)) {
     return monorepoContent;

@@ -237,3 +237,50 @@ export function resetEditorWorkForTests(): void {
   editorWork.fingerprint = "";
   editorWork.syncedFingerprint = null;
 }
+
+// ---------------------------------------------------------------------------
+// Learning-track editor drafts: same database and store, key track:<login>:<vertical>/<slug|new>.
+// ---------------------------------------------------------------------------
+
+export interface StoredTrackDraft<T = unknown> {
+  value: T;
+  updatedAt: number;
+}
+
+function trackDraftKey(login: string, key: string): string {
+  return `track:${login.trim().toLowerCase()}:${key}`;
+}
+
+async function trackStore<R>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest): Promise<R | null> {
+  try {
+    const db = await openDB();
+    return await new Promise<R | null>((resolve) => {
+      try {
+        const tx = db.transaction(STORE_NAME, mode);
+        const req = run(tx.objectStore(STORE_NAME));
+        req.onsuccess = () => resolve((req.result as R) ?? null);
+        req.onerror = () => resolve(null);
+      } catch {
+        resolve(null);
+      }
+    });
+  } catch {
+    return null;
+  }
+}
+
+export async function saveTrackDraft<T>(login: string | null | undefined, key: string, value: T): Promise<void> {
+  if (!usableLogin(login) || signedOutLogins.has(draftKeyFor(login))) return;
+  const record: StoredTrackDraft<T> = { value, updatedAt: Date.now() };
+  await trackStore("readwrite", (s) => s.put(record, trackDraftKey(login, key)));
+}
+
+export async function getTrackDraft<T>(login: string | null | undefined, key: string): Promise<StoredTrackDraft<T> | null> {
+  if (!usableLogin(login)) return null;
+  return trackStore<StoredTrackDraft<T>>("readonly", (s) => s.get(trackDraftKey(login, key)));
+}
+
+export async function clearTrackDraft(login: string | null | undefined, key: string): Promise<void> {
+  if (!usableLogin(login)) return;
+  await trackStore("readwrite", (s) => s.delete(trackDraftKey(login, key)));
+}

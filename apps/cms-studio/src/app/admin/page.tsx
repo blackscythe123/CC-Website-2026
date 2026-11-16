@@ -132,6 +132,11 @@ export default function AdminEditorPage() {
         const { ok, data } = await readApiJson(res);
         if (!ok || !data.article) throw new Error(data.error || `Couldn't load PR #${prNumber}`);
         const a = data.article;
+        if (a.kind === "track") {
+          // Learning-track proposals are edited in the Tracks screen, not the article editor.
+          window.location.assign(`/admin/tracks?revise=${prNumber}`);
+          return;
+        }
         const filePath = typeof a.filePath === "string" ? a.filePath : null;
         const target = parseArticlePath(filePath);
         editor.loadFrom(

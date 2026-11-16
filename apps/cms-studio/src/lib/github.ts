@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest";
 import matter from "gray-matter";
-import { parsePlacement, placementErrors, placementLabel, validateTrack, TRACK_SLUG_RE, type Placement, type Track } from "@coding-club/content-schema/tracks";
+import { parsePlacement, placementErrors, placementLabel, trackEditProblems, validateTrack, TRACK_SLUG_RE, TRACK_VERTICALS, type Placement, type Track } from "@coding-club/content-schema/tracks";
 
 const REPO_OWNER = "blackscythe123";
 const REPO_NAME = "CC-Website-2026";
@@ -487,7 +487,7 @@ export async function listPendingReviewPRs(token: string): Promise<PendingPR[]> 
   return Promise.all(
     pulls.map(async (pr) => {
       // Display-only hint; authorization always re-derives the vertical from the article file path.
-      const branchMatch = pr.head.ref.match(/^(?:draft|cms)\/([a-z0-9_-]+)\//);
+      const branchMatch = pr.head.ref.match(/^(?:draft|cms|track)\/([a-z0-9_-]+)\//);
       const titleMatch = pr.title.match(/^(?:feat|chore)\(([a-z0-9-]+)\)/);
       const vertical = (branchMatch?.[1] || titleMatch?.[1] || "general").toLowerCase();
 
@@ -548,6 +548,8 @@ export async function listPendingReviewPRs(token: string): Promise<PendingPR[]> 
         body: pr.body || "",
         branch: pr.head.ref,
         headSha: pr.head.sha,
+        /** Display hint only; authorization re-classifies from the PR's files. */
+        kind: pr.head.ref.startsWith("track/") ? ("track" as const) : ("article" as const),
         approvers: summary.approvers,
         changesRequested: summary.changesRequested,
         latestFeedback: summary.latestFeedback,
@@ -562,6 +564,7 @@ export async function listPendingReviewPRs(token: string): Promise<PendingPR[]> 
 // ---------------------------------------------------------------------------
 
 const ARTICLE_PATH_RE = /^content\/(?:verticals\/([a-z0-9-]+)|(club))\/posts\/([a-z0-9-]+)\.md$/;
+const TRACK_PATH_RE = /^content\/verticals\/([a-z0-9-]+)\/tracks\/([a-z0-9]+(?:-[a-z0-9]+)*)\.json$/;
 // Only raster images, never HTML/SVG/JS that would be served from the portal's origin.
 const UPLOAD_PATH_RE = /^apps\/main-portal\/public\/uploads\/[A-Za-z0-9_-][A-Za-z0-9._-]*\.(?:png|jpe?g|webp|gif)$/;
 const EDITORIAL_VERTICALS = new Set(ALLOWED_VERTICALS);
@@ -594,7 +597,7 @@ export function assertCompletePRListing(
 }
 
 export type PRFileCheck =
-  | { ok: true; kind: "publish" | "unpublish"; articlePath: string; vertical: string; articleStatus?: string }
+  | { ok: true; kind: "publish" | "unpublish" | "track"; articlePath: string; vertical: string; articleStatus?: string }
   | { ok: false; error: string };
 
 type PRFile = string | { filename: string; status?: string };
@@ -607,6 +610,20 @@ type PRFile = string | { filename: string; status?: string };
  */
 export function validateArticlePRFiles(files: PRFile[]): PRFileCheck {
   const list = files.map((f) => (typeof f === "string" ? { filename: f, status: undefined } : f));
+  // A learning-track PR is exactly one added/modified track file and nothing else (no articles, no uploads).
+  const tracks = list.filter((f) => TRACK_PATH_RE.test(f.filename));
+  if (tracks.length > 0) {
+    if (list.length !== 1) {
+      return { ok: false, error: "A learning-track pull request may change only that one track file." };
+    }
+    const t = tracks[0];
+    const vertical = t.filename.match(TRACK_PATH_RE)![1];
+    if (!TRACK_VERTICALS.includes(vertical)) return { ok: false, error: `Unknown vertical '${vertical}' in ${t.filename}.` };
+    if (t.status !== undefined && t.status !== "added" && t.status !== "modified") {
+      return { ok: false, error: "Tracks can only be created or edited through the CMS, not renamed or deleted." };
+    }
+    return { ok: true, kind: "track", articlePath: t.filename, vertical, articleStatus: t.status };
+  }
   const articles = list.filter((f) => ARTICLE_PATH_RE.test(f.filename));
   const uploads = list.filter((f) => UPLOAD_PATH_RE.test(f.filename));
   const others = list.filter((f) => !ARTICLE_PATH_RE.test(f.filename) && !UPLOAD_PATH_RE.test(f.filename));
@@ -733,6 +750,8 @@ export async function getPRArticleContent(token: string, pullNumber: number) {
     pull_number: pullNumber,
   });
 
+  if (check.kind === "track") return getPRTrackContent(octokit, check, prData, pullNumber);
+
   // An unpublish request deletes the file on its branch, so show the article as it is live on the base.
   const { data: fileRes } = await octokit.repos.getContent({
     owner: REPO_OWNER,
@@ -749,6 +768,7 @@ export async function getPRArticleContent(token: string, pullNumber: number) {
       throw new Error(`Frontmatter vertical '${fmVertical}' does not match file location '${check.vertical}'.`);
     }
     return {
+      kind: check.kind as "publish" | "unpublish",
       filePath: mdFile.filename,
       frontmatter: parsed.data,
       markdownBody: parsed.content,
@@ -799,11 +819,11 @@ type ReviewCheck =
       prAuthor: string;
       contributors: Set<string>;
       decision: "merge" | "count-deputies";
-      kind: "publish" | "unpublish";
+      kind: "publish" | "unpublish" | "track";
       articlePath: string;
     };
 
-const REVIEWABLE_BRANCH_RE = /^(?:draft|cms)\/[a-z0-9_-]+\/[a-z0-9-]+$/;
+const REVIEWABLE_BRANCH_RE = /^(?:draft|cms|track)\/[a-z0-9_-]+\/[a-z0-9-]+$/;
 
 /** Everything both "approve" and "request changes" must satisfy before touching GitHub. */
 async function checkReviewPreconditions(octokit: Octokit, o: ReviewOptions): Promise<ReviewCheck> {
@@ -828,6 +848,10 @@ async function checkReviewPreconditions(octokit: Octokit, o: ReviewOptions): Pro
   if (!fileCheck.ok) return fail(fileCheck.error);
   if (fileCheck.vertical !== o.targetVertical) {
     return fail(`Article location '${fileCheck.vertical}' does not match the reviewed vertical '${o.targetVertical}'.`);
+  }
+  // Branch namespace and content kind must agree: track/ branches carry exactly one track, draft/ and cms/ carry articles.
+  if ((fileCheck.kind === "track") !== prData.head.ref.startsWith("track/")) {
+    return fail("This pull request's branch doesn't match what it changes, so it can't be reviewed in the Studio.");
   }
 
   const prAuthor = (prData.user?.login || "").toLowerCase();
@@ -855,6 +879,14 @@ async function checkReviewPreconditions(octokit: Octokit, o: ReviewOptions): Pro
 
   if (fileCheck.kind === "unpublish" && o.authorRole !== "vertical_head" && o.authorRole !== "superadmin") {
     return fail("Unpublish requests can only come from the Vertical Head or a Superadmin.", 403);
+  }
+  if (fileCheck.kind === "track") {
+    if (o.authorRole !== "vertical_head" && o.authorRole !== "superadmin") {
+      return fail("Learning tracks can only be proposed by the Vertical Head or a Superadmin.", 403);
+    }
+    // Re-validate the exact commit being approved (collaborators can push to the branch after submit).
+    const problem = await trackProblemAt(octokit, fileCheck.articlePath, fileCheck.vertical, prData.head.sha);
+    if (problem) return fail(problem, 409);
   }
 
   // Editing an article that is already published must be approved as if its ORIGINAL author's work
@@ -896,9 +928,12 @@ async function checkReviewPreconditions(octokit: Octokit, o: ReviewOptions): Pro
 }
 
 /** Squash subject built server-side (the PR title is editable on GitHub and must not reach main's log). */
-export function buildMergeSubject(kind: "publish" | "unpublish", vertical: string, title: string, slug: string, pullNumber: number) {
+export function buildMergeSubject(kind: "publish" | "unpublish" | "track", vertical: string, title: string, slug: string, pullNumber: number) {
   const clean = (t: string) => t.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
-  const words = clean(kind === "unpublish" ? `unpublish ${slug}` : title || slug).split(" ").slice(0, 20).join(" ");
+  const words = clean(kind === "unpublish" ? `unpublish ${slug}` : kind === "track" ? `track ${title || slug}` : title || slug)
+    .split(" ")
+    .slice(0, 20)
+    .join(" ");
   return `${kind === "unpublish" ? "chore" : "feat"}(${vertical}): ${words} (#${pullNumber})`;
 }
 
@@ -985,7 +1020,7 @@ export async function approveAndMergePR(
       }
     }
 
-    const slug = check.articlePath.replace(/^.*\/([a-z0-9-]+)\.md$/, "$1");
+    const slug = check.articlePath.replace(/^.*\/([a-z0-9-]+)\.(?:md|json)$/, "$1");
     const { data: mergeResult } = await octokit.pulls.merge({
       owner: REPO_OWNER,
       repo: REPO_NAME,
@@ -1594,4 +1629,222 @@ async function placementInfo(octokit: Octokit, vertical: string, raw: unknown): 
   } catch {
     return { placement, placementLabel: [placement.track, placement.topic, placement.subtopic].filter(Boolean).join(" › ") };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Learning-track pull requests (Phase 3b): one track file per PR on a track/<v>/<slug>-<id> branch.
+// ---------------------------------------------------------------------------
+
+function decodeContent(file: unknown): string | null {
+  if (!file || Array.isArray(file) || typeof file !== "object" || !("content" in file)) return null;
+  const c = (file as { content?: unknown }).content;
+  return typeof c === "string" ? Buffer.from(c, "base64").toString("utf-8") : null;
+}
+
+async function readTrackAt(octokit: Octokit, path: string, ref: string): Promise<{ raw: string; json: unknown } | null> {
+  try {
+    const { data } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path, ref });
+    const raw = decodeContent(data);
+    if (raw === null) return null;
+    try {
+      return { raw, json: JSON.parse(raw) };
+    } catch {
+      return { raw, json: undefined };
+    }
+  } catch (err) {
+    if ((err as { status?: number }).status === 404) return null;
+    throw err;
+  }
+}
+
+/**
+ * Why the track at `ref` can't be merged (null = fine): schema, and id permanence against current main.
+ */
+export async function trackProblemAt(octokit: Octokit, path: string, vertical: string, ref: string): Promise<string | null> {
+  const slug = path.replace(/^.*\/([a-z0-9-]+)\.json$/, "$1");
+  const head = await readTrackAt(octokit, path, ref);
+  if (!head) return "The track file is missing from this pull request.";
+  if (head.json === undefined) return "The track file isn't valid JSON.";
+  const result = validateTrack(head.json, { vertical, slug, bytes: Buffer.byteLength(head.raw) });
+  if (!result.track) return `The track has problems: ${result.errors.slice(0, 3).join(" ")}`;
+  const onMain = await readTrackAt(octokit, path, MAIN_BRANCH);
+  if (onMain?.json !== undefined && onMain) {
+    const published = validateTrack(onMain.json, { vertical, slug });
+    if (published.track) {
+      const problems = trackEditProblems(published.track, result.track);
+      if (problems.length) return problems[0];
+    }
+  }
+  return null;
+}
+
+/** Review preview of a track PR. */
+async function getPRTrackContent(
+  octokit: Octokit,
+  check: { articlePath: string; vertical: string },
+  prData: { head: { sha: string; ref: string }; title: string; user?: { login?: string } | null },
+  pullNumber: number
+) {
+  const slug = check.articlePath.replace(/^.*\/([a-z0-9-]+)\.json$/, "$1");
+  const head = await readTrackAt(octokit, check.articlePath, prData.head.sha);
+  if (!head || head.json === undefined) throw new Error("This pull request's track file can't be read.");
+  const result = validateTrack(head.json, { vertical: check.vertical, slug, bytes: Buffer.byteLength(head.raw) });
+  if (!result.track) throw new Error(`The track in this pull request has problems: ${result.errors.slice(0, 3).join(" ")}`);
+  return {
+    kind: "track" as const,
+    filePath: check.articlePath,
+    vertical: check.vertical,
+    slug,
+    track: result.track,
+    title: result.track.title,
+    summary: result.track.summary,
+    markdownBody: "",
+    tags: [] as string[],
+    coverImage: "",
+    // The PR opener is the track's author (tracks have no byline).
+    author: prData.user?.login || "unknown",
+    authorUsername: "",
+    branch: prData.head.ref,
+    headSha: prData.head.sha,
+    pullNumber,
+    placement: null,
+    placementLabel: null,
+  };
+}
+
+export interface TrackSubmitParams {
+  token: string;
+  authorUsername: string;
+  authorDisplayName: string;
+  vertical: string;
+  slug: string;
+  /** Already validated with validateTrack by the route. */
+  track: Track;
+  mode: "create" | "edit";
+  pullNumber?: number;
+  expectedHeadSha?: string;
+}
+
+function trackPrBody(p: TrackSubmitParams, isNew: boolean) {
+  const topics = p.track.topics.length;
+  const items = p.track.topics.reduce((n, t) => n + (t.items?.length || 0) + (t.subtopics || []).reduce((m, s) => m + (s.items?.length || 0), 0), 0);
+  return `## Learning track ${isNew ? "proposal" : "update"}
+
+- **Track:** ${p.track.title.replace(/[\r\n]+/g, " ")} (\`${p.slug}\`)
+- **Vertical:** ${p.vertical}
+- **Proposed by:** ${p.authorDisplayName} (@${p.authorUsername})
+- **Contents:** ${topics} topic${topics === 1 ? "" : "s"}, ${items} resource${items === 1 ? "" : "s"}
+
+## Editorial Governance
+- [x] Validated against the shared track schema
+- [x] Isolated track branch created
+- [ ] Awaiting Superadmin review before merging into \`${MAIN_BRANCH}\``;
+}
+
+/**
+ * Create or update a learning-track PR. Throws an Error with `status` for user-facing failures.
+ */
+export async function submitTrackPullRequest(p: TrackSubmitParams): Promise<DraftResult> {
+  const octokit = getOctokit(p.token);
+  const path = `content/verticals/${p.vertical}/tracks/${p.slug}.json`;
+  const content = Buffer.from(JSON.stringify(p.track, null, 2) + "\n", "utf-8").toString("base64");
+  const fail = (message: string, status: number) => Object.assign(new Error(message), { status });
+
+  const onMain = await readTrackAt(octokit, path, MAIN_BRANCH);
+  if (!p.pullNumber) {
+    if (p.mode === "create" && onMain) throw fail(`A track called "${p.slug}" already exists in ${p.vertical}. Pick another name, or edit it instead.`, 409);
+    if (p.mode === "edit" && !onMain) throw fail(`There is no published track "${p.slug}" in ${p.vertical} to edit.`, 404);
+  }
+  if (onMain && onMain.json !== undefined) {
+    const published = validateTrack(onMain.json, { vertical: p.vertical, slug: p.slug });
+    if (published.track) {
+      const problems = trackEditProblems(published.track, p.track);
+      if (problems.length) throw fail(problems[0], 400);
+    }
+  }
+
+  let branch: string;
+  let existingSha: string | undefined;
+  if (p.pullNumber) {
+    const { data: pr } = await octokit.pulls.get({ owner: REPO_OWNER, repo: REPO_NAME, pull_number: p.pullNumber });
+    if (pr.state !== "open") throw fail(`PR #${p.pullNumber} is not open.`, 400);
+    if (pr.base.ref !== MAIN_BRANCH || pr.head.repo?.full_name !== `${REPO_OWNER}/${REPO_NAME}`) {
+      throw fail(`PR #${p.pullNumber} can't be updated from the Studio.`, 400);
+    }
+    if (!pr.head.ref.startsWith(`track/${p.vertical}/`) || !REVIEWABLE_BRANCH_RE.test(pr.head.ref)) {
+      throw fail(`PR #${p.pullNumber} is not a learning-track proposal for ${p.vertical}.`, 400);
+    }
+    if (!p.expectedHeadSha || pr.head.sha !== p.expectedHeadSha) {
+      throw fail(`PR #${p.pullNumber} changed since you opened it. Reload it before saving.`, 409);
+    }
+    const files = await octokit.paginate(octokit.pulls.listFiles, { owner: REPO_OWNER, repo: REPO_NAME, pull_number: p.pullNumber, per_page: 100 });
+    const listingError = assertCompletePRListing(pr, files.length);
+    if (listingError) throw fail(listingError, 400);
+    const check = validateArticlePRFiles(files);
+    if (!check.ok || check.kind !== "track" || check.articlePath !== path) {
+      throw fail(`PR #${p.pullNumber} changes a different file, so this track can't be saved into it.`, 400);
+    }
+    branch = pr.head.ref;
+    const { data: current } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path, ref: branch });
+    existingSha = !Array.isArray(current) && "sha" in current ? current.sha : undefined;
+  } else {
+    const { data: refData } = await octokit.git.getRef({ owner: REPO_OWNER, repo: REPO_NAME, ref: `heads/${MAIN_BRANCH}` });
+    branch = `track/${p.vertical}/${p.slug}-${Date.now().toString().slice(-5)}`;
+    await octokit.git.createRef({ owner: REPO_OWNER, repo: REPO_NAME, ref: `refs/heads/${branch}`, sha: refData.object.sha });
+    if (onMain) {
+      const { data: current } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path, ref: branch });
+      existingSha = !Array.isArray(current) && "sha" in current ? current.sha : undefined;
+    }
+  }
+
+  await octokit.repos.createOrUpdateFileContents({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    path,
+    branch,
+    sha: existingSha,
+    content,
+    message: p.pullNumber ? `fix(${p.vertical}): update track ${p.slug} [skip vercel]` : `feat(${p.vertical}): track ${p.slug} [skip vercel]`,
+    author: { name: p.authorDisplayName || p.authorUsername, email: `${p.authorUsername}@users.noreply.github.com` },
+    committer: { name: "SSN Coding Club Studio", email: "bot@ssncodingclub.org" },
+  });
+
+  if (p.pullNumber) {
+    const { data: pr } = await octokit.pulls.get({ owner: REPO_OWNER, repo: REPO_NAME, pull_number: p.pullNumber });
+    await octokit.issues.createComment({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      issue_number: p.pullNumber,
+      body: `### 🚀 Track updated by @${p.authorUsername}\nThe learning track has been revised and is ready for re-review.`,
+    });
+    return { pullNumber: p.pullNumber, prUrl: pr.html_url, branch };
+  }
+
+  const title = p.track.title.replace(/[\r\n]+/g, " ").trim();
+  const { data: pr } = await octokit.pulls.create({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    title: `feat(${p.vertical}): track ${title}`,
+    head: branch,
+    base: MAIN_BRANCH,
+    body: trackPrBody(p, !onMain),
+  });
+  return { pullNumber: pr.number, prUrl: pr.html_url, branch };
+}
+
+/** How many published blogs are placed in each section of a track: { "<topicId>" | "<topicId>/<subId>": n }. */
+export async function placedCountsOnMain(octokit: Octokit, vertical: string, trackSlug: string): Promise<Record<string, number>> {
+  const { data: ref } = await octokit.git.getRef({ owner: REPO_OWNER, repo: REPO_NAME, ref: `heads/${MAIN_BRANCH}` });
+  const { data: tree } = await octokit.git.getTree({ owner: REPO_OWNER, repo: REPO_NAME, tree_sha: ref.object.sha, recursive: "true" });
+  const prefix = `content/verticals/${vertical}/posts/`;
+  const posts = (tree.tree || []).filter((e) => e.type === "blob" && e.path?.startsWith(prefix) && e.path.endsWith(".md") && e.sha);
+  const counts: Record<string, number> = {};
+  for (const post of posts.slice(0, 300)) {
+    const { data: blob } = await octokit.git.getBlob({ owner: REPO_OWNER, repo: REPO_NAME, file_sha: post.sha! });
+    const placement = parsePlacement(matter(Buffer.from(blob.content, "base64").toString("utf-8")).data.placement);
+    if (!placement || placement.track !== trackSlug) continue;
+    const key = placement.subtopic ? `${placement.topic}/${placement.subtopic}` : placement.topic;
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  return counts;
 }

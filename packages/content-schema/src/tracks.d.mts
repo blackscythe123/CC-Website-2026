@@ -51,3 +51,4 @@ export declare function placementErrors(
   ctx: { vertical: string; tracks: Record<string, Track> }
 ): string[];
 export declare function placementLabel(placement: Placement, track: Track): string | null;
+export declare function trackEditProblems(before: Track, after: Track): string[];

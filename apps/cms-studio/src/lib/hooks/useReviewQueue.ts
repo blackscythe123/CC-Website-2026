@@ -19,6 +19,8 @@ export interface ReviewPr {
   branch: string;
   /** Head commit the list data describes; sent back as expectedHeadSha when approving / rejecting. */
   headSha: string;
+  /** "track" for learning-track proposals (display hint from the branch; the server re-checks). */
+  kind?: "article" | "track";
   /** Users whose latest decisive review approved the current head (server-defined). */
   approvers: string[];
   changesRequested: boolean;

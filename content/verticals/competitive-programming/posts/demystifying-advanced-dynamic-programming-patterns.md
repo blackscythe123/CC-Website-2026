@@ -1,15 +1,20 @@
-﻿---
-title: "Demystifying Advanced Dynamic Programming Patterns"
-date: "2026-10-10"
-author: "Rohan Mehta"
-summary: "From bitmask DP to digit DP, solving classic interview and competition roadblocks."
-vertical: "competitive-programming"
+---
+title: Demystifying Advanced Dynamic Programming Patterns
+date: '2026-10-10'
+author: Rohan Mehta
+summary: >-
+  From bitmask DP to digit DP, solving classic interview and competition
+  roadblocks.
+targetPortals:
+  - main-portal
+  - cp-portal
+vertical: competitive-programming
 tags:
-  - "Dynamic Programming"
-  - "Graph Theory"
+  - Dynamic Programming
+  - Graph Theory
 placement:
-  track: "dsa-starter-sheet"
-  topic: "dynamic-programming"
+  track: dsa-starter-sheet
+  topic: dynamic-programming
 ---
 
 Welcome to this technical guide from the **Competitive Programming & DSA** vertical at Coding Club!
@@ -27,3 +32,6 @@ Want to write an article for this vertical?
 1. Open the [CMS Studio](/admin) portal.
 2. Select **Competitive Programming & DSA** under the Vertical dropdown.
 3. Submit your draft. Once approved by our vertical head (Rohan Mehta), it will be published here!
+
+
+ZZ test edit line 2 (automated UI test, will be withdrawn).

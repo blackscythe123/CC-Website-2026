@@ -15,7 +15,6 @@
 .cc-track__title a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .cc-track__item.is-done .cc-track__title { color: var(--cc-track-muted); text-decoration: line-through; }
 .cc-track__ext { margin-left: 0.25rem; font-size: 0.8em; }
-.cc-track__gone { color: var(--cc-track-muted); font-style: italic; }
 .cc-track__badge, .cc-track__level { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.1rem 0.45rem; border: 1px solid var(--cc-track-line); border-radius: 999px; }
 .cc-track__level--easy { border-color: #2e7d32; color: #2e7d32; }
 .cc-track__level--medium { border-color: #b26a00; color: #b26a00; }
@@ -24,3 +23,7 @@
 .cc-track__video { margin: 0.75rem 0 0.25rem; }
 .cc-track__sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .cc-track :focus-visible { outline: 2px solid var(--cc-track-accent); outline-offset: 2px; }
+.cc-track__desc { margin: 0.3rem 0 0; font-size: 0.9rem; line-height: 1.5; color: var(--cc-track-muted); white-space: pre-line; overflow-wrap: anywhere; }
+.cc-track__desc--section { margin: -0.25rem 0 0.75rem; font-size: 0.95rem; }
+.cc-track__empty { margin: 0.25rem 0 0.5rem; font-size: 0.9rem; font-style: italic; color: var(--cc-track-muted); }
+.cc-track__topic, .cc-track__sub { scroll-margin-top: calc(var(--site-nav-height, 64px) + 1rem); }

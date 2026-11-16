@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@coding-club/content-render": "workspace:*",
+    "@coding-club/content-schema": "workspace:*",
     "gray-matter": "^4.0.3",
     "lucide-react": "^1.16.0",
     "next": "16.4.4",

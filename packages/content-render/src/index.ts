@@ -163,14 +163,21 @@ export function trackProgressKey(vertical: string, slug: string): string {
   return `cc-track:v1:${vertical}/${slug}`;
 }
 
-/** Parse stored progress, keeping only ids that still exist in the track (prunes removed items). */
-export function parseTrackProgress(raw: string | null | undefined, validIds: Iterable<string>): Set<string> {
-  const valid = new Set(validIds);
+/** Progress id of a placed blog (item ids never contain ":", so these can't collide). */
+export function placedPostProgressId(slug: string): string {
+  return `post:${slug}`;
+}
+
+/**
+ * Parse stored progress. Unknown ids are KEPT (a blog briefly moved or a track edit must not erase
+ * ticks); counting only looks at current ids. Corrupt or non-array data is treated as empty.
+ */
+export function parseTrackProgress(raw: string | null | undefined): Set<string> {
   if (!raw) return new Set();
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return new Set();
-    return new Set(parsed.filter((x): x is string => typeof x === "string" && valid.has(x)));
+    return new Set(parsed.filter((x): x is string => typeof x === "string" && x.length > 0 && x.length <= 200).slice(0, 2000));
   } catch {
     return new Set();
   }
@@ -182,4 +189,68 @@ export function serializeTrackProgress(done: Set<string>): string {
 
 export function countDone(ids: string[], done: Set<string>): number {
   return ids.reduce((n, id) => n + (done.has(id) ? 1 : 0), 0);
+}
+
+// ---------------------------------------------------------------------------
+// Blogs placed in a track (frontmatter `placement`), grouped per topic/subtopic.
+// ---------------------------------------------------------------------------
+
+export interface PlacementRef {
+  track: string;
+  topic: string;
+  subtopic?: string;
+}
+
+/** A blog shown inside a track. Plain strings only, so it serialises to client components. */
+export interface PlacedPost {
+  slug: string;
+  title: string;
+  summary: string;
+  date: string;
+  href: string;
+}
+
+interface SectionTree {
+  topics: { id: string; subtopics?: { id: string }[] }[];
+}
+
+/** Key of a topic ("arrays") or subtopic ("arrays/sliding-window") section. */
+export function sectionKey(topicId: string, subtopicId?: string): string {
+  return subtopicId ? `${topicId}/${subtopicId}` : topicId;
+}
+
+/**
+ * Group posts placed in `trackSlug` by section. Placements pointing at a missing topic/subtopic are
+ * dropped (the blog simply isn't shown in the tree). Order: date ascending (ISO strings; missing date
+ * last), then slug.
+ */
+export function groupPlacedPosts(
+  posts: (PlacedPost & { placement: PlacementRef | null })[],
+  trackSlug: string,
+  track: SectionTree
+): Record<string, PlacedPost[]> {
+  const valid = new Set<string>();
+  for (const t of track.topics) {
+    valid.add(sectionKey(t.id));
+    for (const s of t.subtopics || []) valid.add(sectionKey(t.id, s.id));
+  }
+  const groups: Record<string, PlacedPost[]> = {};
+  for (const post of posts) {
+    const p = post.placement;
+    if (!p || p.track !== trackSlug) continue;
+    const key = sectionKey(p.topic, p.subtopic);
+    if (!valid.has(key)) continue;
+    (groups[key] ||= []).push({ slug: post.slug, title: post.title, summary: post.summary, date: post.date, href: post.href });
+  }
+  for (const list of Object.values(groups)) {
+    list.sort((a, b) => {
+      if (a.date !== b.date) {
+        if (!a.date) return 1;
+        if (!b.date) return -1;
+        return a.date < b.date ? -1 : 1;
+      }
+      return a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0;
+    });
+  }
+  return groups;
 }

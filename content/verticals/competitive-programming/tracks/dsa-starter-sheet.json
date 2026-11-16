@@ -1,0 +1,47 @@
+{
+  "title": "DSA Starter Sheet",
+  "summary": "A starter path through core data-structure and algorithm patterns: watch, read, then practise. Tick items off as you go.",
+  "vertical": "competitive-programming",
+  "topics": [
+    {
+      "title": "Foundations",
+      "items": [
+        { "id": "f1", "type": "video", "title": "Big-O notation in 5 minutes", "url": "https://www.youtube.com/watch?v=__vX2sjlpXU" },
+        { "id": "f2", "type": "video", "title": "Data structures: easy to advanced (full course)", "url": "https://www.youtube.com/watch?v=RBSGKlAvoiM" }
+      ]
+    },
+    {
+      "title": "Arrays & Hashing",
+      "subtopics": [
+        {
+          "title": "Hash maps",
+          "items": [
+            { "id": "a1", "type": "video", "title": "Two Sum explained", "url": "https://www.youtube.com/watch?v=KLlXCFG5TnA" },
+            { "id": "a2", "type": "link", "title": "Two Sum", "url": "https://leetcode.com/problems/two-sum/", "difficulty": "easy" },
+            { "id": "a3", "type": "link", "title": "Contains Duplicate", "url": "https://leetcode.com/problems/contains-duplicate/", "difficulty": "easy" },
+            { "id": "a4", "type": "link", "title": "Valid Anagram", "url": "https://leetcode.com/problems/valid-anagram/", "difficulty": "easy" }
+          ]
+        },
+        {
+          "title": "Two pointers",
+          "items": [
+            { "id": "a5", "type": "link", "title": "Valid Palindrome", "url": "https://leetcode.com/problems/valid-palindrome/", "difficulty": "easy" },
+            { "id": "a6", "type": "link", "title": "Container With Most Water", "url": "https://leetcode.com/problems/container-with-most-water/", "difficulty": "medium" },
+            { "id": "a7", "type": "link", "title": "3Sum", "url": "https://leetcode.com/problems/3sum/", "difficulty": "medium" }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Dynamic Programming",
+      "items": [
+        { "id": "d1", "type": "post", "slug": "demystifying-advanced-dynamic-programming-patterns" },
+        { "id": "d2", "type": "video", "title": "Dynamic programming course (freeCodeCamp)", "url": "https://www.youtube.com/watch?v=oBt53YbR9Kk" },
+        { "id": "d3", "type": "link", "title": "Climbing Stairs", "url": "https://leetcode.com/problems/climbing-stairs/", "difficulty": "easy" },
+        { "id": "d4", "type": "link", "title": "House Robber", "url": "https://leetcode.com/problems/house-robber/", "difficulty": "medium" },
+        { "id": "d5", "type": "link", "title": "Coin Change", "url": "https://leetcode.com/problems/coin-change/", "difficulty": "medium" },
+        { "id": "d6", "type": "link", "title": "Longest Increasing Subsequence", "url": "https://leetcode.com/problems/longest-increasing-subsequence/", "difficulty": "medium" }
+      ]
+    }
+  ]
+}

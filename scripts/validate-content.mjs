@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
 import { z } from "zod";
+import { validateTrack } from "../packages/content-schema/src/tracks.mjs";
 
 const ROOT_DIR = process.cwd();
 const CONTENT_DIR = path.join(ROOT_DIR, "content");
@@ -279,6 +280,48 @@ for (const filePath of allPostFiles) {
     });
   }
 }
+
+// 2b. Learning tracks: content/verticals/<vertical>/tracks/<slug>.json (schema shared with portals + CMS)
+let trackCount = 0;
+if (fs.existsSync(VERTICALS_DIR)) {
+  for (const vertical of TECH_VERTICALS) {
+    const tracksDir = path.join(VERTICALS_DIR, vertical, "tracks");
+    if (!fs.existsSync(tracksDir)) continue;
+    const postsDir = path.join(VERTICALS_DIR, vertical, "posts");
+    const postSlugs = fs.existsSync(postsDir)
+      ? fs.readdirSync(postsDir).filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -3))
+      : [];
+    for (const file of fs.readdirSync(tracksDir)) {
+      const rel = `content/verticals/${vertical}/tracks/${file}`;
+      if (!file.endsWith(".json") || fs.statSync(path.join(tracksDir, file)).isDirectory()) {
+        hasErrors = true;
+        errors.push({ file: rel, issue: "Only <track-slug>.json files are allowed in a tracks/ folder." });
+        continue;
+      }
+      trackCount++;
+      const raw = fs.readFileSync(path.join(tracksDir, file), "utf8");
+      let json;
+      try {
+        json = JSON.parse(raw);
+      } catch (e) {
+        hasErrors = true;
+        errors.push({ file: rel, issue: `Not valid JSON: ${e.message}` });
+        continue;
+      }
+      const result = validateTrack(json, {
+        vertical,
+        slug: file.slice(0, -5),
+        postSlugs,
+        bytes: Buffer.byteLength(raw),
+      });
+      for (const issue of result.errors) {
+        hasErrors = true;
+        errors.push({ file: rel, issue });
+      }
+    }
+  }
+}
+console.log(`Validated ${trackCount} learning track file(s).`);
 
 // 3. Final Test Output
 if (hasErrors) {

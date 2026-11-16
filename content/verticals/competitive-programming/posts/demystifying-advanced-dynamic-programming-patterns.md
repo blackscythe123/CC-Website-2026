@@ -7,6 +7,9 @@ vertical: "competitive-programming"
 tags:
   - "Dynamic Programming"
   - "Graph Theory"
+placement:
+  track: "dsa-starter-sheet"
+  topic: "dynamic-programming"
 ---
 
 Welcome to this technical guide from the **Competitive Programming & DSA** vertical at Coding Club!

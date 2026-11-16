@@ -33,7 +33,26 @@ jobs:
           node-version: 24
 
       - name: "Verify Commit Discipline"
-        run: node scripts/verify-commit.mjs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_SHA: ${{ github.sha }}
+        # Checks every non-merge commit in the range (merge commits are skipped).
+        # The default PR checkout is a synthetic merge commit, so HEAD alone proves nothing.
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            node scripts/verify-commit.mjs --range "$PR_BASE_SHA..$PR_HEAD_SHA"
+          elif [ "$EVENT_NAME" = "push" ] \
+            && [ -n "$PUSH_BEFORE" ] \
+            && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ] \
+            && git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then
+            node scripts/verify-commit.mjs --range "$PUSH_BEFORE..$PUSH_SHA"
+          else
+            # workflow_dispatch, new branch, or force-push with unknown base: HEAD only
+            node scripts/verify-commit.mjs
+          fi
 
       - name: "Setup pnpm"
         uses: pnpm/action-setup@v4

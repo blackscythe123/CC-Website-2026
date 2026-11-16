@@ -25,6 +25,15 @@ interface RevisionPr {
   filePath: string | null;
   slug: string | null;
   vertical: string | null;
+  /** The PR head the loaded content came from; a revision is refused if someone pushed since. */
+  headSha: string | null;
+}
+
+/** A published article loaded for editing (new edit PR, same vertical + slug). */
+interface EditingPost {
+  vertical: string;
+  slug: string;
+  title: string;
 }
 
 const SAFE_UPLOAD_FILE = /^[A-Za-z0-9._-]+\.(png|jpe?g|webp|gif)$/;
@@ -64,27 +73,28 @@ export default function AdminEditorPage() {
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   const [revision, setRevision] = useState<RevisionPr | null>(null);
   const [loadingRevision, setLoadingRevision] = useState(false);
+  const [editing, setEditing] = useState<EditingPost | null>(null);
 
   // Keep the revision context in the local draft record so Restore after a reload keeps updating the same PR.
   const { setRevisionContext } = editor;
   useEffect(() => {
     setRevisionContext(
       revision
-        ? { number: revision.number, branch: revision.branch, title: revision.title, filePath: revision.filePath, slug: revision.slug, vertical: revision.vertical }
+        ? { number: revision.number, branch: revision.branch, title: revision.title, filePath: revision.filePath, slug: revision.slug, vertical: revision.vertical, headSha: revision.headSha }
         : null
     );
   }, [revision, setRevisionContext]);
 
-  // While revising a PR the vertical is fixed by the PR's file path: only offer that one.
-  const revisionVertical = revision?.vertical ? getVertical(revision.vertical) : undefined;
+  // While revising a PR (or editing a published article) the vertical is fixed by the file path.
+  const revisionVertical = revision?.vertical ? getVertical(revision.vertical) : editing ? getVertical(editing.vertical) : undefined;
   const selectableVerticals = useMemo(() => (revisionVertical ? [revisionVertical] : availableVerticals), [revisionVertical, availableVerticals]);
   const changeVertical = useCallback(
     (v: string) => {
-      if (revision?.vertical) return;
+      if (revision?.vertical || editing) return;
       set("selectedVertical", v);
       set("placement", null); // tracks belong to a vertical
     },
-    [revision, set]
+    [revision, editing, set]
   );
 
   /** Ask before replacing unsaved work in the editor (same dialog "New post" uses). */
@@ -160,7 +170,9 @@ export default function AdminEditorPage() {
           filePath,
           slug: target?.slug ?? null,
           vertical: target?.vertical ?? null,
+          headSha: typeof a.headSha === "string" ? a.headSha : null,
         });
+        setEditing(null);
         setViewMode("write");
       } catch (err) {
         toast.error(err instanceof Error ? err.message : `Couldn't load PR #${prNumber}`);
@@ -205,6 +217,8 @@ export default function AdminEditorPage() {
           filePath: typeof article.filePath === "string" ? article.filePath : null,
           slug: target?.slug ?? null,
           vertical: target?.vertical ?? null,
+          // the restored text was based on this head; if the PR moved on, Submit is refused (409) instead of overwriting
+          headSha: stored.headSha ?? (typeof article.headSha === "string" ? article.headSha : null),
         });
         toast.info(`Still revising PR #${stored.number}`);
       } catch {
@@ -213,6 +227,46 @@ export default function AdminEditorPage() {
     },
     [queue.mine, toast, user.login]
   );
+
+  const loadPublished = useCallback(
+    async (vertical: string, slug: string) => {
+      try {
+        const res = await fetch(`/api/posts/published?vertical=${encodeURIComponent(vertical)}&slug=${encodeURIComponent(slug)}`);
+        const { ok, data } = await readApiJson(res);
+        if (!ok || !data.article) throw new Error(data.error || "Couldn't load that article");
+        const a = data.article;
+        editor.loadFrom(
+          {
+            title: a.title || "",
+            content: a.markdownBody || "",
+            coverImage: a.coverImage || "",
+            selectedVertical: a.vertical,
+            summary: a.summary || "",
+            tags: a.tags || [],
+            placement: a.placement ?? null,
+          },
+          `published ${a.slug}`
+        );
+        setRevision(null);
+        setEditing({ vertical: a.vertical, slug: a.slug, title: a.title || a.slug });
+        setViewMode("write");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Couldn't load that article");
+      }
+    },
+    [editor, toast]
+  );
+
+  // /admin?edit=<vertical>/<slug> loads a published article for an edit request (from Articles).
+  const editHandled = useRef<string | null>(null);
+  useEffect(() => {
+    const target = new URLSearchParams(window.location.search).get("edit") || "";
+    const m = /^([a-z0-9-]+)\/([a-z0-9-]+)$/.exec(target);
+    if (m && editHandled.current !== target) {
+      editHandled.current = target;
+      guardReplace(`the published article “${m[2]}”`, () => loadPublished(m[1], m[2]));
+    }
+  }, [guardReplace, loadPublished]);
 
   const requestRevision = useCallback(
     (prNumber: number, feedback = "") => guardReplace(`PR #${prNumber}`, () => loadRevision(prNumber, feedback)),
@@ -321,6 +375,7 @@ export default function AdminEditorPage() {
         branch
       );
       setRevision(null);
+      setEditing(null);
       setDraftsOpen(false);
       toast.info(`Opened ${branch}`);
     } catch (err) {
@@ -333,6 +388,7 @@ export default function AdminEditorPage() {
   const startNewPost = async () => {
     await editor.reset();
     setRevision(null);
+    setEditing(null);
     setViewMode("write");
     toast.info("Started a new post");
   };
@@ -360,9 +416,11 @@ export default function AdminEditorPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          // Revising: keep the PR's own vertical + slug so the existing file is updated, not duplicated.
-          vertical: revision?.vertical || draft.selectedVertical,
-          slug: revision?.slug || undefined,
+          // Revising / editing: keep the file's own vertical + slug so it is updated, not duplicated.
+          vertical: revision?.vertical || editing?.vertical || draft.selectedVertical,
+          slug: revision?.slug || editing?.slug || undefined,
+          editPublished: editing ? true : undefined,
+          expectedHeadSha: revision?.headSha || undefined,
           title: draft.title.trim(),
           summary: draft.summary.trim(),
           coverImage: draft.coverImage,
@@ -379,6 +437,7 @@ export default function AdminEditorPage() {
       setPublishOpen(false);
       setSubmissionResult({ pullNumber: data.pullNumber, prUrl: data.prUrl });
       setRevision(null);
+      setEditing(null);
       await editor.reset();
       queue.refresh();
     } catch (err) {
@@ -403,6 +462,15 @@ export default function AdminEditorPage() {
         }, onDiscard: editor.discardRecovered }
     : revision
     ? { kind: "revising", number: revision.number, title: revision.title, feedback: revision.feedback }
+    : editing
+    ? {
+        kind: "editing",
+        title: editing.title,
+        onStop: () => {
+          setEditing(null);
+          toast.info("Stopped editing — Submit will create a new article instead");
+        },
+      }
     : changeRequest
     ? { kind: "changes-requested", number: changeRequest.number, title: changeRequest.title, feedback: changeRequest.latestFeedback, loading: loadingRevision, onRevise: () => requestRevision(changeRequest.number, changeRequest.latestFeedback) }
     : isUnassignedMember
@@ -506,6 +574,7 @@ export default function AdminEditorPage() {
         placement={draft.placement}
         onPlacementChange={(v) => set("placement", v)}
         revision={revision ? { number: revision.number, feedback: revision.feedback } : null}
+        editing={Boolean(editing)}
         submitting={submitting}
         serverError={submitError}
         onSubmit={submit}

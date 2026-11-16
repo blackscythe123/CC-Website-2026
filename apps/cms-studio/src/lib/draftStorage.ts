@@ -30,6 +30,8 @@ export interface StoredRevision {
   filePath: string | null;
   slug: string | null;
   vertical: string | null;
+  /** PR head this revision is based on (sent as expectedHeadSha). */
+  headSha?: string | null;
 }
 
 export interface StoredDraft {

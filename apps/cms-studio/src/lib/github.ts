@@ -33,6 +33,10 @@ export interface CreateDraftParams {
   existingBranch?: string;
   /** Learning-track placement: an object sets it, null removes it, undefined keeps what the PR already has. */
   placement?: Placement | null;
+  /** Open an edit PR for an article that is already published (same vertical + slug; keeps byline and date). */
+  editPublished?: boolean;
+  /** For revisions: the PR head the author loaded; a different head means someone else pushed meanwhile. */
+  expectedHeadSha?: string;
 }
 
 export interface DraftResult {
@@ -153,6 +157,7 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     pendingImages,
     pullNumber,
     existingBranch,
+    editPublished = false,
   } = params;
 
   if (!ALLOWED_VERTICALS.includes(vertical)) {
@@ -189,6 +194,12 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     const { data: prMeta } = await octokit.pulls.get({ owner: REPO_OWNER, repo: REPO_NAME, pull_number: pullNumber });
     const listingError = assertCompletePRListing(prMeta, prFiles.length);
     if (listingError) throw new Error(listingError);
+    if (params.expectedHeadSha && prMeta.head.sha !== params.expectedHeadSha) {
+      throw Object.assign(
+        new Error(`PR #${pullNumber} changed since you opened it (someone else pushed to it). Reopen it to get the latest version, then re-apply your change.`),
+        { status: 409 }
+      );
+    }
     const check = validateArticlePRFiles(prFiles);
     if (!check.ok || check.kind !== "publish") {
       throw new Error(check.ok ? "This pull request is not an article submission." : check.error);
@@ -215,7 +226,21 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     }
   }
 
-  if (!pullNumber) {
+  if (!pullNumber && editPublished) {
+    // Edit of a published article: it must exist on main; keep its byline, date and placement unless changed.
+    try {
+      const { data: live } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path: filePath, ref: MAIN_BRANCH });
+      if (Array.isArray(live) || !("content" in live) || typeof live.content !== "string") throw Object.assign(new Error("not a file"), { status: 404 });
+      const fm = matter(Buffer.from(live.content, "base64").toString("utf-8")).data;
+      preservedAuthor = { author: fm.author, authorUsername: fm.authorUsername, authorAvatar: fm.authorAvatar, date: fm.date };
+      preservedPlacement = fm.placement;
+    } catch (err) {
+      if ((err as { status?: number }).status === 404) {
+        throw Object.assign(new Error(`There is no published article "${cleanSlug}" in ${vertical} to edit.`), { status: 404 });
+      }
+      throw err;
+    }
+  } else if (!pullNumber) {
     // A new submission must not replace someone's published article (that would be an edit approved
     // under the submitter's quorum). Published articles are changed only by reviewed edit/unpublish PRs.
     try {
@@ -347,6 +372,8 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     path: filePath,
     message: pullNumber
       ? `fix(${vertical}): update revisions for PR #${pullNumber} [skip vercel]`
+      : editPublished
+      ? `fix(${vertical}): edit ${cleanSlug} article [skip vercel]`
       : `feat(${vertical}): add ${cleanSlug} article [skip vercel]`,
     content: contentBase64,
     branch: branchName,
@@ -384,9 +411,9 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
   }
 
   // 6. Create brand new Pull Request
-  const prTitle = `feat(${vertical}): ${title}`;
+  const prTitle = editPublished ? `fix(${vertical}): edit ${title}` : `feat(${vertical}): ${title}`;
   const prBody = `## Overview
-New article submission for the **${vertical}** technical vertical.
+${editPublished ? `Edit of the published article \`${filePath}\` (byline and date are kept).` : `New article submission for the **${vertical}** technical vertical.`}
 
 - **Title:** ${title}
 - **Author:** ${authorDisplayName} (@${authorUsername})
@@ -619,8 +646,8 @@ export function validateArticlePRFiles(files: PRFile[]): PRFileCheck {
     const t = tracks[0];
     const vertical = t.filename.match(TRACK_PATH_RE)![1];
     if (!TRACK_VERTICALS.includes(vertical)) return { ok: false, error: `Unknown vertical '${vertical}' in ${t.filename}.` };
-    if (t.status !== undefined && t.status !== "added" && t.status !== "modified") {
-      return { ok: false, error: "Tracks can only be created or edited through the CMS, not renamed or deleted." };
+    if (t.status !== undefined && t.status !== "added" && t.status !== "modified" && t.status !== "removed") {
+      return { ok: false, error: "Tracks can't be renamed through the CMS." };
     }
     return { ok: true, kind: "track", articlePath: t.filename, vertical, articleStatus: t.status };
   }
@@ -821,6 +848,7 @@ type ReviewCheck =
       decision: "merge" | "count-deputies";
       kind: "publish" | "unpublish" | "track";
       articlePath: string;
+      articleStatus?: string;
     };
 
 const REVIEWABLE_BRANCH_RE = /^(?:draft|cms|track)\/[a-z0-9_-]+\/[a-z0-9-]+$/;
@@ -886,7 +914,7 @@ async function checkReviewPreconditions(octokit: Octokit, o: ReviewOptions, inte
     }
     // Re-validate the exact commit being approved (collaborators can push to the branch after submit).
     // Requesting changes stays possible on a broken track, so the author can be told what to fix.
-    if (intent === "approve") {
+    if (intent === "approve" && fileCheck.articleStatus !== "removed") {
       const problem = await trackProblemAt(octokit, fileCheck.articlePath, fileCheck.vertical, prData.head.sha);
       if (problem) return fail(problem, 409);
     }
@@ -927,12 +955,20 @@ async function checkReviewPreconditions(octokit: Octokit, o: ReviewOptions, inte
     decision,
     kind: fileCheck.kind,
     articlePath: fileCheck.articlePath,
+    articleStatus: fileCheck.articleStatus,
   };
 }
 
 /** Squash subject built server-side (the PR title is editable on GitHub and must not reach main's log). */
-export function buildMergeSubject(kind: "publish" | "unpublish" | "track", vertical: string, title: string, slug: string, pullNumber: number) {
+export function buildMergeSubject(
+  kind: "publish" | "unpublish" | "track" | "track-delete",
+  vertical: string,
+  title: string,
+  slug: string,
+  pullNumber: number
+) {
   const clean = (t: string) => t.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+  if (kind === "track-delete") return `chore(${vertical}): remove track ${clean(slug)} (#${pullNumber})`;
   const words = clean(kind === "unpublish" ? `unpublish ${slug}` : kind === "track" ? `track ${title || slug}` : title || slug)
     .split(" ")
     .slice(0, 20)
@@ -986,6 +1022,8 @@ export async function approveAndMergePR(
     const { headSha, headBranch, prAuthor, contributors, decision } = check;
     const cleanReviewer = reviewerUsername.toLowerCase();
 
+    const stale = await changedOnMainSinceBranching(octokit, check.articlePath, headSha);
+    if (stale) return { success: false, merged: false, status: 409, message: stale };
     if (check.kind === "publish") {
       const problem = await placementProblemAtMerge(octokit, check.articlePath, headSha);
       if (problem) return { success: false, merged: false, status: 409, message: problem };
@@ -1030,7 +1068,13 @@ export async function approveAndMergePR(
       pull_number: pullNumber,
       sha: headSha,
       merge_method: "squash",
-      commit_title: buildMergeSubject(check.kind, options.targetVertical, options.articleTitle || "", slug, pullNumber),
+      commit_title: buildMergeSubject(
+        check.kind === "track" && check.articleStatus === "removed" ? "track-delete" : check.kind,
+        options.targetVertical,
+        options.articleTitle || "",
+        slug,
+        pullNumber
+      ),
       commit_message: `Authored-by: @${prAuthor} <${prAuthor}@users.noreply.github.com>\nApproved-by: @${reviewerUsername} <${reviewerUsername}@users.noreply.github.com> (${reviewerRole})`,
     });
 
@@ -1684,12 +1728,14 @@ export async function trackProblemAt(octokit: Octokit, path: string, vertical: s
 /** Review preview of a track PR. */
 async function getPRTrackContent(
   octokit: Octokit,
-  check: { articlePath: string; vertical: string },
+  check: { articlePath: string; vertical: string; articleStatus?: string },
   prData: { head: { sha: string; ref: string }; title: string; user?: { login?: string } | null },
   pullNumber: number
 ) {
   const slug = check.articlePath.replace(/^.*\/([a-z0-9-]+)\.json$/, "$1");
-  const head = await readTrackAt(octokit, check.articlePath, prData.head.sha);
+  const removing = check.articleStatus === "removed";
+  // A deletion request shows the track as it is live now.
+  const head = await readTrackAt(octokit, check.articlePath, removing ? MAIN_BRANCH : prData.head.sha);
   if (!head) throw new Error("This pull request's track file can't be read.");
   const result =
     head.json === undefined
@@ -1702,6 +1748,8 @@ async function getPRTrackContent(
     slug,
     /** null when the file at the PR head is invalid; it can then only be sent back (approve re-checks). */
     track: result.track,
+    /** true for a request to delete the whole track. */
+    deleting: removing,
     trackErrors: result.errors,
     title: result.track?.title || slug,
     summary: result.track?.summary || "",
@@ -1727,7 +1775,7 @@ export interface TrackSubmitParams {
   slug: string;
   /** Already validated with validateTrack by the route. */
   track: Track;
-  mode: "create" | "edit";
+  mode: "create" | "edit" | "delete";
   pullNumber?: number;
   expectedHeadSha?: string;
 }
@@ -1758,6 +1806,7 @@ export async function submitTrackPullRequest(p: TrackSubmitParams): Promise<Draf
   const fail = (message: string, status: number) => Object.assign(new Error(message), { status });
 
   const onMain = await readTrackAt(octokit, path, MAIN_BRANCH);
+  if (p.mode === "delete") return requestTrackDeletion(octokit, p, path, onMain !== null);
   if (!p.pullNumber) {
     if (p.mode === "create" && onMain) throw fail(`A track called "${p.slug}" already exists in ${p.vertical}. Pick another name, or edit it instead.`, 409);
     if (p.mode === "edit" && !onMain) throw fail(`There is no published track "${p.slug}" in ${p.vertical} to edit.`, 404);
@@ -1790,6 +1839,9 @@ export async function submitTrackPullRequest(p: TrackSubmitParams): Promise<Draf
     const check = validateArticlePRFiles(files);
     if (!check.ok || check.kind !== "track" || check.articlePath !== path) {
       throw fail(`PR #${p.pullNumber} changes a different file, so this track can't be saved into it.`, 400);
+    }
+    if (check.articleStatus === "removed") {
+      throw fail(`PR #${p.pullNumber} is a request to delete this track. Withdraw it instead of editing it.`, 400);
     }
     branch = pr.head.ref;
     const { data: current } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path, ref: branch });
@@ -1854,4 +1906,184 @@ export async function placedCountsOnMain(octokit: Octokit, vertical: string, tra
     counts[key] = (counts[key] || 0) + 1;
   }
   return counts;
+}
+
+
+// ---------------------------------------------------------------------------
+// Mistake recovery: stale-change guard, withdraw, restore, track deletion.
+// ---------------------------------------------------------------------------
+
+async function blobShaAt(octokit: Octokit, path: string, ref: string): Promise<string | null> {
+  try {
+    const { data } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path, ref });
+    return !Array.isArray(data) && "sha" in data ? data.sha : null;
+  } catch (err) {
+    if ((err as { status?: number }).status === 404) return null;
+    throw err;
+  }
+}
+
+/**
+ * Refuse to merge if the file this PR changes was changed on main after the PR's branch was made
+ * (another edit, unpublish or track change merged meanwhile). Git could otherwise combine or silently
+ * overwrite the two changes. Returns a reason, or null.
+ */
+export async function changedOnMainSinceBranching(octokit: Octokit, path: string, headSha: string): Promise<string | null> {
+  const { data: cmp } = await octokit.repos.compareCommits({ owner: REPO_OWNER, repo: REPO_NAME, base: MAIN_BRANCH, head: headSha });
+  const mergeBase = cmp.merge_base_commit?.sha;
+  if (!mergeBase) return "Couldn't compare this pull request with main. Try again.";
+  const [atBase, onMain] = await Promise.all([blobShaAt(octokit, path, mergeBase), blobShaAt(octokit, path, MAIN_BRANCH)]);
+  if (atBase === onMain) return null;
+  return "This page was changed on the live site after this request was opened (another change to it was merged). Ask the author to withdraw this request and redo the change on the latest version.";
+}
+
+/**
+ * Close the caller's own pending CMS pull request (or any, for a Superadmin) and delete its branch.
+ * Nothing reaches main, so no approval is needed.
+ */
+export async function withdrawPullRequest(token: string, pullNumber: number, login: string, isSuperadmin: boolean): Promise<{ status: number; message: string }> {
+  const octokit = getOctokit(token);
+  const { data: pr } = await octokit.pulls.get({ owner: REPO_OWNER, repo: REPO_NAME, pull_number: pullNumber });
+  if (pr.state !== "open") return { status: 400, message: `PR #${pullNumber} is already closed.` };
+  if (pr.base.ref !== MAIN_BRANCH || pr.head.repo?.full_name !== `${REPO_OWNER}/${REPO_NAME}` || !REVIEWABLE_BRANCH_RE.test(pr.head.ref)) {
+    return { status: 400, message: `PR #${pullNumber} wasn't made by the Studio, so it can't be withdrawn here.` };
+  }
+  if ((pr.user?.login || "").toLowerCase() !== login.toLowerCase() && !isSuperadmin) {
+    return { status: 403, message: "You can only withdraw your own submissions." };
+  }
+  await octokit.issues.createComment({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    issue_number: pullNumber,
+    body: `### ↩️ Withdrawn by @${login}\nThis request was withdrawn in CMS Studio. Nothing was published.`,
+  });
+  await octokit.pulls.update({ owner: REPO_OWNER, repo: REPO_NAME, pull_number: pullNumber, state: "closed" });
+  try {
+    await octokit.git.deleteRef({ owner: REPO_OWNER, repo: REPO_NAME, ref: `heads/${pr.head.ref}` });
+  } catch (err) {
+    console.warn(`Could not delete branch ${pr.head.ref}:`, err);
+  }
+  return { status: 200, message: `PR #${pullNumber} withdrawn.` };
+}
+
+export interface UnpublishedPost {
+  vertical: string;
+  slug: string;
+  title: string;
+  /** Commit whose parent still has the article. */
+  removedIn: string;
+  removedAt: string;
+}
+
+const UNPUBLISH_SUBJECT_RE = /^chore\(([a-z0-9-]+)\): unpublish ([a-z0-9]+(?:-[a-z0-9]+)*) \(#\d+\)$/;
+
+/** Articles unpublished through the Studio (recent history of main) that aren't live again. */
+export async function listRecentlyUnpublished(token: string, limit = 200): Promise<UnpublishedPost[]> {
+  const octokit = getOctokit(token);
+  const { data: commits } = await octokit.repos.listCommits({ owner: REPO_OWNER, repo: REPO_NAME, sha: MAIN_BRANCH, per_page: Math.min(limit, 100) });
+  const seen = new Set<string>();
+  const out: UnpublishedPost[] = [];
+  for (const c of commits) {
+    const m = UNPUBLISH_SUBJECT_RE.exec((c.commit.message || "").split("\n")[0]);
+    if (!m || !c.parents?.[0]) continue;
+    const [, vertical, slug] = m;
+    if (!ALLOWED_VERTICALS.includes(vertical) || seen.has(`${vertical}/${slug}`)) continue;
+    seen.add(`${vertical}/${slug}`);
+    const path = vertical === "club" ? `content/club/posts/${slug}.md` : `content/verticals/${vertical}/posts/${slug}.md`;
+    if ((await blobShaAt(octokit, path, MAIN_BRANCH)) !== null) continue; // already live again
+    let title = slug;
+    try {
+      const { data } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path, ref: c.parents[0].sha });
+      if (!Array.isArray(data) && "content" in data && typeof data.content === "string") {
+        title = String(matter(Buffer.from(data.content, "base64").toString("utf-8")).data.title || slug);
+      }
+    } catch {
+      continue;
+    }
+    out.push({ vertical, slug, title, removedIn: c.sha, removedAt: c.commit.committer?.date || c.commit.author?.date || "" });
+  }
+  return out;
+}
+
+/**
+ * Open a PR that puts an unpublished article back exactly as it was (same slug, byline, date, placement,
+ * so its comment thread and readers' progress return). Reviewed like any article by its requester.
+ */
+export async function restoreUnpublishedPost(token: string, vertical: string, slug: string, login: string): Promise<DraftResult> {
+  const fail = (message: string, status: number) => Object.assign(new Error(message), { status });
+  if (!ALLOWED_VERTICALS.includes(vertical) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) throw fail("Invalid article.", 400);
+  const octokit = getOctokit(token);
+  const found = (await listRecentlyUnpublished(token)).find((p) => p.vertical === vertical && p.slug === slug);
+  if (!found) throw fail(`"${slug}" isn't in the recently unpublished list (or it is already live).`, 404);
+  const path = vertical === "club" ? `content/club/posts/${slug}.md` : `content/verticals/${vertical}/posts/${slug}.md`;
+  const { data: commit } = await octokit.repos.getCommit({ owner: REPO_OWNER, repo: REPO_NAME, ref: found.removedIn });
+  const parent = commit.parents?.[0]?.sha;
+  if (!parent) throw fail("Couldn't find the version before it was unpublished.", 404);
+  const { data: old } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path, ref: parent });
+  if (Array.isArray(old) || !("content" in old) || typeof old.content !== "string") throw fail("Couldn't read the unpublished article.", 404);
+
+  const { data: refData } = await octokit.git.getRef({ owner: REPO_OWNER, repo: REPO_NAME, ref: `heads/${MAIN_BRANCH}` });
+  const branch = `draft/${vertical}/restore-${slug}-${Date.now().toString().slice(-5)}`;
+  await octokit.git.createRef({ owner: REPO_OWNER, repo: REPO_NAME, ref: `refs/heads/${branch}`, sha: refData.object.sha });
+  try {
+    await octokit.repos.createOrUpdateFileContents({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path,
+      branch,
+      content: old.content.replace(/\n/g, ""),
+      message: `feat(${vertical}): restore ${slug} [skip vercel]`,
+      committer: { name: "SSN Coding Club Studio", email: "bot@ssncodingclub.org" },
+    });
+    const { data: pr } = await octokit.pulls.create({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      title: `feat(${vertical}): restore ${found.title.replace(/[\r\n]+/g, " ")}`,
+      head: branch,
+      base: MAIN_BRANCH,
+      body: `## Restore request\n\n@${login} asked to put \`${path}\` back on the website exactly as it was before it was unpublished (same address, byline and date).\n\nIt goes live only after this request is approved in CMS Studio review.`,
+    });
+    return { pullNumber: pr.number, prUrl: pr.html_url, branch };
+  } catch (err) {
+    try {
+      await octokit.git.deleteRef({ owner: REPO_OWNER, repo: REPO_NAME, ref: `heads/${branch}` });
+    } catch {
+      // best effort
+    }
+    throw err;
+  }
+}
+
+/** A PR that removes a whole track (Head/Superadmin; a Superadmin approves). Placed blogs stay published. */
+async function requestTrackDeletion(octokit: Octokit, p: TrackSubmitParams, path: string, exists: boolean): Promise<DraftResult> {
+  const fail = (message: string, status: number) => Object.assign(new Error(message), { status });
+  if (p.pullNumber) throw fail("A deletion request can't be combined with an existing proposal. Withdraw it first.", 400);
+  if (!exists) throw fail(`There is no published track "${p.slug}" in ${p.vertical} to delete.`, 404);
+  const { data: refData } = await octokit.git.getRef({ owner: REPO_OWNER, repo: REPO_NAME, ref: `heads/${MAIN_BRANCH}` });
+  const branch = `track/${p.vertical}/remove-${p.slug}-${Date.now().toString().slice(-5)}`.slice(0, 120);
+  await octokit.git.createRef({ owner: REPO_OWNER, repo: REPO_NAME, ref: `refs/heads/${branch}`, sha: refData.object.sha });
+  const { data: current } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path, ref: branch });
+  const sha = !Array.isArray(current) && "sha" in current ? current.sha : undefined;
+  if (!sha) throw fail("Couldn't read the track to delete.", 404);
+  await octokit.repos.deleteFile({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    path,
+    sha,
+    branch,
+    message: `chore(${p.vertical}): remove track ${p.slug} [skip vercel]`,
+    author: { name: p.authorDisplayName || p.authorUsername, email: `${p.authorUsername}@users.noreply.github.com` },
+    committer: { name: "SSN Coding Club Studio", email: "bot@ssncodingclub.org" },
+  });
+  const counts = await placedCountsOnMain(octokit, p.vertical, p.slug);
+  const placed = Object.values(counts).reduce((a, b) => a + b, 0);
+  const { data: pr } = await octokit.pulls.create({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    title: `chore(${p.vertical}): remove track ${p.slug}`,
+    head: branch,
+    base: MAIN_BRANCH,
+    body: `## Delete learning track\n\n@${p.authorUsername} asked to remove the track \`${p.slug}\` from ${p.vertical}.\n\n${placed ? `**${placed} published blog${placed === 1 ? " is" : "s are"} placed in it.** ${placed === 1 ? "It stays" : "They stay"} published as normal blog${placed === 1 ? "" : "s"} but leave the tree.` : "No published blogs are placed in it."}\n\nThe track stays live until a Superadmin approves this request.`,
+  });
+  return { pullNumber: pr.number, prUrl: pr.html_url, branch };
 }

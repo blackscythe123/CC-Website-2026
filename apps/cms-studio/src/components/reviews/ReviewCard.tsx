@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Check, CircleAlert, ExternalLink, Eye, GitPullRequestArrow, MessageSquare, ShieldCheck } from "lucide-react";
+import { Check, CircleAlert, ExternalLink, Eye, GitPullRequestArrow, MessageSquare, ShieldCheck, Undo2 } from "lucide-react";
 import type { ReviewPr } from "@/lib/hooks/useReviewQueue";
 import { verticalLabel } from "@/lib/verticals";
 import { Avatar, Badge, Button, VerticalIcon, buttonClasses } from "@/components/ui";
@@ -27,9 +27,11 @@ export interface ReviewCardProps {
   onPreview: () => void;
   onApprove: () => void;
   onRequestChanges: () => void;
+  /** Close this request without publishing (author or Superadmin). */
+  onWithdraw?: () => void;
 }
 
-export default function ReviewCard({ pr, progress, isMine, canReview, hasApproved, approving, previewing, onPreview, onApprove, onRequestChanges }: ReviewCardProps) {
+export default function ReviewCard({ pr, progress, isMine, canReview, hasApproved, approving, previewing, onPreview, onApprove, onRequestChanges, onWithdraw }: ReviewCardProps) {
   return (
     <article className="rounded-xl border border-border bg-bg p-4 shadow-card sm:p-5">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
@@ -91,8 +93,13 @@ export default function ReviewCard({ pr, progress, isMine, canReview, hasApprove
           </a>
         </div>
         <div className="ml-auto flex gap-2">
+          {onWithdraw ? (
+            <Button size="sm" variant="ghost" icon={Undo2} onClick={onWithdraw}>
+              Withdraw
+            </Button>
+          ) : null}
           {isMine && pr.changesRequested ? (
-            <Link href={`/admin?revise=${pr.number}`} className={buttonClasses({ size: "sm", variant: "primary" })}>
+            <Link href={pr.kind === "track" ? `/admin/tracks?revise=${pr.number}` : `/admin?revise=${pr.number}`} className={buttonClasses({ size: "sm", variant: "primary" })}>
               <GitPullRequestArrow className="h-4 w-4" aria-hidden />
               Load &amp; revise
             </Link>

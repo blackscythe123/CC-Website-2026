@@ -5,7 +5,7 @@ import { CircleCheck, ExternalLink, Info, TriangleAlert, UserCheck } from "lucid
 import type { ClubRoles, UserRoleInfo, UserRoleType } from "@/lib/roles";
 import { ALL_VERTICALS } from "@/lib/verticals";
 import { assignableRoles } from "@/lib/governance";
-import { Avatar, Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { Avatar, Button, Card, ConfirmDialog, Field, Input, Select, Spinner } from "@/components/ui";
 import { ROLE_LABEL, actorRoleIn, currentAssignment } from "./shared";
 
 export interface CandidateUser {
@@ -81,9 +81,19 @@ export default function AssignRoleCard({
   const existing = query ? currentAssignment(roles, query) : null;
   const currentHead = role === "vertical_head" ? roles?.vertical_heads?.[vertical]?.[0] : undefined;
 
-  const submit = async (e: React.FormEvent) => {
+  const [confirming, setConfirming] = useState(false);
+  const target = username.trim().replace(/^@/, "");
+  const verticalName = ALL_VERTICALS.find((v) => v.slug === vertical)?.name || vertical;
+  const replacingHead = Boolean(currentHead && currentHead.toLowerCase() !== target.toLowerCase());
+
+  // Role changes take effect immediately, so the form asks once before saving.
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const done = await onAssign({ username: username.trim().replace(/^@/, ""), role, vertical: role === "superadmin" ? undefined : vertical });
+    if (target) setConfirming(true);
+  };
+  const save = async () => {
+    setConfirming(false);
+    const done = await onAssign({ username: target, role, vertical: role === "superadmin" ? undefined : vertical });
     if (done) {
       setUsername("");
       setVerified(null);
@@ -215,6 +225,28 @@ export default function AssignRoleCard({
             Save role
           </Button>
         </div>
+        <ConfirmDialog
+          open={confirming}
+          title={`Make @${target} ${ROLE_LABEL[role] ?? role}${role === "superadmin" ? "" : ` of ${verticalName}`}?`}
+          tone={replacingHead || role === "superadmin" ? "danger" : "primary"}
+          confirmLabel={replacingHead ? `Replace @${currentHead}` : "Save role"}
+          onCancel={() => setConfirming(false)}
+          onConfirm={save}
+          message={
+            <>
+              <p>This takes effect immediately for the Studio and is recorded in the club&apos;s roles file. You can change it back later from this page.</p>
+              {existing ? <p>@{target} currently has: {existing}.</p> : null}
+              {replacingHead ? (
+                <p className="rounded-lg bg-warning-bg p-3 text-warning">
+                  @{currentHead} is the current head of {verticalName} and will lose that role.
+                </p>
+              ) : null}
+              {role === "superadmin" ? (
+                <p className="rounded-lg bg-warning-bg p-3 text-warning">Superadmins can change every vertical, every role and approve anything.</p>
+              ) : null}
+            </>
+          }
+        />
       </form>
     </Card>
   );

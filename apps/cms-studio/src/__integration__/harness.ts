@@ -10,6 +10,9 @@ import * as rolesRoute from "@/app/api/roles/route";
 import * as requestsRoute from "@/app/api/roles/requests/route";
 import * as tracksRoute from "@/app/api/tracks/route";
 import * as remoteDraftsRoute from "@/app/api/posts/drafts/remote/route";
+import * as withdrawRoute from "@/app/api/posts/withdraw/route";
+import * as restoreRoute from "@/app/api/posts/restore/route";
+import * as publishedRoute from "@/app/api/posts/published/route";
 
 const ROUTES: Record<string, Record<string, (r: NextRequest) => Promise<Response>>> = {
   "/api/posts/draft": draftRoute as never,
@@ -19,6 +22,9 @@ const ROUTES: Record<string, Record<string, (r: NextRequest) => Promise<Response
   "/api/roles/requests": requestsRoute as never,
   "/api/tracks": tracksRoute as never,
   "/api/posts/drafts/remote": remoteDraftsRoute as never,
+  "/api/posts/withdraw": withdrawRoute as never,
+  "/api/posts/restore": restoreRoute as never,
+  "/api/posts/published": publishedRoute as never,
 };
 
 // 1x1 transparent PNG
@@ -88,6 +94,10 @@ export interface SubmitOpts {
   coverImage?: string;
   /** Sent only when the key is present (undefined = keep, null = none). */
   placement?: { track: string; topic: string; subtopic?: string } | null | Record<string, unknown>;
+  /** Edit an already-published article (new PR, same vertical + slug). */
+  editPublished?: boolean;
+  /** Defaults to the PR's current head for revisions (what the editor loaded). */
+  expectedHeadSha?: string;
 }
 
 export function makeWorld(): World {
@@ -148,6 +158,8 @@ export function makeWorld(): World {
       pullNumber: o.pullNumber,
       existingBranch: o.existingBranch,
       ...("placement" in o ? { placement: o.placement } : {}),
+      ...(o.editPublished !== undefined ? { editPublished: o.editPublished } : {}),
+      ...(o.pullNumber ? { expectedHeadSha: o.expectedHeadSha ?? fake.headSha(o.pullNumber) } : {}),
     };
     const r = await call(login, "POST", "/api/posts/draft", body);
     return { ...r, pull: r.json?.pullNumber, branch: r.json?.branch };

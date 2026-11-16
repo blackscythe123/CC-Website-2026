@@ -19,8 +19,9 @@ const JOIN: NavItem = { id: "join", href: "/admin/roles", label: "Join a vertica
 export function navItemsFor(role: UserRoleType | null, _verticals: string[]): NavItem[] {
   if (!role) return [];
   if (role === "superadmin" || role === "vertical_head") return [WRITE, REVIEWS, ARTICLES, TRACKS, PEOPLE];
-  if (role === "deputy") return [WRITE, REVIEWS, PEOPLE];
-  return [WRITE, REVIEWS, JOIN];
+  if (role === "deputy") return [WRITE, REVIEWS, ARTICLES, PEOPLE];
+  // Members with a vertical can propose edits to published articles from the Articles page.
+  return _verticals.length ? [WRITE, REVIEWS, ARTICLES, JOIN] : [WRITE, REVIEWS, JOIN];
 }
 
 export function isActive(item: NavItem, pathname: string | null): boolean {

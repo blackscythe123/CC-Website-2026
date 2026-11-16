@@ -51,10 +51,15 @@ function ItemsEditor({
   items,
   onChange,
   idPrefix,
+  moveTargets = [],
+  onMoveTo,
 }: {
   items: EditItem[];
   onChange: (items: EditItem[]) => void;
   idPrefix: string;
+  /** Other topics/subtopics this resource can be moved to (keeps its id, so readers' ticks survive). */
+  moveTargets?: { key: string; label: string }[];
+  onMoveTo?: (index: number, targetKey: string) => void;
 }) {
   const update = (index: number, patch: Partial<EditItem>) => onChange(items.map((it, i) => (i === index ? { ...it, ...patch } : it)));
   return (
@@ -72,6 +77,26 @@ function ItemsEditor({
               <span className="flex-1" />
               <IconButton size="sm" icon={ArrowUp} label="Move up" disabled={i === 0} onClick={() => onChange(moved(items, i, -1))} />
               <IconButton size="sm" icon={ArrowDown} label="Move down" disabled={i === items.length - 1} onClick={() => onChange(moved(items, i, 1))} />
+              {onMoveTo && moveTargets.length ? (
+                <>
+                  <label htmlFor={`${base}-move`} className="sr-only">
+                    Move to another section
+                  </label>
+                  <select
+                    id={`${base}-move`}
+                    value=""
+                    onChange={(e) => e.target.value && onMoveTo(i, e.target.value)}
+                    className="h-7 max-w-[11rem] rounded-md border border-border bg-bg px-1.5 text-[12px] text-muted"
+                  >
+                    <option value="">Move to…</option>
+                    {moveTargets.map((t) => (
+                      <option key={t.key} value={t.key}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              ) : null}
               <IconButton size="sm" icon={X} tone="danger" label="Remove this resource" onClick={() => onChange(items.filter((_, j) => j !== i))} />
             </div>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -144,12 +169,15 @@ export default function TrackEditor({
   submitting,
   onSubmit,
   onCancel,
+  onDelete,
 }: {
   target: TrackEditorTarget;
   login: string;
   submitting: boolean;
   onSubmit: (slug: string, track: ReturnType<typeof toTrack>) => void;
   onCancel: () => void;
+  /** Shown for published tracks: request deleting the whole track. */
+  onDelete?: () => void;
 }) {
   const draftKey = `${target.vertical}/${target.pullNumber ? `pr-${target.pullNumber}` : target.slug || "new"}`;
   const [edit, setEdit] = useState<EditTrack>(target.initial);
@@ -198,6 +226,35 @@ export default function TrackEditor({
     if (sub) return sub.id ? target.placedCounts[`${topic.id}/${sub.id}`] || 0 : 0;
     return Object.entries(target.placedCounts).reduce((n, [k, v]) => (k === topic.id || k.startsWith(`${topic.id}/`) ? n + v : n), 0);
   };
+  // Every topic/subtopic, for "Move to…" (by row key; ids are assigned at submit for new sections).
+  const sectionTargets = edit.topics.flatMap((t, ti) => [
+    { key: t.key, label: t.title || `Topic ${ti + 1}` },
+    ...t.subtopics.map((s, si) => ({ key: s.key, label: `${t.title || `Topic ${ti + 1}`} › ${s.title || `Subtopic ${si + 1}`}` })),
+  ]);
+  const moveItem = (fromKey: string, index: number, toKey: string) =>
+    setEdit((e) => {
+      let moving: EditItem | undefined;
+      const take = (items: EditItem[]) => {
+        moving = items[index];
+        return items.filter((_, i) => i !== index);
+      };
+      const topics = e.topics.map((t) =>
+        t.key === fromKey
+          ? { ...t, items: take(t.items) }
+          : { ...t, subtopics: t.subtopics.map((s) => (s.key === fromKey ? { ...s, items: take(s.items) } : s)) }
+      );
+      if (!moving) return e;
+      const item = moving;
+      return {
+        ...e,
+        topics: topics.map((t) =>
+          t.key === toKey
+            ? { ...t, items: [...t.items, item] }
+            : { ...t, subtopics: t.subtopics.map((s) => (s.key === toKey ? { ...s, items: [...s.items, item] } : s)) }
+        ),
+      };
+    });
+
   const askRemove = (label: string, placed: number, run: () => void) => {
     if (placed === 0 && !label) return run();
     setPendingRemove({ label, placed, run });
@@ -322,7 +379,13 @@ export default function TrackEditor({
                   />
                 </div>
                 <SectionFields section={topic} idPrefix={tp} label="Topic" onChange={(patch) => setTopic(ti, patch)} />
-                <ItemsEditor items={topic.items} idPrefix={tp} onChange={(items) => setTopic(ti, { items })} />
+                <ItemsEditor
+                  items={topic.items}
+                  idPrefix={tp}
+                  onChange={(items) => setTopic(ti, { items })}
+                  moveTargets={sectionTargets.filter((x) => x.key !== topic.key)}
+                  onMoveTo={(i, to) => moveItem(topic.key, i, to)}
+                />
 
                 {topic.subtopics.map((sub, si) => {
                   const sp = `${tp}-sub-${sub.key}`;
@@ -344,7 +407,13 @@ export default function TrackEditor({
                         />
                       </div>
                       <SectionFields section={sub} idPrefix={sp} label="Subtopic" onChange={(patch) => setSub(ti, si, patch)} />
-                      <ItemsEditor items={sub.items} idPrefix={sp} onChange={(items) => setSub(ti, si, { items })} />
+                      <ItemsEditor
+                        items={sub.items}
+                        idPrefix={sp}
+                        onChange={(items) => setSub(ti, si, { items })}
+                        moveTargets={sectionTargets.filter((x) => x.key !== sub.key)}
+                        onMoveTo={(i, to) => moveItem(sub.key, i, to)}
+                      />
                     </div>
                   );
                 })}
@@ -354,9 +423,17 @@ export default function TrackEditor({
               </section>
             );
           })}
-          <Button icon={Plus} onClick={() => setEdit((e) => ({ ...e, topics: [...e.topics, emptyTopic()] }))}>
-            Add topic
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button icon={Plus} onClick={() => setEdit((e) => ({ ...e, topics: [...e.topics, emptyTopic()] }))}>
+              Add topic
+            </Button>
+            <span className="flex-1" />
+            {onDelete ? (
+              <Button variant="danger" icon={Trash2} onClick={onDelete}>
+                Delete this track…
+              </Button>
+            ) : null}
+          </div>
         </>
       )}
 

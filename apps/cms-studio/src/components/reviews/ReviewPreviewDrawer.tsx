@@ -28,6 +28,8 @@ export interface PreviewArticle {
   track?: Track | null;
   trackErrors?: string[];
   slug?: string;
+  /** A request to delete the whole track. */
+  deleting?: boolean;
 }
 
 export default function ReviewPreviewDrawer({
@@ -104,6 +106,11 @@ export default function ReviewPreviewDrawer({
           {article.placementLabel ? (
             <p className="mb-4 rounded-lg border border-border bg-bg p-3 text-sm">
               <span className="font-semibold">Placed in learning track:</span> {article.placementLabel}
+            </p>
+          ) : null}
+          {article.kind === "track" && article.deleting ? (
+            <p role="alert" className="mb-4 rounded-lg bg-danger-bg p-3 text-sm font-semibold text-danger">
+              This request deletes the whole track below from the website. Blogs placed in it stay published as normal blogs.
             </p>
           ) : null}
           {article.kind === "track" && article.track ? (

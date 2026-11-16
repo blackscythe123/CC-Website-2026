@@ -772,6 +772,18 @@ export class FakeGitHub {
     }
 
     // ------------------------------------------------------------ commits / compare
+    if (p === "/commits" && method === "GET") {
+      // first-parent history of a ref, newest first (enough for the Studio's "recent changes" reads)
+      let sha = this.resolveRef(c.query.get("sha") || "main");
+      if (!sha) throw new HttpError(404, "Not Found");
+      const list: Commit[] = [];
+      while (sha) {
+        const cm: Commit = this.commits.get(sha)!;
+        list.push(cm);
+        sha = cm.parents[0];
+      }
+      return this.paginate(list.map((cm) => this.commitJson(cm)), c);
+    }
     if ((m = p.match(/^\/commits\/(.+)$/)) && method === "GET") {
       const sha = this.resolveRef(m[1]);
       if (!sha) throw new HttpError(404, "No commit found for SHA");
@@ -810,6 +822,17 @@ export class FakeGitHub {
       if (!pr) throw new HttpError(404, "Not Found");
       const sub = m[2];
       if (!sub && method === "GET") return { status: 200, body: this.pullJson(pr) };
+      if (!sub && method === "PATCH") {
+        const user = this.requireUser(c);
+        if (user !== pr.user) this.requirePush(c);
+        const b = c.body || {};
+        if (b.state === "closed" && pr.state === "open") {
+          pr.frozenHeadSha = this.pullHead(pr);
+          pr.state = "closed";
+        }
+        if (typeof b.title === "string") pr.title = b.title;
+        return { status: 200, body: this.pullJson(pr) };
+      }
       const head = this.pullHead(pr);
       const baseTip = this.tip(pr.baseRef);
       if (sub === "files" && method === "GET") {

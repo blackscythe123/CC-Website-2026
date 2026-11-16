@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { RefreshCw, Search } from "lucide-react";
+import { RefreshCw, RotateCcw, Search } from "lucide-react";
 import { useStudio } from "@/components/shell/StudioContext";
 import { useToast } from "@/components/toast/ToastProvider";
 import { ALL_VERTICALS, CLUB_VERTICAL } from "@/lib/verticals";
@@ -23,6 +23,10 @@ export default function ArticlesPage() {
   const [unpublishing, setUnpublishing] = useState<PublishedPost | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [unpublished, setUnpublished] = useState<{ vertical: string; slug: string; title: string; removedAt: string }[]>([]);
+  const [restoring, setRestoring] = useState<{ vertical: string; slug: string; title: string } | null>(null);
+  const [restoreBusy, setRestoreBusy] = useState(false);
+
   const [repurposeFor, setRepurposeFor] = useState<PublishedPost | null>(null);
   const [pack, setPack] = useState<RepurposePack | null>(null);
   const [packLoading, setPackLoading] = useState(false);
@@ -33,6 +37,14 @@ export default function ArticlesPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Couldn't load articles");
       setPosts(data.posts || []);
+      // Heads/Superadmins also see recently unpublished articles they can restore (others get an empty list).
+      if ((data.posts || []).some((p: PublishedPost) => p.canDelete)) {
+        const r = await fetch("/api/posts/restore");
+        const u = await r.json().catch(() => ({}));
+        setUnpublished(r.ok && Array.isArray(u.posts) ? u.posts : []);
+      } else {
+        setUnpublished([]);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't load articles");
     } finally {
@@ -99,12 +111,34 @@ export default function ArticlesPage() {
     }
   };
 
+  const restore = async () => {
+    if (!restoring) return;
+    setRestoreBusy(true);
+    try {
+      const res = await fetch("/api/posts/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vertical: restoring.vertical, slug: restoring.slug }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't restore the article");
+      toast.success(`Restore request opened (PR #${data.pullNumber}). It goes live once approved.`);
+      setRestoring(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't restore the article");
+    } finally {
+      setRestoreBusy(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="hidden text-2xl font-extrabold tracking-tight md:block">Articles</h1>
-          <p className="mt-1 text-sm text-muted">Published articles. Heads can unpublish in their vertical; superadmins anywhere.</p>
+          <p className="mt-1 text-sm text-muted">
+            Published articles. Anyone in a vertical can propose an edit; heads can unpublish and restore in their vertical; superadmins anywhere.
+          </p>
         </div>
         <Button size="sm" icon={RefreshCw} loading={refreshing} onClick={refresh}>
           Refresh
@@ -167,6 +201,43 @@ export default function ArticlesPage() {
           ))
         )}
       </div>
+
+      {unpublished.length ? (
+        <section className="mt-8 space-y-2" aria-labelledby="unpublished-heading">
+          <h2 id="unpublished-heading" className="text-[13px] font-bold uppercase tracking-wide text-muted">
+            Recently unpublished
+          </h2>
+          {unpublished.map((p) => (
+            <div key={`${p.vertical}/${p.slug}`} className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-bg p-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold">{p.title}</p>
+                <p className="text-[13px] text-muted">
+                  {p.vertical} · /{p.slug}
+                  {p.removedAt ? ` · unpublished ${new Date(p.removedAt).toLocaleDateString()}` : ""}
+                </p>
+              </div>
+              <Button size="sm" icon={RotateCcw} onClick={() => setRestoring(p)}>
+                Restore
+              </Button>
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+      <ConfirmDialog
+        open={Boolean(restoring)}
+        title="Restore this article?"
+        tone="primary"
+        loading={restoreBusy}
+        confirmLabel="Open restore request"
+        onConfirm={restore}
+        onCancel={() => setRestoring(null)}
+        message={
+          <p>
+            “{restoring?.title}” is put back exactly as it was (same address, author and date, so its comments return). It goes live after the request is approved.
+          </p>
+        }
+      />
 
       <RepurposeDrawer title={repurposeFor?.title ?? null} loading={packLoading} pack={pack} onClose={() => setRepurposeFor(null)} />
 

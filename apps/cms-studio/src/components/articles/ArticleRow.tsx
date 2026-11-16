@@ -1,6 +1,7 @@
 "use client";
 
-import { ExternalLink, Lock, Share2, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { ExternalLink, Lock, Pencil, Share2, Trash2 } from "lucide-react";
 import { publicPostUrl, verticalLabel } from "@/lib/verticals";
 import { Badge, Button, VerticalIcon, buttonClasses } from "@/components/ui";
 
@@ -12,6 +13,8 @@ export interface PublishedPost {
   author: string;
   summary: string;
   canDelete: boolean;
+  /** May open an edit request for it. */
+  canEdit?: boolean;
 }
 
 export default function ArticleRow({ post, onRepurpose, onUnpublish }: { post: PublishedPost; onRepurpose: () => void; onUnpublish: () => void }) {
@@ -36,6 +39,12 @@ export default function ArticleRow({ post, onRepurpose, onUnpublish }: { post: P
           Read
           <ExternalLink className="h-3.5 w-3.5" aria-hidden />
         </a>
+        {post.canEdit ? (
+          <Link href={`/admin?edit=${post.vertical}/${post.slug}`} className={buttonClasses({ size: "sm" })}>
+            <Pencil className="h-3.5 w-3.5" aria-hidden />
+            Edit
+          </Link>
+        ) : null}
         <Button size="sm" icon={Share2} onClick={onRepurpose} title="Generate posts for X, LinkedIn, Discord and WhatsApp">
           Repurpose
         </Button>

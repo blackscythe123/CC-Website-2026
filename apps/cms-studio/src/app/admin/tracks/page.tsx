@@ -356,7 +356,7 @@ export default function TracksPage() {
               <p>This opens a deletion request. The track stays live until a Superadmin approves it.</p>
               <p className={placed ? "rounded-lg bg-warning-bg p-3 text-warning" : ""}>
                 {placed
-                  ? `${placed} published blog${placed === 1 ? " is" : "s are"} placed in it. ${placed === 1 ? "It stays" : "They stay"} published as normal blog${placed === 1 ? "" : "s"} but leave the track. Readers' ticks and the track's comment threads stay on GitHub but are no longer shown.`
+                  ? `${placed} published blog${placed === 1 ? " is" : "s are"} placed in it. ${placed === 1 ? "It stays published as a normal blog but leaves the track." : "They stay published as normal blogs but leave the track."} Readers' ticks and the track's comment threads stay on GitHub but are no longer shown.`
                   : "No published blogs are placed in it."}
               </p>
             </>

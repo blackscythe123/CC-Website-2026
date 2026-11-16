@@ -69,3 +69,21 @@ Guard tests were mutation-checked: disabling the merge-time placement check, the
 ## Data hygiene
 
 Test PRs #33 (track) and #34 (placed blog) were labelled "ZZ Test", closed with a comment, and their branches deleted (confirmed: no `track/*` or `zz-*` branches remain). The comments config was switched on only in the local working copy for the browser test and restored before committing. The local session file was deleted.
+
+## Mistake recovery (follow-up batch, 2026-11-16)
+
+Scope from an EGM review (code inventory + design gaps): edit published articles, withdraw requests, restore unpublished articles, delete tracks, refuse merges that would overwrite a newer change, move a resource between topics, confirm role changes.
+
+| Leg | Evidence |
+|---|---|
+| Articles → Edit loads the live article (vertical locked, placement kept); "Submit edit for review" opens a `fix(<v>): edit …` PR with only that file | Rendered (Playwright Chromium) + GitHub-confirmed (test PRs #36, #37) |
+| An edit keeps the byline exactly (a hand-written article without `authorUsername` doesn't get the editor's name) | **Found by the browser pass** on #36, fixed, re-checked on #37 (GitHub-confirmed) + Automated |
+| Edit approval follows the original author's rank (unknown author = Superadmin only) | Automated (integration) |
+| Withdraw from Reviews and from the Tracks screen: PR closed unmerged, branch deleted | Rendered + GitHub-confirmed (#36, #37, #38 closed, no branches left) |
+| Track deletion request: one removed file, PR text lists placed blogs; review preview shows a deletion banner; a deletion can't be revised into an edit | Rendered + GitHub-confirmed (#38) + Automated |
+| Move a resource to another topic/subtopic in the track editor (id kept) | Rendered (not submitted) |
+| Role assignment asks for confirmation (with Head-replacement / Superadmin warnings); cancelling saves nothing | Rendered; `roles.json` unchanged on GitHub |
+| Restore an unpublished article: listed for its Head/Superadmins, restored byte-for-byte through a reviewed PR | Automated (integration). Not browser-tested: no article is currently unpublished on main, and creating one needs a second Superadmin's approval. |
+| Second of two edits to the same article/track is refused at merge (409); a stale revision is refused (409) | Automated (integration, mutation-checked) |
+
+Test PRs #36–#38 were withdrawn through the new UI and their branches deleted.

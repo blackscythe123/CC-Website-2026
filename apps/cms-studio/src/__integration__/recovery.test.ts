@@ -56,6 +56,21 @@ describe("16. editing a published article", () => {
     expect((await w.call("m1", "GET", "/api/posts/published?vertical=ai-ml&slug=../x")).status).toBe(400);
   });
 
+  it("never re-attributes a hand-written article: missing byline fields stay missing; an unquoted date stays a date", async () => {
+    const HAND = "content/verticals/ai-ml/posts/hand-written.md";
+    w.fake.push("main", { [HAND]: "---\ntitle: Hand Written\ndate: 2026-01-05\nauthor: Some Alumnus\n---\n\nOld body.\n" }, { message: "x", author: "h1" });
+    const r = await w.submit("m1", { vertical: "ai-ml", slug: "hand-written", title: "Hand Written", body: "New body.", cover: false, editPublished: true });
+    expect(r.status).toBe(200);
+    const fm = matter(w.fake.readText(w.fake.pull(r.pull).headRef, HAND)!).data;
+    expect(fm.author).toBe("Some Alumnus");
+    expect(fm.authorUsername).toBeUndefined();
+    expect(fm.authorAvatar).toBeUndefined();
+    expect(String(fm.date)).toMatch(/^2026-01-05/);
+    // unknown original author = treated as the strictest case: only a Superadmin may approve the edit
+    expect((await w.review("h1", r.pull, "approve")).status).toBe(403);
+    expect((await w.review("sa1", r.pull, "approve")).json.merged).toBe(true);
+  });
+
   it("keeps the placement unless the edit changes it", async () => {
     w.fake.push("main", { [TRACK]: track(["basics", "advanced"]) }, { message: "feat(ai-ml): track", author: "h1" });
     const { data, content } = matter(w.fake.readText("main", AI_POST)!);
@@ -175,7 +190,7 @@ describe("20. deleting a track", () => {
     const pr = w.fake.pull(r.json.pullNumber);
     expect(pr.headRef).toMatch(/^track\/ai-ml\/remove-ml-basics-\d{5}$/);
     expect(w.fake.changedFiles(pr.headRef)).toEqual([{ filename: TRACK, status: "removed" }]);
-    expect(pr.body).toMatch(/1 published blog is placed in it/);
+    expect(pr.body).toMatch(/1 published blog is placed in it.*It stays published as a normal blog but leaves the track\./s);
 
     const preview = await w.call("sa1", "GET", `/api/posts/reviews?previewPullNumber=${r.json.pullNumber}`);
     expect(preview.json.article).toMatchObject({ kind: "track", deleting: true, title: "ML Basics" });

@@ -52,7 +52,7 @@ describe("extractEmbeds / injectEmbeds", () => {
       `Line one\n${url}`, // same paragraph as other text
       `[a video](${url})`,
     ]) {
-      expect(extractEmbeds(md).embeds, md).toHaveLength(0);
+      expect(extractEmbeds(md).embeds.items, md).toHaveLength(0);
       expect(renderArticlePreview(md), md).not.toContain("<iframe");
     }
   });
@@ -67,9 +67,28 @@ describe("extractEmbeds / injectEmbeds", () => {
     expect(html).not.toContain("evil.example");
     expect(html).not.toContain("<script");
   });
-  it("leaves unknown tokens untouched and the HTML otherwise unchanged", () => {
-    expect(injectEmbeds("<p>CCEMBED5</p>", [])).toBe("<p>CCEMBED5</p>");
-    expect(injectEmbeds("<p>CCEMBED5</p>", [{ kind: "video", id: ID }])).toBe("<p>CCEMBED5</p>");
+  it("ignores tokens typed by authors and unknown token numbers", () => {
+    // An author paragraph that looks like a token can't produce or duplicate a player.
+    const html = renderArticlePreview(`CCEMBED0\n\n${url}\n\nCCEMBED00`);
+    expect(html.match(/<iframe/g)).toHaveLength(1);
+    expect(html).toContain("<p>CCEMBED0</p>");
+    const { embeds } = extractEmbeds(url);
+    expect(injectEmbeds(`<p>${embeds.token}7</p>`, embeds)).toBe(`<p>${embeds.token}7</p>`);
+  });
+  it("never touches URLs inside code fences (CommonMark closing rules) or raw HTML blocks", () => {
+    for (const md of [
+      "````\n```\n\n" + url + "\n\n````", // an inner shorter fence doesn't close the outer one
+      "```js\n\n" + url + "\n\n```js\n\n" + url + "\n\n```", // a line with an info string never closes a fence
+      "~~~\n\n" + url + "\n\n```\n\n" + url + "\n\n~~~", // backticks don't close a tilde fence
+      "<pre>\n\n" + url + "\n\n</pre>",
+      "<!--\n\n" + url + "\n\n-->",
+    ]) {
+      const r = extractEmbeds(md);
+      expect(r.embeds.items, md).toHaveLength(0);
+      expect(r.markdown, md).toBe(md);
+    }
+    // ...and the document after a closed fence still works
+    expect(extractEmbeds("```\ncode\n```\n\n" + url).embeds.items).toHaveLength(1);
   });
   it("builds iframe HTML only from valid IDs", () => {
     expect(youTubeEmbedHtml({ kind: "video", id: '"><script>' })).toBe("");

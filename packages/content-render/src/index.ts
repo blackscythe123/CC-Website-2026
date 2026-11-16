@@ -14,7 +14,6 @@ export type Embed =
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 const LIST_ID = /^[A-Za-z0-9_-]{10,64}$/;
 const WATCH_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com"]);
-const TOKEN_PREFIX = "CCEMBED";
 
 /** Parse a YouTube video / playlist / video-in-playlist URL. Returns null for anything else. */
 export function parseYouTubeUrl(input: string): Embed | null {
@@ -65,27 +64,62 @@ export function youTubeEmbedHtml(e: Embed): string {
   );
 }
 
-const FENCE = /^ {0,3}(`{3,}|~{3,})/;
+const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+// Raw HTML blocks whose content must never be touched, even across blank lines (CommonMark types 1 and 2).
+const RAW_HTML_OPEN = /^ {0,3}<(pre|script|style|textarea)(?:\s|>|$)/i;
+const COMMENT_OPEN = /^ {0,3}<!--/;
+
+/** Embeds found in one document, tied to a random per-render token so author text can't forge one. */
+export interface EmbedSet {
+  token: string;
+  items: Embed[];
+}
+
+function randomToken(): string {
+  const bytes = new Uint8Array(6);
+  globalThis.crypto.getRandomValues(bytes);
+  return `CCEMBED${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}N`;
+}
 
 /**
  * Replace each YouTube URL that sits alone on its own line (blank line or start/end of document on both
- * sides, outside fenced code) with a plain-text token. The token survives any markdown engine and
- * sanitizer as `<p>CCEMBEDn</p>`, and injectEmbeds swaps it for the player afterwards.
+ * sides, outside fenced code, indented code and raw HTML blocks) with a plain-text token. The token
+ * survives any markdown engine and sanitizer as `<p>TOKENn</p>`; injectEmbeds swaps it for the player.
  */
-export function extractEmbeds(markdown: string): { markdown: string; embeds: Embed[] } {
+export function extractEmbeds(markdown: string): { markdown: string; embeds: EmbedSet } {
   const lines = markdown.split(/\r?\n/);
-  const embeds: Embed[] = [];
-  let fence: string | null = null;
+  const embeds: EmbedSet = { token: randomToken(), items: [] };
+  let fence: { char: string; len: number } | null = null;
+  let rawEnd: RegExp | null = null;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const f = line.match(FENCE);
-    if (f) {
-      const marker = f[1][0];
-      if (fence === null) fence = marker;
-      else if (fence === marker) fence = null;
+
+    if (fence) {
+      // CommonMark: the closing fence uses the same character, is at least as long, and has no info string.
+      const close = line.match(/^ {0,3}(`{3,}|~{3,})\s*$/);
+      if (close && close[1][0] === fence.char && close[1].length >= fence.len) fence = null;
       continue;
     }
-    if (fence !== null) continue;
+    if (rawEnd) {
+      if (rawEnd.test(line)) rawEnd = null;
+      continue;
+    }
+    const open = line.match(FENCE_OPEN);
+    if (open && !(open[1][0] === "`" && open[2].includes("`"))) {
+      fence = { char: open[1][0], len: open[1].length };
+      continue;
+    }
+    const raw = line.match(RAW_HTML_OPEN);
+    if (raw) {
+      const end = new RegExp(`</${raw[1]}>`, "i");
+      if (!end.test(line)) rawEnd = end;
+      continue;
+    }
+    if (COMMENT_OPEN.test(line)) {
+      if (!/-->/.test(line)) rawEnd = /-->/;
+      continue;
+    }
+
     const trimmed = line.trim();
     if (!trimmed || trimmed !== line.replace(/\s+$/, "")) continue; // indented lines are code / list continuation
     const prevBlank = i === 0 || lines[i - 1].trim() === "";
@@ -93,20 +127,22 @@ export function extractEmbeds(markdown: string): { markdown: string; embeds: Emb
     if (!prevBlank || !nextBlank) continue;
     const parsed = parseYouTubeUrl(trimmed);
     if (!parsed) continue;
-    lines[i] = `${TOKEN_PREFIX}${embeds.length}`;
-    embeds.push(parsed);
+    lines[i] = `${embeds.token}${embeds.items.length}`;
+    embeds.items.push(parsed);
   }
   return { markdown: lines.join("\n"), embeds };
 }
 
 /**
- * Swap `<p>CCEMBEDn</p>` paragraphs for the player. Must run AFTER sanitizing, and its output must not
- * be sanitized again (that would strip the iframe). Unknown token numbers are left untouched.
+ * Swap `<p>TOKENn</p>` paragraphs for the player. Must run AFTER sanitizing, and its output must not
+ * be sanitized again (that would strip the iframe). Anything that isn't this render's exact token is
+ * left untouched.
  */
-export function injectEmbeds(html: string, embeds: Embed[]): string {
-  if (embeds.length === 0) return html;
-  return html.replace(/<p>\s*CCEMBED(\d+)\s*<\/p>/g, (match, n: string) => {
-    const e = embeds[Number(n)];
+export function injectEmbeds(html: string, embeds: EmbedSet): string {
+  if (embeds.items.length === 0) return html;
+  const re = new RegExp(`<p>\\s*${embeds.token}(\\d{1,4})\\s*</p>`, "g");
+  return html.replace(re, (match, n: string) => {
+    const e = embeds.items[Number(n)];
     const out = e ? youTubeEmbedHtml(e) : "";
     return out || match;
   });

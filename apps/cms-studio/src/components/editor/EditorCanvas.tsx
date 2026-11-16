@@ -126,9 +126,10 @@ export default function EditorCanvas(props: EditorCanvasProps) {
       setEmbedError("That isn't a YouTube video or playlist link.");
       return;
     }
-    const { start, end } = embedSelection.current;
-    // The link must be its own paragraph to become a player, so surround it with blank lines.
-    const result = insertBlock(content, start, end, `\n\n${url}\n\n`);
+    // Insert AFTER any selected text (never replace it). The link must be its own paragraph to become a
+    // player, so surround it with blank lines.
+    const { end } = embedSelection.current;
+    const result = insertBlock(content, end, end, `\n\n${url}\n\n`);
     pendingSelection.current = { start: result.selectionStart, end: result.selectionEnd };
     onContentChange(result.text);
     setEmbedOpen(false);

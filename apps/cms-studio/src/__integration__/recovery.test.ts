@@ -190,7 +190,7 @@ describe("20. deleting a track", () => {
     const pr = w.fake.pull(r.json.pullNumber);
     expect(pr.headRef).toMatch(/^track\/ai-ml\/remove-ml-basics-\d{5}$/);
     expect(w.fake.changedFiles(pr.headRef)).toEqual([{ filename: TRACK, status: "removed" }]);
-    expect(pr.body).toMatch(/1 published blog is placed in it.*It stays published as a normal blog but leaves the track\./s);
+    expect(pr.body).toMatch(/1 published blog is placed in it[\s\S]*It stays published as a normal blog but leaves the track\./);
 
     const preview = await w.call("sa1", "GET", `/api/posts/reviews?previewPullNumber=${r.json.pullNumber}`);
     expect(preview.json.article).toMatchObject({ kind: "track", deleting: true, title: "ML Basics" });

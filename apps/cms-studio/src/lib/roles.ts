@@ -399,6 +399,19 @@ export function checkRoleChangeAllowed(
   return null;
 }
 
+/** Deep copy of the role lists, so assign/remove never mutate the caller's (or the cache's) object. */
+export function cloneRoles(roles: ClubRoles): ClubRoles {
+  const copyMap = (m: Record<string, string[]> | undefined) =>
+    Object.fromEntries(Object.entries(m || {}).map(([k, v]) => [k, [...(v || [])]]));
+  return {
+    superadmins: [...(roles.superadmins || [])],
+    vertical_heads: copyMap(roles.vertical_heads),
+    deputies: copyMap(roles.deputies),
+    members: copyMap(roles.members),
+    pending_requests: (roles.pending_requests || []).map((r) => ({ ...r })),
+  };
+}
+
 export function assignRole(
   roles: ClubRoles,
   targetUsername: string,
@@ -409,13 +422,7 @@ export function assignRole(
   if (!GITHUB_USERNAME_REGEX.test(cleanUser)) {
     throw new Error(`Invalid GitHub username '${cleanUser}'. Traversal or special characters are strictly forbidden.`);
   }
-  const updated: ClubRoles = {
-    superadmins: [...(roles.superadmins || [])],
-    vertical_heads: { ...(roles.vertical_heads || {}) },
-    deputies: { ...(roles.deputies || {}) },
-    members: { ...(roles.members || {}) },
-    pending_requests: [...(roles.pending_requests || [])],
-  };
+  const updated = cloneRoles(roles);
 
   if (role === "superadmin") {
     if (!updated.superadmins.some((u) => u.toLowerCase() === cleanUser)) {
@@ -490,13 +497,7 @@ export function removeRole(
   vertical?: string
 ): ClubRoles {
   const cleanUser = targetUsername.toLowerCase().trim().replace(/^@/, "");
-  const updated: ClubRoles = {
-    superadmins: [...(roles.superadmins || [])],
-    vertical_heads: { ...(roles.vertical_heads || {}) },
-    deputies: { ...(roles.deputies || {}) },
-    members: { ...(roles.members || {}) },
-    pending_requests: [...(roles.pending_requests || [])],
-  };
+  const updated = cloneRoles(roles);
 
   if (role === "superadmin") {
     updated.superadmins = updated.superadmins.filter(

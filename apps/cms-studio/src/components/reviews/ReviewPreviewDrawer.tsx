@@ -2,9 +2,8 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { marked } from "marked";
 import { ExternalLink, GitPullRequestArrow, ShieldCheck } from "lucide-react";
-import { sanitizeArticleHtml } from "@/lib/sanitize";
+import { renderArticlePreview } from "@/lib/renderPreview";
 import type { ReviewPr } from "@/lib/hooks/useReviewQueue";
 import { Button, Drawer, buttonClasses } from "@/components/ui";
 import ArticlePreview from "@/components/editor/ArticlePreview";
@@ -47,7 +46,7 @@ export default function ReviewPreviewDrawer({
   onRequestChanges: () => void;
 }) {
   const html = useMemo(
-    () => (article ? sanitizeArticleHtml(marked.parse(article.markdownBody || "", { gfm: true, breaks: true }) as string) : ""),
+    () => (article ? renderArticlePreview(article.markdownBody || "") : ""),
     [article]
   );
 

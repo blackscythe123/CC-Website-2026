@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { marked } from "marked";
-import { sanitizeArticleHtml } from "@/lib/sanitize";
+import { renderArticlePreview } from "@/lib/renderPreview";
 import { ALL_VERTICALS, CLUB_VERTICAL, getVertical } from "@/lib/verticals";
 import { parseArticlePath, useArticleDraft } from "@/lib/hooks/useArticleDraft";
 import { imagesTooLarge, readApiJson, TOO_LARGE_MESSAGE } from "@/lib/hooks/apiClient";
@@ -114,7 +113,7 @@ export default function AdminEditorPage() {
 
   const parsedHtml = useMemo(() => {
     try {
-      return sanitizeArticleHtml(marked.parse(draft.content || "*Start writing to see the preview…*", { gfm: true, breaks: true }) as string, {
+      return renderArticlePreview(draft.content || "*Start writing to see the preview…*", {
         allowedImageUrls: draft.pendingImages.map((img) => img.placeholderUrl),
       });
     } catch {

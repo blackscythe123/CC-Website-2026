@@ -1,0 +1,13 @@
+{
+  "origins": [
+    "https://cc-main-portal.vercel.app",
+    "https://cc-ai-ml-portal.vercel.app",
+    "https://cc-ar-vr-portal.vercel.app",
+    "https://cc-cp-portal.vercel.app",
+    "https://cc-cybersecurity-portal.vercel.app",
+    "https://cc-ssnhacks-portal.vercel.app",
+    "https://cc-design-portal.vercel.app",
+    "https://cc-full-stack-portal.vercel.app",
+    "https://cc-oss-portal.vercel.app"
+  ]
+}

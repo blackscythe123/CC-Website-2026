@@ -143,9 +143,14 @@ export function shouldDeployApp(app, changedFiles, { repoRoot = DEFAULT_REPO_ROO
 
   if (app in VERTICAL_PORTAL_MAP) {
     const slug = VERTICAL_PORTAL_MAP[app];
-    // portals.json feeds the portal's link back to the main portal (packages/scrapbook-ui/src/portals.ts).
+    // portals.json feeds the portal's link back to the main portal (packages/scrapbook-ui/src/portals.ts);
+    // comments.json switches reader comments on/off on every portal at build time.
     const hit = relevant.some(
-      (f) => ownApp(f) || f.startsWith(`content/verticals/${slug}/`) || f === "content/club/portals.json"
+      (f) =>
+        ownApp(f) ||
+        f.startsWith(`content/verticals/${slug}/`) ||
+        f === "content/club/portals.json" ||
+        f === "content/club/comments.json"
     );
     return hit
       ? { build: true, reason: `Changes in apps/${app} or content/verticals/${slug}/.` }

@@ -27,3 +27,13 @@
 .cc-track__desc--section { margin: -0.25rem 0 0.75rem; font-size: 0.95rem; }
 .cc-track__empty { margin: 0.25rem 0 0.5rem; font-size: 0.9rem; font-style: italic; color: var(--cc-track-muted); }
 .cc-track__topic, .cc-track__sub { scroll-margin-top: calc(var(--site-nav-height, 64px) + 1rem); }
+
+/* Reader comments (@coding-club/content-render/comments) */
+.cc-comments { margin-top: 3rem; border-top: 2px solid var(--foreground, #111); padding-top: 1.25rem; }
+.cc-comments__heading { margin: 0; font-size: 1.25rem; font-weight: 800; }
+.cc-comments__note { margin: 0.25rem 0 1rem; font-size: 0.85rem; color: #666; }
+.cc-comments__frame { display: block; width: 100%; min-height: 150px; border: 0; color-scheme: light; background: transparent; }
+.cc-comments__placeholder { min-height: 150px; }
+.cc-comments--section { margin: 0.5rem 0 0.75rem; }
+.cc-comments__toggle { font: inherit; font-size: 0.8rem; font-weight: 700; background: none; border: 1px solid currentColor; border-radius: 6px; padding: 0.15rem 0.6rem; cursor: pointer; color: inherit; }
+.cc-comments--section .cc-comments__frame { margin-top: 0.75rem; }

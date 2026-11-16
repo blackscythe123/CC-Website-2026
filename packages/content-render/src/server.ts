@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { TRACK_SLUG_RE, validateTrack, type Track } from "@coding-club/content-schema/tracks";
+import { parseCommentsConfig, type CommentsConfig } from "./index";
 
 export interface LoadedTrack {
   slug: string;
@@ -49,4 +50,21 @@ export function loadTracks(contentRoot: string, vertical: string): LoadedTrack[]
 
 export function loadTrack(contentRoot: string, vertical: string, slug: string): LoadedTrack | null {
   return readTrack(contentRoot, vertical, slug);
+}
+
+/**
+ * Reader-comments config from content/club/comments.json. Returns null (comments off) when the file is
+ * missing, invalid, or disabled — the site never fails to build because of it (CI validates the file).
+ */
+export function loadCommentsConfig(contentRoot: string): CommentsConfig | null {
+  const file = path.join(contentRoot, "club", "comments.json");
+  if (!fs.existsSync(/* turbopackIgnore: true */ file)) return null;
+  try {
+    const { config, errors } = parseCommentsConfig(JSON.parse(fs.readFileSync(/* turbopackIgnore: true */ file, "utf8")));
+    if (errors.length) console.warn(`[comments] content/club/comments.json is invalid; comments are off: ${errors.join(" ")}`);
+    return config && config.enabled && config.categoryId ? config : null;
+  } catch {
+    console.warn("[comments] content/club/comments.json is not valid JSON; comments are off.");
+    return null;
+  }
 }

@@ -1,5 +1,5 @@
-import { loadTrack, loadTracks, type LoadedTrack } from "@coding-club/content-render/server";
-import { groupPlacedPosts, type PlacedPost } from "@coding-club/content-render";
+import { loadCommentsConfig, loadTrack, loadTracks, type LoadedTrack } from "@coding-club/content-render/server";
+import { commentsOn, groupPlacedPosts, type CommentsConfig, type PlacedPost } from "@coding-club/content-render";
 import { placementLabel, type Placement } from "@coding-club/content-schema/tracks";
 import portalConfig from "../../portal.config.json";
 import { getPortalPosts, resolveContentDir } from "@/lib/posts";
@@ -34,4 +34,10 @@ export function getPlacementCrumb(placement: Placement | null): { label: string;
   const label = placementLabel(placement, loaded.track);
   if (!label) return null;
   return { label, href: `/tracks/${loaded.slug}#t-${placement.subtopic || placement.topic}` };
+}
+
+/** Reader comments config for this vertical (null = comments off). */
+export function getCommentsConfig(): CommentsConfig | null {
+  const config = loadCommentsConfig(resolveContentDir());
+  return commentsOn(config, portalConfig.verticalSlug) ? config : null;
 }

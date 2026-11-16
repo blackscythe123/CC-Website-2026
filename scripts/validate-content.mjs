@@ -3,6 +3,7 @@ import path from "node:path";
 import matter from "gray-matter";
 import { z } from "zod";
 import { validateTrack, parsePlacement, placementErrors } from "../packages/content-schema/src/tracks.mjs";
+import { parseCommentsConfig } from "../packages/content-schema/src/comments.mjs";
 
 const ROOT_DIR = process.cwd();
 const CONTENT_DIR = path.join(ROOT_DIR, "content");
@@ -366,6 +367,44 @@ for (const filePath of allPostFiles) {
 }
 for (const w of warnings) {
   console.warn(`⚠️  [${w.file}] ${w.issue}`);
+}
+
+// 2d. Reader comments: content/club/comments.json must be valid, and giscus.json (repo root) must allow
+// every portal domain, or giscus refuses to load the widget there.
+const COMMENTS_FILE = path.join(CONTENT_DIR, "club", "comments.json");
+if (fs.existsSync(COMMENTS_FILE)) {
+  let raw;
+  try {
+    raw = JSON.parse(fs.readFileSync(COMMENTS_FILE, "utf8"));
+  } catch (e) {
+    hasErrors = true;
+    errors.push({ file: "content/club/comments.json", issue: `Not valid JSON: ${e.message}` });
+  }
+  if (raw !== undefined) {
+    const { config, errors: problems } = parseCommentsConfig(raw);
+    for (const issue of problems) {
+      hasErrors = true;
+      errors.push({ file: "content/club/comments.json", issue });
+    }
+    if (config?.enabled) {
+      const giscusFile = path.join(ROOT_DIR, "giscus.json");
+      let origins = [];
+      try {
+        origins = JSON.parse(fs.readFileSync(giscusFile, "utf8")).origins || [];
+      } catch {
+        origins = [];
+      }
+      for (const portal of registeredPortals) {
+        if (!origins.includes(`https://${portal.domain}`)) {
+          hasErrors = true;
+          errors.push({
+            file: "giscus.json",
+            issue: `Comments are enabled but "https://${portal.domain}" (${portal.id}) is not in giscus.json origins, so comments wouldn't load there.`,
+          });
+        }
+      }
+    }
+  }
 }
 
 // 3. Final Test Output

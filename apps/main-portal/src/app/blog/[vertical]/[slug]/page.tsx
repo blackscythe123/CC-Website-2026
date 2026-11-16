@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getAllPosts, getPost } from "@/lib/posts";
+import { getAllPosts, getPost, resolveContentDir } from "@/lib/posts";
+import Comments from "@coding-club/content-render/comments";
+import { commentTerm, commentsOn } from "@coding-club/content-render";
+import { loadCommentsConfig } from "@coding-club/content-render/server";
 import { getVerticalBySlug } from "@/lib/verticals";
 import type { Metadata } from "next";
 
@@ -198,6 +201,11 @@ export default async function BlogPostPage({
           </a>
         </div>
       </footer>
+
+      {(() => {
+        const config = loadCommentsConfig(resolveContentDir());
+        return <Comments config={commentsOn(config, verticalSlug) ? config : null} term={commentTerm("post", verticalSlug, post.slug)} />;
+      })()}
     </article>
   );
 }

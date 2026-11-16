@@ -12,6 +12,10 @@
     "./tracks": {
       "types": "./src/tracks.d.mts",
       "default": "./src/tracks.mjs"
+    },
+    "./comments": {
+      "types": "./src/comments.d.mts",
+      "default": "./src/comments.mjs"
     }
   }
 }

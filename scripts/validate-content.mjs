@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
 import { z } from "zod";
-import { validateTrack } from "../packages/content-schema/src/tracks.mjs";
+import { validateTrack, parsePlacement, placementErrors } from "../packages/content-schema/src/tracks.mjs";
 
 const ROOT_DIR = process.cwd();
 const CONTENT_DIR = path.join(ROOT_DIR, "content");
@@ -283,14 +283,12 @@ for (const filePath of allPostFiles) {
 
 // 2b. Learning tracks: content/verticals/<vertical>/tracks/<slug>.json (schema shared with portals + CMS)
 let trackCount = 0;
+const tracksByVertical = {};
 if (fs.existsSync(VERTICALS_DIR)) {
   for (const vertical of TECH_VERTICALS) {
     const tracksDir = path.join(VERTICALS_DIR, vertical, "tracks");
     if (!fs.existsSync(tracksDir)) continue;
-    const postsDir = path.join(VERTICALS_DIR, vertical, "posts");
-    const postSlugs = fs.existsSync(postsDir)
-      ? fs.readdirSync(postsDir).filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -3))
-      : [];
+    const tracksOfVertical = (tracksByVertical[vertical] = {});
     for (const file of fs.readdirSync(tracksDir)) {
       const rel = `content/verticals/${vertical}/tracks/${file}`;
       if (!file.endsWith(".json") || fs.statSync(path.join(tracksDir, file)).isDirectory()) {
@@ -311,17 +309,64 @@ if (fs.existsSync(VERTICALS_DIR)) {
       const result = validateTrack(json, {
         vertical,
         slug: file.slice(0, -5),
-        postSlugs,
         bytes: Buffer.byteLength(raw),
       });
       for (const issue of result.errors) {
         hasErrors = true;
         errors.push({ file: rel, issue });
       }
+      if (result.track) tracksOfVertical[file.slice(0, -5)] = result.track;
     }
   }
 }
 console.log(`Validated ${trackCount} learning track file(s).`);
+
+// 2c. Blog placements (frontmatter `placement: { track, topic, subtopic? }`).
+//   - malformed placement, a placement on a club post, or a placed post hidden from its own portal → error
+//   - a placement whose track/topic/subtopic doesn't exist → WARNING only, so a Head can still remove a
+//     topic; such blogs just drop out of the tree until they are moved (readers ignore them).
+const warnings = [];
+for (const filePath of allPostFiles) {
+  const rel = path.relative(ROOT_DIR, filePath).split(path.sep).join("/");
+  let data;
+  try {
+    ({ data } = matter(fs.readFileSync(filePath, "utf8")));
+  } catch {
+    continue; // already reported by the post checks above
+  }
+  if (data.placement === undefined) continue;
+  const m = rel.match(/^content\/verticals\/([^/]+)\/posts\//);
+  if (!m) {
+    hasErrors = true;
+    errors.push({ file: rel, issue: "Only vertical blogs can have a placement (club posts and other content can't)." });
+    continue;
+  }
+  const vertical = m[1];
+  const placement = parsePlacement(data.placement);
+  if (!placement) {
+    hasErrors = true;
+    errors.push({
+      file: rel,
+      issue: "placement must be exactly { track, topic, subtopic? } with kebab-case values (topic ids start with a letter).",
+    });
+    continue;
+  }
+  const ownPortal = registeredPortals.find((p) => p.vertical === vertical)?.id;
+  const targets = Array.isArray(data.targetPortals) ? data.targetPortals : [];
+  if (ownPortal && targets.length > 0 && !targets.some((t) => t === ownPortal || t === "*" || t === "all")) {
+    hasErrors = true;
+    errors.push({
+      file: rel,
+      issue: `This blog is placed in a track but targetPortals doesn't include "${ownPortal}", so it would never show in the track.`,
+    });
+  }
+  for (const w of placementErrors(placement, { vertical, tracks: tracksByVertical[vertical] || {} })) {
+    warnings.push({ file: rel, issue: `${w} The blog won't appear in any track until its placement is fixed.` });
+  }
+}
+for (const w of warnings) {
+  console.warn(`⚠️  [${w.file}] ${w.issue}`);
+}
 
 // 3. Final Test Output
 if (hasErrors) {

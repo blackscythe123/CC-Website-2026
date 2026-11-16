@@ -1,6 +1,6 @@
 # Design: YouTube Embeds, Learning Tracks and Comments
 
-Status: **v3.1.** Phase 1 (v2.1) is shipped (PR #31). Phases 2–4 redesigned on 2026-11-16 after the owner's clarification, then revised after an EGM review (design, readiness, codebase accuracy, scope) and two owner decisions: blogs join a tree only through their own placement, and placement follows the normal blog quorum.
+Status: **v3.1, implemented.** Phase 1 shipped in PR #31 and Phase 2 in PR #32. Phases 3a, 3b and 4 are built on one branch and merged together (to save Vercel deploys). Phases 2–4 were redesigned on 2026-11-16 after the owner's clarification, then revised after an EGM review and two owner decisions: blogs join a tree only through their own placement, and placement follows the normal blog quorum. Test evidence: `docs/testing/learning-tracks-report.md`.
 Date: 2026-11-16
 Request (club leads): "add an option to embed YT videos/playlists into a blog, and a way to organise blogs according to topic and subtopic (NeetCode was only an example of the shape) so CP and other verticals can create DSA courses or internship guidance; let the CMS manage it."
 
@@ -242,11 +242,13 @@ Accepted behaviours: a blog unpublished and re-published with the same slug gets
 - **`giscus.json` at the repo root** with `origins` = every portal domain from `portals.json` + the main portal (and later `*.codingclub.tech`). Other sites embedding our repo ids are refused by giscus. A CI check fails if a `portals.json` domain is missing from `origins`.
 - **Moderators: Superadmins** (repo admins) hide, delete or lock comments and block users. Heads moderate by reporting to a Superadmin (they don't have repo triage rights).
 - **Kill switches** in `content/club/comments.json`: `enabled` (global) and `disabledVerticals: []`. Schema-checked in CI; a missing or invalid file means comments off.
-- `scripts/lib/affected-apps.mjs`: a change to `content/club/comments.json` or `giscus.json` redeploys all portals (with a test).
+- `scripts/lib/affected-apps.mjs`: a change to `content/club/comments.json` redeploys all portals (with a test). `giscus.json` is read by giscus from the repo at request time, so changing it deploys nothing.
 
 ### 4.4 Implementation
-- `@coding-club/content-render/comments` (new export): `<Comments term config />` client component. The config is read on the server (`comments.json`) and passed as props. It injects giscus' `client.js` (pinned to a version) only when the box scrolls near or "Discuss" is clicked, with `data-loading="lazy"`, `data-reactions-enabled="1"`, `data-input-position="bottom"`, `data-theme="light"`, `data-lang="en"`.
-- Risk accepted for now: `client.js` is third-party script on our origins (it can read that origin's `localStorage`, which holds only track progress). Moving to a self-hosted giscus on Vercel is a follow-up; terms don't change.
+- `@coding-club/content-render/comments` (new export): `<Comments config term mode />` client component. The config is read on the server (`loadCommentsConfig` from `comments.json`, validated by the shared `@coding-club/content-schema/comments`) and passed as props.
+- **As built:** the component embeds the giscus widget **iframe directly** (`https://giscus.app/en/widget?…`) instead of loading giscus' `client.js`. It does what `client.js` does: moves the `?giscus=` sign-in return parameter into `localStorage` (`giscus-session`) and strips it from the URL, builds the widget URL (`origin`, `session`, `repo`, `repoId`, `category`, `categoryId`, `term`, `strict=1`, `theme=light`, `reactionsEnabled=1`, `inputPosition=bottom`), resizes the iframe from its `resizeHeight` messages (origin- and source-checked), and clears the session on sign-out or credential errors. Reasons: `client.js` attaches to the first `.giscus` element only, so several widgets per page (one per topic) need our own embedding; and no third-party script runs on the portal origins.
+- Loading: inline boxes (blog and track pages) load when scrolled within 600px; topic/subtopic boxes load on "Discuss" (one open at a time).
+- Remaining dependency: the widget itself is served by giscus.app inside a sandboxed cross-origin iframe. Self-hosting giscus on Vercel stays a follow-up; terms don't change. If giscus changes its widget URL parameters, update `giscusWidgetUrl` (unit-tested).
 - Not shown in CMS previews.
 
 ### 4.5 Owner setup (one time)

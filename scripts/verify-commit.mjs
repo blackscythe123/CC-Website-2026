@@ -157,15 +157,17 @@ function checkMessage(rawMsg, { hookMode = false, isMerge = false } = {}) {
   let coAuthorCount = 0;
   let cmsAuthored = 0;
   let cmsApproved = 0;
+  let cmsSelfPublished = 0;
   for (const line of bodyLines) {
     const kind = validateTrailer(line);
     if (kind === "coauthor") coAuthorCount++;
     else if (cmsAuthoredRegex.test(line)) cmsAuthored++;
     else if (cmsApprovedRegex.test(line)) cmsApproved++;
+    else if (cmsSelfPublishedRegex.test(line)) cmsSelfPublished++;
   }
 
-  // A CMS Studio squash merge carries exactly one Authored-by and one Approved-by trailer.
-  const isCmsMerge = cmsAuthored === 1 && cmsApproved === 1 && cmsSubjectRegex.test(firstLine);
+  // A CMS Studio squash merge carries exactly one Authored-by and exactly one Approved-by OR Self-published-by.
+  const isCmsMerge = cmsAuthored === 1 && cmsApproved + cmsSelfPublished === 1 && cmsSubjectRegex.test(firstLine);
 
   if (!isCmsMerge && hasSubjectAttribution(firstLine)) {
     fail("Subject line MUST NOT contain AI attribution.", `Message: "${firstLine}"`);

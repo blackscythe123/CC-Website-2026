@@ -881,6 +881,11 @@ export class FakeGitHub {
         const b = c.body || {};
         if (pr.state !== "open") throw new HttpError(405, "Pull Request is not mergeable");
         if (b.sha && b.sha !== head) throw new HttpError(409, "Head branch was modified. Review and try the merge again.");
+        // main's ruleset: 1 approving review from someone other than the author; only the repo admin bypasses it
+        if (pr.baseRef === "main" && c.user !== OWNER) {
+          const approved = (this.reviews.get(pr.number) || []).some((r) => r.state === "APPROVED" && r.user.login !== pr.user && r.commit_id === head);
+          if (!approved) throw new HttpError(405, "At least 1 approving review is required by reviewers with write access.");
+        }
         const mb = this.mergeBase(baseTip, head)!;
         const baseTree = this.treeOfCommit(mb);
         const headTree = this.treeOfCommit(head);

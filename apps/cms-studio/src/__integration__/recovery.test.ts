@@ -258,3 +258,31 @@ describe("21. publishing waits for CI and self-publishes are recorded", () => {
     expect(w.fake.history("main")[0].message).toContain("Approved-by: @h1 <h1@users.noreply.github.com> (vertical_head)");
   });
 });
+
+describe("22. hardening from the EGM re-check", () => {
+  it("withdraw takes the vertical from the PR's files, not its branch name", async () => {
+    // m1 hand-makes a PR on a draft/ai-ml/ branch that actually changes a full-stack article
+    w.fake.createBranch("draft/ai-ml/sneaky-77777");
+    w.fake.push("draft/ai-ml/sneaky-77777", { "content/verticals/full-stack/posts/sneaky.md": "---\ntitle: Sneaky\n---\nx\n" }, { author: "m1", message: "x" });
+    const pr = w.fake.openPull({ author: "m1", head: "draft/ai-ml/sneaky-77777", title: "x" });
+    expect((await w.call("h1", "POST", "/api/posts/withdraw", { pullNumber: pr.number })).status).toBe(403);
+    expect((await w.call("h2", "POST", "/api/posts/withdraw", { pullNumber: pr.number })).status).toBe(200);
+  });
+
+  it("publishing your own work needs the server's publish token; normal approvals don't", async () => {
+    vi.stubEnv("CMS_PUBLISH_TOKEN", "");
+    const own = await w.submit("h1", { title: "Head Own", slug: "head-own" });
+    const r = await w.review("h1", own.pull, "approve");
+    expect(r.status).toBe(503);
+    expect(w.fake.pull(own.pull).merged).toBe(false);
+    const other = await w.submit("m1");
+    expect((await w.review("h1", other.pull, "approve")).json.merged).toBe(true);
+  });
+
+  it("retrying while CI is still running records no extra approvals", async () => {
+    const s = await w.submit("m1");
+    w.fake.ciStatus.set(w.fake.headSha(s.pull), "in_progress");
+    for (let i = 0; i < 3; i++) expect((await w.review("h1", s.pull, "approve")).status).toBe(409);
+    expect(w.fake.reviewsOf(s.pull)).toEqual([]);
+  });
+});

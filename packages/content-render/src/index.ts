@@ -277,7 +277,8 @@ const SAFE_PART = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
  */
 export function commentTerm(kind: "post" | "track" | "topic", ...parts: string[]): string | null {
   const expected = kind === "topic" ? 3 : 2;
-  if (parts.length !== expected || !parts.every((p) => typeof p === "string" && p.length <= 80 && SAFE_PART.test(p))) return null;
+  // Each part stays well under GitHub's 256-character Discussion title limit (older slugs exceed 80 chars).
+  if (parts.length !== expected || !parts.every((p) => typeof p === "string" && p.length <= 120 && SAFE_PART.test(p))) return null;
   return `${kind}:${parts.join("/")}`;
 }
 

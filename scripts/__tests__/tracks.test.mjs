@@ -114,6 +114,7 @@ test("validate-content: track and placement rules in CI", () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "cc-tracks-"));
   try {
     fs.cpSync(path.join(repoRoot, "content"), path.join(tmp, "content"), { recursive: true });
+    fs.copyFileSync(path.join(repoRoot, "giscus.json"), path.join(tmp, "giscus.json"));
     const tracksDir = path.join(tmp, "content", "verticals", V, "tracks");
     const postsDir = path.join(tmp, "content", "verticals", V, "posts");
     fs.mkdirSync(tracksDir, { recursive: true });

@@ -63,7 +63,8 @@ Guard tests were mutation-checked: disabling the merge-time placement check, the
 | `?giscus=` session is moved out of the URL and passed to the widget; a bad session is cleared | Rendered (Playwright Chromium; giscus rejected the fake session with 400 and the component cleared it) |
 | No giscus `client.js` loaded on the portal origin | Rendered (request log) |
 | CI: invalid `comments.json` fails; enabled config requires every portal domain in `giscus.json` origins | Automated (script tests) |
-| Real GitHub sign-in, posting a comment, the thread appearing in Discussions | **Pending.** Needs the owner's one-time GitHub setup (enable Discussions, create the "Comments" Announcement category, install the giscus app), then the owner signs in and comments once on the live site. |
+| giscus sees the repo and the configured category (`/api/discussions/categories` returns our repo id and the Announcements id; thread lookup 404 = not created yet) | Confirmed against giscus.app after setup (Discussions on via CLI, giscus app installed by the owner) |
+| Real GitHub sign-in, posting a comment, the thread appearing in Discussions | **Pending:** the owner signs in and comments once on the live site after the deploy (sign-in can't be automated). |
 
 ## Data hygiene
 

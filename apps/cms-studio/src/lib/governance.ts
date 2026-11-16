@@ -47,12 +47,14 @@ export function approvalTarget(authorRole: UserRoleType): { label: string; deput
  */
 export function canReviewPr(
   viewer: { login: string; role: UserRoleType; rolesByVertical?: Record<string, UserRoleType> } | null | undefined,
-  pr: { author: string; vertical: string },
+  pr: { author: string; vertical: string; kind?: "article" | "track" },
   authorRole: UserRoleType | null
 ): boolean {
   if (!viewer) return false;
   if (pr.author.toLowerCase() === viewer.login.toLowerCase()) return false;
   const reviewerRole: UserRoleType | null = viewer.role === "superadmin" ? "superadmin" : viewer.rolesByVertical?.[pr.vertical] ?? null;
+  // Learning tracks are proposed by Heads/Superadmins and always need a Superadmin.
+  if (pr.kind === "track") return reviewerRole === "superadmin";
   const author = authorRole ?? "member";
   switch (reviewerRole) {
     case "superadmin":

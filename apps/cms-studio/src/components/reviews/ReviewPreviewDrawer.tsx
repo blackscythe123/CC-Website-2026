@@ -7,6 +7,8 @@ import { renderArticlePreview } from "@/lib/renderPreview";
 import type { ReviewPr } from "@/lib/hooks/useReviewQueue";
 import { Button, Drawer, buttonClasses } from "@/components/ui";
 import ArticlePreview from "@/components/editor/ArticlePreview";
+import TrackView from "@coding-club/content-render/track-view";
+import type { Track } from "@coding-club/content-schema/tracks";
 
 export interface PreviewArticle {
   title: string;
@@ -21,6 +23,10 @@ export interface PreviewArticle {
   headSha?: string;
   /** "DSA Sheet › Arrays › Two pointers" when the blog is placed in a learning track. */
   placementLabel?: string | null;
+  /** Present for learning-track proposals. */
+  kind?: "publish" | "unpublish" | "track";
+  track?: Track;
+  slug?: string;
 }
 
 export default function ReviewPreviewDrawer({
@@ -48,7 +54,7 @@ export default function ReviewPreviewDrawer({
   onRequestChanges: () => void;
 }) {
   const html = useMemo(
-    () => (article ? renderArticlePreview(article.markdownBody || "") : ""),
+    () => (article && article.kind !== "track" ? renderArticlePreview(article.markdownBody || "") : ""),
     [article]
   );
 
@@ -61,7 +67,7 @@ export default function ReviewPreviewDrawer({
         </a>
       ) : null}
       {isMine && pr?.changesRequested ? (
-        <Link href={`/admin?revise=${pr.number}`} className={buttonClasses({ size: "sm", variant: "primary" })}>
+        <Link href={article?.kind === "track" ? `/admin/tracks?revise=${pr.number}` : `/admin?revise=${pr.number}`} className={buttonClasses({ size: "sm", variant: "primary" })}>
           <GitPullRequestArrow className="h-4 w-4" aria-hidden />
           Load &amp; revise
         </Link>
@@ -99,7 +105,18 @@ export default function ReviewPreviewDrawer({
               <span className="font-semibold">Placed in learning track:</span> {article.placementLabel}
             </p>
           ) : null}
-          <ArticlePreview
+          {article.kind === "track" && article.track ? (
+            <div className="rounded-xl border border-border bg-white p-5 text-black">
+              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Learning track proposal · /tracks/{article.slug}</p>
+              <h2 className="mt-1 text-2xl font-black">{article.track.title}</h2>
+              {article.track.summary ? <p className="mt-1 text-neutral-600">{article.track.summary}</p> : null}
+              <div className="mt-5">
+                <TrackView track={article.track} vertical={article.vertical} slug={article.slug || "preview"} placed={{}} readOnly />
+              </div>
+              <p className="mt-4 text-xs text-neutral-500">Blogs placed in each section by their authors appear after its links and videos on the live page.</p>
+            </div>
+          ) : null}
+          {article.kind === "track" ? null : <ArticlePreview
             authorName={article.author}
             authorLogin={pr?.author || article.author}
             authorAvatar={pr?.authorAvatar}
@@ -109,7 +126,7 @@ export default function ReviewPreviewDrawer({
             html={html}
             summary={article.summary}
             tags={article.tags}
-          />
+          />}
         </div>
       ) : null}
     </Drawer>

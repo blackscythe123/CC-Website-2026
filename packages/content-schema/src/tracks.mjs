@@ -210,3 +210,32 @@ export function placementLabel(placement, track) {
   if (!topic || (placement.subtopic && !subtopic)) return null;
   return [track.title, topic.title, subtopic?.title].filter(Boolean).join(" › ");
 }
+
+/**
+ * Problems with editing `before` (published) into `after`. Ids are permanent: a topic/subtopic id may be
+ * removed, but never moved (topic ↔ subtopic, or a subtopic to another topic), because blog placements,
+ * progress and comment threads point at them. Item ids may be removed but never reused for another type.
+ */
+export function trackEditProblems(before, after) {
+  const where = (track) => {
+    const m = new Map();
+    for (const t of track.topics || []) {
+      m.set(t.id, "topic");
+      for (const s of t.subtopics || []) m.set(s.id, `subtopic of "${t.id}"`);
+    }
+    return m;
+  };
+  const problems = [];
+  const a = where(before);
+  const b = where(after);
+  for (const [id, was] of a) {
+    const now = b.get(id);
+    if (now && now !== was) problems.push(`"${id}" was a ${was} and can't become a ${now}. Remove it and add a new one instead.`);
+  }
+  const itemTypes = new Map(trackItems(before).map((i) => [i.id, i.type]));
+  for (const item of trackItems(after)) {
+    const was = itemTypes.get(item.id);
+    if (was && was !== item.type) problems.push(`Item id "${item.id}" was a ${was} and can't be reused for a ${item.type}.`);
+  }
+  return problems;
+}

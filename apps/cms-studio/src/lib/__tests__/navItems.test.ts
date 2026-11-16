@@ -3,8 +3,8 @@ import { navItemsFor } from "@/components/shell/navItems";
 
 const ids = (role: Parameters<typeof navItemsFor>[0], verticals: string[] = []) => navItemsFor(role, verticals).map((i) => i.id);
 
-it("superadmin sees everything", () => expect(ids("superadmin")).toEqual(["write", "reviews", "articles", "people"]));
-it("head sees articles and people", () => expect(ids("vertical_head", ["ai-ml"])).toEqual(["write", "reviews", "articles", "people"]));
+it("superadmin sees everything", () => expect(ids("superadmin")).toEqual(["write", "reviews", "articles", "tracks", "people"]));
+it("head sees articles, tracks and people", () => expect(ids("vertical_head", ["ai-ml"])).toEqual(["write", "reviews", "articles", "tracks", "people"]));
 it("deputy sees people but not articles", () => expect(ids("deputy", ["ai-ml"])).toEqual(["write", "reviews", "people"]));
 it("member gets a join entry", () => expect(ids("member", ["ai-ml"])).toEqual(["write", "reviews", "join"]));
 it("unassigned member gets a join entry", () => expect(ids("member", [])).toEqual(["write", "reviews", "join"]));

@@ -50,6 +50,52 @@ const ALLOWED_VERTICALS = [
   "club",
 ];
 
+/** Portal ids from content/club/portals.json. */
+const VERTICAL_PORTAL_ID: Record<string, string> = {
+  "ai-ml": "ai-ml-portal",
+  "ar-vr-game-dev": "ar-vr-portal",
+  "competitive-programming": "cp-portal",
+  cybersecurity: "cybersecurity-portal",
+  ssnhacks: "ssnhacks-portal",
+  "design-ui-ux": "design-portal",
+  "full-stack": "full-stack-portal",
+  "open-source": "oss-portal",
+};
+const KNOWN_PORTAL_IDS = new Set(["main-portal", ...Object.values(VERTICAL_PORTAL_ID)]);
+
+/**
+ * Every article is always published on the main portal and on its own vertical portal; extra known
+ * portals the client asked for are kept, unknown ids are dropped.
+ */
+export function resolveTargetPortals(vertical: string, requested?: string[]): string[] {
+  const own = VERTICAL_PORTAL_ID[vertical];
+  const extra = (requested || []).filter((id) => typeof id === "string" && KNOWN_PORTAL_IDS.has(id));
+  return Array.from(new Set(["main-portal", ...(own ? [own] : []), ...extra]));
+}
+
+/** gray-matter turns unquoted YAML dates into Date objects; String(Date) is not YYYY-MM-DD. */
+export function normalizeContentDate(d: unknown): string {
+  if (d instanceof Date) return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+  if (typeof d === "string") return d.slice(0, 10);
+  return "";
+}
+
+export const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+
+/** Throws if any pending image is not a real jpg/png/webp/gif within the size limit. */
+export function assertSafePendingImages(pendingImages: PendingImage[] | undefined): void {
+  for (const img of pendingImages || []) {
+    if (!img || typeof img.filename !== "string" || typeof img.base64 !== "string") {
+      throw new Error("Invalid image payload.");
+    }
+    if (!isSafePendingImage(img.filename, img.base64)) {
+      throw new Error(
+        `Image "${img.filename.slice(0, 60)}" was rejected: only JPG, PNG, WebP or GIF up to 3 MB are allowed. Remove or replace it and try again.`
+      );
+    }
+  }
+}
+
 function isSafePendingImage(filename: string, base64: string): boolean {
   const extMatch = filename.toLowerCase().match(/\.([a-z0-9]+)$/);
   const ext = extMatch ? extMatch[1] : "";
@@ -57,7 +103,7 @@ function isSafePendingImage(filename: string, base64: string): boolean {
   if (!allowed.includes(ext)) return false;
 
   const buf = Buffer.from(base64, "base64");
-  if (buf.length > 5 * 1024 * 1024) return false;
+  if (buf.length === 0 || buf.length > MAX_IMAGE_BYTES) return false;
 
   const isJpeg = buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
   const isPng = buf.length > 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
@@ -88,8 +134,9 @@ export function findUnresolvedLocalImageUrls(
 }
 
 export async function createDraftAndPullRequest(params: CreateDraftParams): Promise<DraftResult> {
-  const fallbackToken = process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
-  let octokit = getOctokit(params.token);
+  // Always act as the signed-in author. (A former fallback to a shared PAT silently made the PAT owner
+  // the PR opener, which broke anti-self-review and revision ownership.)
+  const octokit = getOctokit(params.token);
   const {
     authorUsername,
     authorDisplayName,
@@ -115,8 +162,52 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
         "Re-add the cover image and any broken inline images, then submit again."
     );
   }
+  // Reject bad images up front so nothing is written to GitHub (no half-created branches or dead links).
+  assertSafePendingImages(pendingImages);
+
+  const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const filePath =
+    vertical === "club"
+      ? `content/club/posts/${cleanSlug}.md`
+      : `content/verticals/${vertical}/posts/${cleanSlug}.md`;
+
+  // Revisions must keep editing the PR's one existing article file (no second .md, no type crossover),
+  // and must preserve the original author's byline.
+  let preservedAuthor: { author?: unknown; authorUsername?: unknown; authorAvatar?: unknown; date?: unknown } | null = null;
+  if (pullNumber) {
+    const prFiles = await octokit.paginate(octokit.pulls.listFiles, {
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      pull_number: pullNumber,
+      per_page: 100,
+    });
+    const check = validateArticlePRFiles(prFiles);
+    if (!check.ok || check.kind !== "publish") {
+      throw new Error(check.ok ? "This pull request is not an article submission." : check.error);
+    }
+    if (check.articlePath !== filePath) {
+      throw new Error(
+        `This revision would create a new file (${filePath}) instead of updating ${check.articlePath}. Keep the original vertical and slug.`
+      );
+    }
+    try {
+      const { data: existing } = await octokit.repos.getContent({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        path: filePath,
+        ref: existingBranch,
+      });
+      if (!Array.isArray(existing) && "content" in existing && typeof existing.content === "string") {
+        const fm = matter(Buffer.from(existing.content, "base64").toString("utf-8")).data;
+        preservedAuthor = { author: fm.author, authorUsername: fm.authorUsername, authorAvatar: fm.authorAvatar, date: fm.date };
+      }
+    } catch {
+      // fall through: treated as the author's own first write
+    }
+  }
 
   let branchName = existingBranch;
+  let createdBranch = false;
 
   // If this is a revision of an existing PR, reuse the existing branch!
   if (!branchName) {
@@ -130,7 +221,6 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
 
     // 2. Create unique draft branch
     const timestamp = Date.now().toString().slice(-5);
-    const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
     branchName = `draft/${vertical}/${cleanSlug}-${timestamp}`;
 
     try {
@@ -140,25 +230,18 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
         ref: `refs/heads/${branchName}`,
         sha: mainSha,
       });
+      createdBranch = true;
     } catch (refErr: unknown) {
       const err = refErr as { status?: number; message?: string };
-      if ((err.status === 404 || err.status === 403) && fallbackToken) {
-        octokit = getOctokit(fallbackToken);
-        await octokit.git.createRef({
-          owner: REPO_OWNER,
-          repo: REPO_NAME,
-          ref: `refs/heads/${branchName}`,
-          sha: mainSha,
-        });
-      } else {
-        throw new Error(
-          err.status === 404 || err.status === 403
-            ? `Repository write permission required on ${REPO_OWNER}/${REPO_NAME}. Please accept the GitHub collaborator invitation sent to @${authorUsername} or ask an admin to assign you.`
-            : (err.message || "Failed to create draft branch on GitHub.")
-        );
-      }
+      throw new Error(
+        err.status === 404 || err.status === 403
+          ? `Repository write permission required on ${REPO_OWNER}/${REPO_NAME}. Please accept the GitHub collaborator invitation sent to @${authorUsername} or ask an admin to assign you.`
+          : (err.message || "Failed to create draft branch on GitHub.")
+      );
     }
   }
+
+  try {
 
   // 3. Process and upload pending images ON THE DRAFT BRANCH
   let processedBody = markdownBody;
@@ -166,11 +249,8 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
 
   if (pendingImages && pendingImages.length > 0) {
     for (const img of pendingImages) {
-      if (!isSafePendingImage(img.filename, img.base64)) {
-        continue;
-      }
       const ext = img.filename.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] || "png";
-      const base = img.filename.replace(/\.[^/.]+$/, "").toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+      const base = img.filename.replace(/\.[^/.]+$/, "").toLowerCase().replace(/[^a-z0-9_-]/g, "_").slice(0, 60) || "image";
       const cleanImgName = `${Date.now()}-${base}.${ext}`;
       const imgPath = `apps/main-portal/public/uploads/${cleanImgName}`;
       const permanentUrl = `/uploads/${cleanImgName}`;
@@ -193,16 +273,22 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     }
   }
 
+  // Belt and braces: nothing browser-local may survive into the committed article.
+  if (findUnresolvedLocalImageUrls(processedBody, processedCoverImage, []).length > 0) {
+    throw new Error("An image could not be uploaded, so the article was not submitted. Re-add the images and try again.");
+  }
+
   // 4. Prepare markdown frontmatter
   const today = new Date().toISOString().split("T")[0];
   const fileData = {
     title,
-    date: today,
-    author: authorDisplayName || authorUsername,
-    authorUsername,
-    authorAvatar: `https://github.com/${authorUsername}.png`,
+    date: (preservedAuthor?.date as string | undefined) || today,
+    author: (preservedAuthor?.author as string | undefined) || authorDisplayName || authorUsername,
+    authorUsername: (preservedAuthor?.authorUsername as string | undefined) || authorUsername,
+    authorAvatar:
+      (preservedAuthor?.authorAvatar as string | undefined) || `https://github.com/${authorUsername}.png`,
     summary,
-    targetPortals: targetPortals && targetPortals.length > 0 ? targetPortals : ["main-portal"],
+    targetPortals: resolveTargetPortals(vertical, targetPortals),
     vertical,
     ...(processedCoverImage ? { coverImage: processedCoverImage } : {}),
     tags: tags && tags.length > 0 ? tags : [vertical],
@@ -210,12 +296,6 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
 
   const fileContent = matter.stringify(processedBody, fileData);
   const contentBase64 = Buffer.from(fileContent, "utf-8").toString("base64");
-
-  const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-  const filePath =
-    vertical === "club"
-      ? `content/club/posts/${cleanSlug}.md`
-      : `content/verticals/${vertical}/posts/${cleanSlug}.md`;
 
   // Get existing file sha if updating an existing branch
   let existingFileSha: string | undefined;
@@ -306,6 +386,17 @@ ${processedCoverImage ? `\n- **Cover Banner:** ![](${processedCoverImage})\n` : 
     prUrl: prData.html_url,
     branch: branchName,
   };
+  } catch (err) {
+    // Don't leave a half-written draft branch behind if anything after branch creation failed.
+    if (createdBranch && branchName) {
+      try {
+        await octokit.git.deleteRef({ owner: REPO_OWNER, repo: REPO_NAME, ref: `heads/${branchName}` });
+      } catch {
+        // best effort
+      }
+    }
+    throw err;
+  }
 }
 
 export interface PendingPR {
@@ -318,89 +409,102 @@ export interface PendingPR {
   htmlUrl: string;
   body: string;
   branch: string;
+  /** The commit reviewers are looking at; approve/reject must echo it back. */
+  headSha: string;
+  /** Users whose latest decisive review approved THIS head commit. */
+  approvers: string[];
+  /** True only if feedback was given on the current head (cleared once the author pushes a revision). */
+  changesRequested: boolean;
+  latestFeedback: string;
+  reviews: { user: string; state: string; body: string; date: string }[];
+}
+
+type ReviewLike = { user?: { login?: string } | null; state: string; commit_id?: string | null; body?: string | null; submitted_at?: string | null };
+
+/** Latest decisive (APPROVED / CHANGES_REQUESTED / DISMISSED) review per user, on the given head commit. */
+export function summarizeReviewsForHead(reviews: ReviewLike[], headSha: string) {
+  const latest = new Map<string, ReviewLike>();
+  for (const r of reviews) {
+    const u = r.user?.login?.toLowerCase();
+    if (!u) continue;
+    if (r.state !== "APPROVED" && r.state !== "CHANGES_REQUESTED" && r.state !== "DISMISSED") continue;
+    latest.set(u, r);
+  }
+  const approvers: string[] = [];
+  let changesRequested = false;
+  let latestFeedback = "";
+  for (const [u, r] of latest) {
+    if (r.commit_id !== headSha) continue;
+    if (r.state === "APPROVED") approvers.push(u);
+    if (r.state === "CHANGES_REQUESTED") {
+      changesRequested = true;
+      latestFeedback = r.body || latestFeedback;
+    }
+  }
+  return { approvers, changesRequested, latestFeedback };
 }
 
 export async function listPendingReviewPRs(token: string): Promise<PendingPR[]> {
   const octokit = getOctokit(token);
-  const { data: pulls } = await octokit.pulls.list({
+  // Paginated: the default page of 30 used to hide older PRs from the queue entirely.
+  const pulls = await octokit.paginate(octokit.pulls.list, {
     owner: REPO_OWNER,
     repo: REPO_NAME,
     state: "open",
     base: MAIN_BRANCH,
     sort: "created",
     direction: "desc",
+    per_page: 100,
   });
 
-  // Fetch reviews for each PR to check approval quorum and feedback
-  const prsWithReviews = await Promise.all(
+  return Promise.all(
     pulls.map(async (pr) => {
-      let vertical = "general";
-      const match =
-        pr.title.match(/\[(?:Draft:\s*)?([a-zA-Z0-9_-]+)\]/i) ||
-        pr.title.match(/feat\(([a-zA-Z0-9_-]+)\)/i);
-      if (match && match[1]) {
-        vertical = match[1].toLowerCase();
-      }
+      // Display-only hint; authorization always re-derives the vertical from the article file path.
+      const branchMatch = pr.head.ref.match(/^(?:draft|cms)\/([a-z0-9_-]+)\//);
+      const titleMatch = pr.title.match(/^(?:feat|chore)\(([a-z0-9-]+)\)/);
+      const vertical = (branchMatch?.[1] || titleMatch?.[1] || "general").toLowerCase();
 
-      let reviewsList: { user: string; state: string; body: string; date: string }[] = [];
-      let approvers: string[] = [];
-      let changesRequested = false;
-      let latestFeedback = "";
-
+      let reviewsList: PendingPR["reviews"] = [];
+      let summary = { approvers: [] as string[], changesRequested: false, latestFeedback: "" };
       try {
-        const { data: reviews } = await octokit.pulls.listReviews({
+        const reviews = await octokit.paginate(octokit.pulls.listReviews, {
           owner: REPO_OWNER,
           repo: REPO_NAME,
           pull_number: pr.number,
+          per_page: 100,
         });
-
         reviewsList = reviews.map((r) => ({
           user: r.user?.login || "unknown",
           state: r.state,
           body: r.body || "",
           date: r.submitted_at || "",
         }));
+        summary = summarizeReviewsForHead(reviews, pr.head.sha);
 
-        approvers = Array.from(
-          new Set(
-            reviews
-              .filter((r) => r.state === "APPROVED")
-              .map((r) => r.user?.login?.toLowerCase())
-              .filter(Boolean) as string[]
-          )
-        );
-
-        const changeReqs = reviews.filter((r) => r.state === "CHANGES_REQUESTED");
-        if (changeReqs.length > 0) {
-          changesRequested = true;
-          latestFeedback = changeReqs[changeReqs.length - 1].body || "";
-        }
-
-        // Also check PR comments for editorial feedback comments (e.g. self-rejection or comment fallback)
-        try {
-          const { data: comments } = await octokit.issues.listComments({
-            owner: REPO_OWNER,
-            repo: REPO_NAME,
-            issue_number: pr.number,
-            per_page: 50,
-          });
-
-          const feedbackComments = comments.filter((c) =>
-            c.body && c.body.includes("Editorial Feedback & Rejection")
+        // Feedback comments only count if they were posted after the current head commit.
+        if (!summary.changesRequested) {
+          const [{ data: headCommit }, comments] = await Promise.all([
+            octokit.repos.getCommit({ owner: REPO_OWNER, repo: REPO_NAME, ref: pr.head.sha }),
+            octokit.paginate(octokit.issues.listComments, {
+              owner: REPO_OWNER,
+              repo: REPO_NAME,
+              issue_number: pr.number,
+              per_page: 100,
+            }),
+          ]);
+          const headDate = Date.parse(headCommit.commit.committer?.date || headCommit.commit.author?.date || "") || 0;
+          const feedback = comments.filter(
+            (c) => c.body?.includes("Editorial Feedback & Rejection") && Date.parse(c.created_at) > headDate
           );
-
-          if (feedbackComments.length > 0) {
-            changesRequested = true;
-            const lastComment = feedbackComments[feedbackComments.length - 1];
-            // Extract the actual feedback text from markdown body
-            const cleaned = (lastComment.body || "")
-              .replace(/###\s*📝\s*Editorial Feedback & Rejection/i, "")
-              .replace(/\*\*Reviewer:\*\*\s*@\w+/i, "")
-              .trim();
-            latestFeedback = cleaned || latestFeedback || "Revisions requested by editorial reviewer.";
+          if (feedback.length > 0) {
+            const last = feedback[feedback.length - 1];
+            summary.changesRequested = true;
+            summary.latestFeedback =
+              (last.body || "")
+                .replace(/###\s*📝\s*Editorial Feedback & Rejection/i, "")
+                .replace(/\*\*Reviewer:\*\*\s*@[\w-]+/i, "")
+                .trim() || "Revisions requested by editorial reviewer.";
           }
-        } catch (commentErr) {
-          console.warn(`Could not fetch comments for PR #${pr.number}:`, commentErr);
         }
       } catch (err) {
         console.warn(`Could not fetch reviews for PR #${pr.number}:`, err);
@@ -416,15 +520,14 @@ export async function listPendingReviewPRs(token: string): Promise<PendingPR[]> 
         htmlUrl: pr.html_url,
         body: pr.body || "",
         branch: pr.head.ref,
-        approvers,
-        changesRequested,
-        latestFeedback,
+        headSha: pr.head.sha,
+        approvers: summary.approvers,
+        changesRequested: summary.changesRequested,
+        latestFeedback: summary.latestFeedback,
         reviews: reviewsList,
       };
     })
   );
-
-  return prsWithReviews;
 }
 
 // ---------------------------------------------------------------------------
@@ -432,24 +535,54 @@ export async function listPendingReviewPRs(token: string): Promise<PendingPR[]> 
 // ---------------------------------------------------------------------------
 
 const ARTICLE_PATH_RE = /^content\/(?:verticals\/([a-z0-9-]+)|(club))\/posts\/([a-z0-9-]+)\.md$/;
-const UPLOAD_PATH_RE = /^apps\/main-portal\/public\/uploads\/[A-Za-z0-9._-]+$/;
+// Only raster images, never HTML/SVG/JS that would be served from the portal's origin.
+const UPLOAD_PATH_RE = /^apps\/main-portal\/public\/uploads\/[A-Za-z0-9_-][A-Za-z0-9._-]*\.(?:png|jpe?g|webp|gif)$/;
+const EDITORIAL_VERTICALS = new Set(ALLOWED_VERTICALS);
 
 export type PRFileCheck =
-  | { ok: true; articlePath: string; vertical: string }
+  | { ok: true; kind: "publish" | "unpublish"; articlePath: string; vertical: string }
   | { ok: false; error: string };
 
-/** A CMS article PR may contain exactly one article file plus uploaded images, nothing else. */
-export function validateArticlePRFiles(filenames: string[]): PRFileCheck {
-  const articles = filenames.filter((f) => ARTICLE_PATH_RE.test(f));
-  const others = filenames.filter((f) => !ARTICLE_PATH_RE.test(f) && !UPLOAD_PATH_RE.test(f));
+type PRFile = string | { filename: string; status?: string };
+
+/**
+ * A CMS editorial PR is exactly one of:
+ *  - publish:   one added/modified article file plus newly *added* upload images, nothing else;
+ *  - unpublish: one removed article file and nothing else.
+ * Anything else (code, workflows, roles.json, renames, replaced uploads, two articles) is refused.
+ */
+export function validateArticlePRFiles(files: PRFile[]): PRFileCheck {
+  const list = files.map((f) => (typeof f === "string" ? { filename: f, status: undefined } : f));
+  const articles = list.filter((f) => ARTICLE_PATH_RE.test(f.filename));
+  const uploads = list.filter((f) => UPLOAD_PATH_RE.test(f.filename));
+  const others = list.filter((f) => !ARTICLE_PATH_RE.test(f.filename) && !UPLOAD_PATH_RE.test(f.filename));
   if (others.length > 0) {
-    return { ok: false, error: `PR modifies files outside article content and uploads: ${others.slice(0, 5).join(", ")}` };
+    return {
+      ok: false,
+      error: `PR modifies files outside article content and uploads: ${others.slice(0, 5).map((f) => f.filename).join(", ")}`,
+    };
   }
   if (articles.length !== 1) {
     return { ok: false, error: `PR must contain exactly one article file (found ${articles.length}).` };
   }
-  const m = articles[0].match(ARTICLE_PATH_RE)!;
-  return { ok: true, articlePath: articles[0], vertical: m[1] || m[2] };
+  const article = articles[0];
+  const m = article.filename.match(ARTICLE_PATH_RE)!;
+  const vertical = m[1] || m[2];
+  if (!EDITORIAL_VERTICALS.has(vertical)) {
+    return { ok: false, error: `Unknown vertical '${vertical}' in ${article.filename}.` };
+  }
+  if (article.status === "renamed") {
+    return { ok: false, error: "Renaming articles is not supported through the CMS." };
+  }
+  const notAdded = uploads.filter((u) => u.status !== undefined && u.status !== "added");
+  if (notAdded.length > 0) {
+    return { ok: false, error: `PR changes or removes existing uploads: ${notAdded.map((u) => u.filename).join(", ")}` };
+  }
+  if (article.status === "removed") {
+    if (uploads.length > 0) return { ok: false, error: "An unpublish request may only remove the article." };
+    return { ok: true, kind: "unpublish", articlePath: article.filename, vertical };
+  }
+  return { ok: true, kind: "publish", articlePath: article.filename, vertical };
 }
 
 export type EditorialRole = "superadmin" | "vertical_head" | "deputy" | "member" | "none";
@@ -530,7 +663,7 @@ export async function getPRArticleContent(token: string, pullNumber: number) {
     per_page: 100,
   });
 
-  const check = validateArticlePRFiles(files.map((f) => f.filename));
+  const check = validateArticlePRFiles(files);
   if (!check.ok) {
     throw new Error(check.error);
   }
@@ -542,11 +675,12 @@ export async function getPRArticleContent(token: string, pullNumber: number) {
     pull_number: pullNumber,
   });
 
+  // An unpublish request deletes the file on its branch, so show the article as it is live on the base.
   const { data: fileRes } = await octokit.repos.getContent({
     owner: REPO_OWNER,
     repo: REPO_NAME,
     path: mdFile.filename,
-    ref: prData.head.sha,
+    ref: check.kind === "unpublish" ? prData.base.sha : prData.head.sha,
   });
 
   if ("content" in fileRes && typeof fileRes.content === "string") {
@@ -576,38 +710,135 @@ export async function getPRArticleContent(token: string, pullNumber: number) {
   throw new Error("Could not read draft file content.");
 }
 
-export async function rejectPR(
-  token: string,
-  pullNumber: number,
-  reviewerUsername: string,
-  reason: string
-): Promise<{ success: boolean; message: string }> {
-  const octokit = getOctokit(token);
-  try {
-    // 1. Submit formal review requesting changes
-    try {
-      await octokit.pulls.createReview({
-        owner: REPO_OWNER,
-        repo: REPO_NAME,
-        pull_number: pullNumber,
-        event: "REQUEST_CHANGES",
-        body: `❌ **Editorial Feedback & Revision Requested by @${reviewerUsername}:**\n\n${reason}`,
-      });
-    } catch {
-      // In case self-review or permissions restrict event
-    }
+export interface ReviewOptions {
+  token: string;
+  pullNumber: number;
+  reviewerUsername: string;
+  /** Reviewer's role in the PR's vertical (see roleInVertical). */
+  reviewerRole: string;
+  targetVertical: string;
+  /** PR author's role in the PR's vertical. */
+  authorRole: string;
+  deputyUsernames?: string[];
+  /** authorUsername from the article frontmatter (excluded from reviewing). */
+  articleAuthorUsername?: string;
+  /** The head commit the reviewer actually looked at. Required: approvals never land on unseen changes. */
+  expectedHeadSha: string;
+  /** Article title from the frontmatter, used for the squash-merge subject. */
+  articleTitle?: string;
+}
+export type ApproveAndMergeOptions = ReviewOptions;
 
-    // 2. Post comment to the PR discussion
+type ReviewCheck =
+  | { ok: false; status: number; message: string }
+  | {
+      ok: true;
+      headSha: string;
+      headBranch: string;
+      prAuthor: string;
+      contributors: Set<string>;
+      decision: "merge" | "count-deputies";
+      kind: "publish" | "unpublish";
+      articlePath: string;
+    };
+
+const REVIEWABLE_BRANCH_RE = /^(?:draft|cms)\/[a-z0-9_-]+\/[a-z0-9-]+$/;
+
+/** Everything both "approve" and "request changes" must satisfy before touching GitHub. */
+async function checkReviewPreconditions(octokit: Octokit, o: ReviewOptions): Promise<ReviewCheck> {
+  const fail = (message: string, status = 400): ReviewCheck => ({ ok: false, status, message });
+  const { data: prData } = await octokit.pulls.get({ owner: REPO_OWNER, repo: REPO_NAME, pull_number: o.pullNumber });
+
+  if (prData.state !== "open") return fail("This pull request is not open.");
+  if (prData.base.ref !== MAIN_BRANCH) return fail(`Only PRs targeting '${MAIN_BRANCH}' can be reviewed here.`);
+  if (prData.head.repo?.full_name !== `${REPO_OWNER}/${REPO_NAME}`) return fail("PRs from forks can't be reviewed in the Studio.");
+  if (!REVIEWABLE_BRANCH_RE.test(prData.head.ref)) return fail("Only CMS draft branches can be reviewed in the Studio.");
+  if (!o.expectedHeadSha || prData.head.sha !== o.expectedHeadSha) {
+    return fail("This article changed since you opened it. Reopen the preview to review the latest version.", 409);
+  }
+
+  const files = await octokit.paginate(octokit.pulls.listFiles, {
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    pull_number: o.pullNumber,
+    per_page: 100,
+  });
+  const fileCheck = validateArticlePRFiles(files);
+  if (!fileCheck.ok) return fail(fileCheck.error);
+  if (fileCheck.vertical !== o.targetVertical) {
+    return fail(`Article location '${fileCheck.vertical}' does not match the reviewed vertical '${o.targetVertical}'.`);
+  }
+
+  const prAuthor = (prData.user?.login || "").toLowerCase();
+  const commits = await octokit.paginate(octokit.pulls.listCommits, {
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    pull_number: o.pullNumber,
+    per_page: 100,
+  });
+  const contributors = new Set<string>(prAuthor ? [prAuthor] : []);
+  for (const c of commits) {
+    const login = c.author?.login?.toLowerCase();
+    if (login) contributors.add(login);
+  }
+  if (o.articleAuthorUsername) contributors.add(o.articleAuthorUsername.toLowerCase());
+  if (contributors.has(o.reviewerUsername.toLowerCase())) {
+    return fail("Self-review is forbidden. You authored or edited this article, so you cannot review it.", 403);
+  }
+
+  if (fileCheck.kind === "unpublish" && o.authorRole !== "vertical_head" && o.authorRole !== "superadmin") {
+    return fail("Unpublish requests can only come from the Vertical Head or a Superadmin.", 403);
+  }
+
+  const decision = evaluateReviewerAuthority(o.reviewerRole as EditorialRole, o.authorRole as EditorialRole);
+  if (decision !== "merge" && decision !== "count-deputies") return fail(decision, 403);
+
+  return {
+    ok: true,
+    headSha: prData.head.sha,
+    headBranch: prData.head.ref,
+    prAuthor,
+    contributors,
+    decision,
+    kind: fileCheck.kind,
+    articlePath: fileCheck.articlePath,
+  };
+}
+
+/** Squash subject built server-side (the PR title is editable on GitHub and must not reach main's log). */
+export function buildMergeSubject(kind: "publish" | "unpublish", vertical: string, title: string, slug: string, pullNumber: number) {
+  const clean = (t: string) => t.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+  const words = clean(kind === "unpublish" ? `unpublish ${slug}` : title || slug).split(" ").slice(0, 20).join(" ");
+  return `${kind === "unpublish" ? "chore" : "feat"}(${vertical}): ${words} (#${pullNumber})`;
+}
+
+export async function rejectPR(
+  options: ReviewOptions & { reason: string }
+): Promise<{ success: boolean; status?: number; message: string }> {
+  const octokit = getOctokit(options.token);
+  try {
+    const check = await checkReviewPreconditions(octokit, options);
+    if (!check.ok) return { success: false, status: check.status, message: check.message };
+
+    await octokit.pulls.createReview({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      pull_number: options.pullNumber,
+      commit_id: check.headSha,
+      event: "REQUEST_CHANGES",
+      body: `❌ **Editorial Feedback & Revision Requested by @${options.reviewerUsername}:**\n\n${options.reason}`,
+    });
+
     await octokit.issues.createComment({
       owner: REPO_OWNER,
       repo: REPO_NAME,
-      issue_number: pullNumber,
-      body: `### 📝 Editorial Feedback & Rejection\n**Reviewer:** @${reviewerUsername}\n\n${reason}`,
+      issue_number: options.pullNumber,
+      body: `### 📝 Editorial Feedback & Rejection\n**Reviewer:** @${options.reviewerUsername}\n\n${options.reason}`,
     });
 
     return {
       success: true,
-      message: `Changes requested on PR #${pullNumber}. Author will see your feedback comment.`,
+      message: `Changes requested on PR #${options.pullNumber}. Author will see your feedback comment.`,
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Failed to request changes on PR";
@@ -615,84 +846,19 @@ export async function rejectPR(
   }
 }
 
-export interface ApproveAndMergeOptions {
-  token: string;
-  pullNumber: number;
-  reviewerUsername: string;
-  reviewerRole: string;
-  targetVertical: string;
-  authorRole: string;
-  deputyUsernames?: string[];
-  /** authorUsername from the article frontmatter (excluded from approving). */
-  articleAuthorUsername?: string;
-}
-
 export async function approveAndMergePR(
-  options: ApproveAndMergeOptions
-): Promise<{ success: boolean; merged: boolean; message: string }> {
-  const {
-    token,
-    pullNumber,
-    reviewerUsername,
-    reviewerRole,
-    authorRole,
-    deputyUsernames = [],
-  } = options;
+  options: ReviewOptions
+): Promise<{ success: boolean; merged: boolean; status?: number; message: string }> {
+  const { token, pullNumber, reviewerUsername, reviewerRole, deputyUsernames = [] } = options;
   const octokit = getOctokit(token);
 
   try {
-    // 1. Fetch PR details
-    const { data: prData } = await octokit.pulls.get({
-      owner: REPO_OWNER,
-      repo: REPO_NAME,
-      pull_number: pullNumber,
-    });
-    const headBranch = prData.head.ref;
-    const headSha = prData.head.sha;
-    const prAuthor = (prData.user?.login || "author").toLowerCase();
+    const check = await checkReviewPreconditions(octokit, options);
+    if (!check.ok) return { success: false, merged: false, status: check.status, message: check.message };
+    const { headSha, headBranch, prAuthor, contributors, decision } = check;
     const cleanReviewer = reviewerUsername.toLowerCase();
-    const fail = (message: string) => ({ success: false, merged: false, message });
 
-    if (prData.state !== "open") return fail("This pull request is not open.");
-    if (prData.base.ref !== MAIN_BRANCH) return fail(`Only PRs targeting '${MAIN_BRANCH}' can be merged here.`);
-
-    // 2. The PR may only contain one article (in the vertical being reviewed) plus uploads
-    const files = await octokit.paginate(octokit.pulls.listFiles, {
-      owner: REPO_OWNER,
-      repo: REPO_NAME,
-      pull_number: pullNumber,
-      per_page: 100,
-    });
-    const fileCheck = validateArticlePRFiles(files.map((f) => f.filename));
-    if (!fileCheck.ok) return fail(fileCheck.error);
-    if (fileCheck.vertical !== options.targetVertical) {
-      return fail(
-        `Article location '${fileCheck.vertical}' does not match the reviewed vertical '${options.targetVertical}'.`
-      );
-    }
-
-    // 3. STRICT anti-self-review: PR opener, frontmatter author and every commit author are excluded
-    const commits = await octokit.paginate(octokit.pulls.listCommits, {
-      owner: REPO_OWNER,
-      repo: REPO_NAME,
-      pull_number: pullNumber,
-      per_page: 100,
-    });
-    const contributors = new Set<string>([prAuthor]);
-    for (const c of commits) {
-      const login = c.author?.login?.toLowerCase();
-      if (login) contributors.add(login);
-    }
-    if (options.articleAuthorUsername) contributors.add(options.articleAuthorUsername.toLowerCase());
-    if (contributors.has(cleanReviewer)) {
-      return fail("Self-approval is forbidden. You authored or edited this article, so you cannot approve it.");
-    }
-
-    // 4. Authority check BEFORE recording any GitHub review
-    const decision = evaluateReviewerAuthority(reviewerRole as EditorialRole, authorRole as EditorialRole);
-    if (decision !== "merge" && decision !== "count-deputies") return fail(decision);
-
-    // 5. Record the approval pinned to the reviewed commit
+    // Record the approval pinned to the reviewed commit
     try {
       await octokit.pulls.createReview({
         owner: REPO_OWNER,
@@ -724,25 +890,20 @@ export async function approveAndMergePR(
       }
     }
 
-    // 6. Merge exactly the reviewed commit (GitHub rejects if the author pushed after review)
+    const slug = check.articlePath.replace(/^.*\/([a-z0-9-]+)\.md$/, "$1");
     const { data: mergeResult } = await octokit.pulls.merge({
       owner: REPO_OWNER,
       repo: REPO_NAME,
       pull_number: pullNumber,
       sha: headSha,
       merge_method: "squash",
-      commit_title: `${prData.title} (#${pullNumber})`,
+      commit_title: buildMergeSubject(check.kind, options.targetVertical, options.articleTitle || "", slug, pullNumber),
       commit_message: `Authored-by: @${prAuthor} <${prAuthor}@users.noreply.github.com>\nApproved-by: @${reviewerUsername} <${reviewerUsername}@users.noreply.github.com> (${reviewerRole})`,
     });
 
-    // 5. Delete head branch to prevent branch clutter
-    if (mergeResult.merged && headBranch && (headBranch.startsWith("draft/") || headBranch.startsWith("cms/"))) {
+    if (mergeResult.merged && headBranch && REVIEWABLE_BRANCH_RE.test(headBranch)) {
       try {
-        await octokit.git.deleteRef({
-          owner: REPO_OWNER,
-          repo: REPO_NAME,
-          ref: `heads/${headBranch}`,
-        });
+        await octokit.git.deleteRef({ owner: REPO_OWNER, repo: REPO_NAME, ref: `heads/${headBranch}` });
       } catch (deleteErr) {
         console.warn(`Could not delete branch ${headBranch}:`, deleteErr);
       }
@@ -750,8 +911,10 @@ export async function approveAndMergePR(
 
     return {
       success: mergeResult.merged,
-      merged: true,
-      message: `Successfully approved & merged PR #${pullNumber} into main! Branch ${headBranch} deleted.`,
+      merged: Boolean(mergeResult.merged),
+      message: mergeResult.merged
+        ? `Successfully approved & merged PR #${pullNumber} into main! Branch ${headBranch} deleted.`
+        : `GitHub did not merge PR #${pullNumber}: ${mergeResult.message}`,
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Merge failed";
@@ -759,57 +922,79 @@ export async function approveAndMergePR(
   }
 }
 
+/**
+ * Unpublishing never touches main directly (CLAUDE.md: no direct pushes to main). It opens an
+ * "unpublish" pull request that removes the article on an isolated draft branch; the request then goes
+ * through the normal review queue and quorum (a Head's request needs a Superadmin, a Superadmin's needs
+ * another Superadmin), and is only merged by approveAndMergePR.
+ */
 export async function deletePublishedPost(
   token: string,
   vertical: string,
   slug: string,
   removerUsername: string
-): Promise<{ success: boolean; message: string }> {
-  // Security validation: strictly alphanumeric lowercase slugs with hyphens only
-  const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/(^-|-$)/g, "");
-  if (!cleanSlug || cleanSlug !== slug.toLowerCase()) {
+): Promise<{ success: boolean; message: string; pullNumber?: number; prUrl?: string }> {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
     return { success: false, message: "Security error: Invalid article slug format. Traversal characters are strictly forbidden." };
   }
-
-  const cleanVertical = vertical.toLowerCase().replace(/[^a-z0-9-]/g, "");
+  if (!ALLOWED_VERTICALS.includes(vertical)) {
+    return { success: false, message: `Invalid vertical '${vertical}'.` };
+  }
 
   const octokit = getOctokit(token);
-  const filePath =
-    cleanVertical === "club"
-      ? `content/club/posts/${cleanSlug}.md`
-      : `content/verticals/${cleanVertical}/posts/${cleanSlug}.md`;
+  const filePath = vertical === "club" ? `content/club/posts/${slug}.md` : `content/verticals/${vertical}/posts/${slug}.md`;
+  let branchName = "";
+  let createdBranch = false;
 
   try {
-    const { data } = await octokit.repos.getContent({
+    const { data: refData } = await octokit.git.getRef({ owner: REPO_OWNER, repo: REPO_NAME, ref: `heads/${MAIN_BRANCH}` });
+    const { data: existing } = await octokit.repos.getContent({
       owner: REPO_OWNER,
       repo: REPO_NAME,
       path: filePath,
-      ref: MAIN_BRANCH,
+      ref: refData.object.sha,
     });
-
-    if (Array.isArray(data) || !data.sha) {
-      return { success: false, message: "Article file not found or is a directory." };
+    if (Array.isArray(existing) || !("sha" in existing) || !existing.sha) {
+      return { success: false, message: "Article file not found." };
     }
+
+    branchName = `draft/${vertical}/unpublish-${slug}-${Date.now().toString().slice(-5)}`;
+    await octokit.git.createRef({ owner: REPO_OWNER, repo: REPO_NAME, ref: `refs/heads/${branchName}`, sha: refData.object.sha });
+    createdBranch = true;
 
     await octokit.repos.deleteFile({
       owner: REPO_OWNER,
       repo: REPO_NAME,
       path: filePath,
-      message: `chore(unpublish): remove ${slug} in ${vertical} by @${removerUsername}`,
-      sha: data.sha,
-      branch: MAIN_BRANCH,
-      committer: {
-        name: removerUsername,
-        email: `${removerUsername}@users.noreply.github.com`,
-      },
+      message: `chore(${vertical}): unpublish ${slug} [skip vercel]`,
+      sha: existing.sha,
+      branch: branchName,
+    });
+
+    const { data: pr } = await octokit.pulls.create({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      title: `chore(${vertical}): unpublish ${slug}`,
+      head: branchName,
+      base: MAIN_BRANCH,
+      body: `## Unpublish request\n\n@${removerUsername} asked to remove \`${filePath}\` from the website.\n\nThe article stays live until this request is approved and merged through CMS Studio review.`,
     });
 
     return {
       success: true,
-      message: `Article '${slug}' in ${vertical} has been successfully unpublished from main.`,
+      pullNumber: pr.number,
+      prUrl: pr.html_url,
+      message: `Unpublish request opened as PR #${pr.number}. The article stays live until it is approved.`,
     };
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : "Failed to unpublish article";
+    if (createdBranch) {
+      try {
+        await octokit.git.deleteRef({ owner: REPO_OWNER, repo: REPO_NAME, ref: `heads/${branchName}` });
+      } catch {
+        // best effort
+      }
+    }
+    const errorMsg = err instanceof Error ? err.message : "Failed to open the unpublish request";
     return { success: false, message: errorMsg };
   }
 }
@@ -877,7 +1062,7 @@ export async function listAllPublishedPostsFromGitHub(
             slug,
             vertical,
             title: data.title || slug,
-            date: data.date ? String(data.date).split("T")[0] : "",
+            date: normalizeContentDate(data.date),
             author: data.author || "SSN Coding Club Member",
             summary: data.summary || "",
             coverImage: data.coverImage || "",
@@ -901,8 +1086,9 @@ export async function listAllPublishedPostsFromGitHub(
     posts.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
     return posts;
   } catch (err) {
+    // Surface the failure: returning [] made callers think the repo had no articles.
     console.error("Error fetching published posts tree from GitHub:", err);
-    return [];
+    throw err;
   }
 }
 
@@ -1039,7 +1225,7 @@ export async function savePersonalDraftBranch(params: PersonalDraftParams): Prom
     authorUsername,
     authorAvatar: `https://github.com/${authorUsername}.png`,
     summary: summary || "",
-    targetPortals: targetPortals && targetPortals.length > 0 ? targetPortals : ["main-portal"],
+    targetPortals: resolveTargetPortals(vertical, targetPortals),
     vertical: vertical || "club",
     ...(processedCoverImage ? { coverImage: processedCoverImage } : {}),
     tags: tags && tags.length > 0 ? tags : [vertical],
@@ -1101,13 +1287,17 @@ export async function listPersonalDraftBranches(token: string, authorUsername: s
   const octokit = getOctokit(token);
   try {
     const prefix = `drafts/${authorUsername.toLowerCase()}/`;
-    const { data: branches } = await octokit.repos.listBranches({
+    // Only this user's refs, with no 100-branch cut-off.
+    const refs = await octokit.paginate(octokit.git.listMatchingRefs, {
       owner: REPO_OWNER,
       repo: REPO_NAME,
+      ref: `heads/${prefix}`,
       per_page: 100,
     });
-
-    const userDraftBranches = branches.filter((b) => b.name.startsWith(prefix));
+    const userDraftBranches = refs.map((r) => ({
+      name: r.ref.replace(/^refs\/heads\//, ""),
+      commit: { sha: r.object.sha },
+    }));
     const results: PersonalDraftInfo[] = [];
 
     for (const b of userDraftBranches) {

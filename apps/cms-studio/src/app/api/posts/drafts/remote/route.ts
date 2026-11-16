@@ -3,9 +3,62 @@ import {
   savePersonalDraftBranch,
   listPersonalDraftBranches,
   getPersonalDraftBranch,
+  getOctokit,
 } from "@/lib/github";
 import { getSessionToken } from "@/lib/session";
 import { getUserRoleInfo, getLiveClubRoles } from "@/lib/roles";
+
+const REPO_OWNER = "blackscythe123";
+const REPO_NAME = "CC-Website-2026";
+const UPLOADS_DIR = "apps/main-portal/public/uploads";
+const SAFE_UPLOAD_FILE = /^[A-Za-z0-9._-]+\.(png|jpe?g|webp|gif)$/;
+/** Total base64 payload returned with a draft; keeps the response well under serverless limits. */
+const MAX_PENDING_IMAGE_BYTES = Math.floor(3.5 * 1024 * 1024);
+const MIME_BY_EXT: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif" };
+
+/**
+ * `/uploads/<file>` images a WIP draft references that exist on the draft branch but NOT on main.
+ * Submitting makes a new branch from main, so the client re-uploads these (as pending images) or the
+ * published article would point at files that were never merged.
+ */
+async function collectBranchOnlyImages(token: string, branch: string, markdownBody: string, coverImage: string) {
+  const octokit = getOctokit(token);
+  const files = new Set<string>();
+  for (const text of [markdownBody || "", coverImage || ""]) {
+    for (const m of text.matchAll(/\/uploads\/([A-Za-z0-9._-]+)/g)) {
+      if (SAFE_UPLOAD_FILE.test(m[1])) files.add(m[1]);
+    }
+  }
+
+  const out: { filename: string; base64: string; mimeType: string; uploadPath: string }[] = [];
+  let total = 0;
+  for (const filename of files) {
+    const path = `${UPLOADS_DIR}/${filename}`;
+    try {
+      // Already published on main: the /uploads link keeps working, nothing to carry over.
+      await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path, ref: "main" });
+      continue;
+    } catch (err) {
+      if ((err as { status?: number }).status !== 404) continue; // unknown state: don't guess
+    }
+    try {
+      const { data } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path, ref: branch });
+      if (Array.isArray(data) || data.type !== "file") continue;
+      let base64 = typeof data.content === "string" ? data.content.replace(/\s/g, "") : "";
+      if (!base64 && data.sha) {
+        const blob = await octokit.git.getBlob({ owner: REPO_OWNER, repo: REPO_NAME, file_sha: data.sha });
+        base64 = blob.data.content.replace(/\s/g, "");
+      }
+      if (!base64 || total + base64.length > MAX_PENDING_IMAGE_BYTES) continue;
+      total += base64.length;
+      const ext = filename.split(".").pop()!.toLowerCase();
+      out.push({ filename, base64, mimeType: MIME_BY_EXT[ext] || "image/png", uploadPath: `/uploads/${filename}` });
+    } catch {
+      // not on the draft branch either: leave the link as is
+    }
+  }
+  return out;
+}
 
 export async function GET(request: NextRequest) {
   const token = getSessionToken(request);
@@ -38,7 +91,13 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Unauthorized access or invalid draft branch name" }, { status: 403 });
       }
       const draft = await getPersonalDraftBranch(token, branch);
-      return NextResponse.json({ draft });
+      let pendingImages: Awaited<ReturnType<typeof collectBranchOnlyImages>> = [];
+      try {
+        pendingImages = await collectBranchOnlyImages(token, branch, draft.markdownBody || "", draft.coverImage || "");
+      } catch (imgErr) {
+        console.error("Could not collect draft-branch images:", imgErr);
+      }
+      return NextResponse.json({ draft, pendingImages });
     }
 
     // List all personal draft branches
@@ -95,26 +154,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { vertical, slug, title, summary, coverImage, tags, markdownBody, pendingImages, targetPortals } = body;
 
-    // Verify role assignment: Unassigned members cannot push branches
-    const roleInfo = getUserRoleInfo(userData.login, await getLiveClubRoles());
-    if (roleInfo.role === "member") {
-      if (!roleInfo.verticals || roleInfo.verticals.length === 0) {
-        return NextResponse.json(
-          {
-            error:
-              "Access Denied: You must be assigned to a technical vertical in Governance & Roles before saving remote draft branches.",
-          },
-          { status: 403 }
-        );
-      }
-      if (vertical && !roleInfo.verticals.includes(vertical)) {
-        return NextResponse.json(
-          {
-            error: `As a Member, you are only authorized to save drafts for: ${roleInfo.verticals.join(", ")}`,
-          },
-          { status: 403 }
-        );
-      }
+    const roleInfo = getUserRoleInfo(userData.login, await getLiveClubRoles(true, { token }));
+    if (roleInfo.role !== "superadmin" && (!roleInfo.verticals || roleInfo.verticals.length === 0)) {
+      return NextResponse.json(
+        {
+          error:
+            "Access Denied: You must be assigned to a technical vertical in Governance & Roles before saving remote draft branches.",
+        },
+        { status: 403 }
+      );
     }
 
     const ALLOWED_VERTICALS = [
@@ -135,6 +183,21 @@ export async function POST(request: NextRequest) {
         { error: `Invalid vertical '${safeVertical}'. Allowed verticals are: ${ALLOWED_VERTICALS.join(", ")}` },
         { status: 400 }
       );
+    }
+
+    // Same vertical authorization as POST /api/posts/draft: club announcements are superadmin-only, and
+    // everyone else may only save drafts for verticals where they hold a role.
+    if (roleInfo.role !== "superadmin") {
+      if (safeVertical === "club") {
+        return NextResponse.json({ error: "Only Superadmins can save Club Announcement drafts." }, { status: 403 });
+      }
+      const assigned = Object.keys(roleInfo.rolesByVertical || {});
+      if (!assigned.includes(safeVertical)) {
+        return NextResponse.json(
+          { error: `You can only save drafts for your own verticals: ${assigned.join(", ") || "none"}` },
+          { status: 403 }
+        );
+      }
     }
 
     const rawSlug = (slug || title || "untitled").trim();

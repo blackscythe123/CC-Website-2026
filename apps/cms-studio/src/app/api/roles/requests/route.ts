@@ -5,6 +5,7 @@ import {
   getLiveClubRoles,
   getLiveUserRoleInfo,
   writeRolesAndSyncCodeowners,
+  getLiveClubRolesForWrite,
   getUserRoleInfo,
   canApproveRoleRequest,
   assignRole,
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const roleInfo = await getLiveUserRoleInfo(userData.login);
+    const roleInfo = await getLiveUserRoleInfo(userData.login, false, token);
     const activeToken = process.env.GITHUB_ADMIN_TOKEN || token;
     const octokit = new Octokit({ auth: activeToken });
 
@@ -136,7 +137,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Also include any legacy requests from roles.json
-    const roles = await getLiveClubRoles();
+    const roles = await getLiveClubRoles(false, { token });
     const legacyRequests: RoleRequest[] = roles.pending_requests || [];
     const allRequests: RoleRequest[] = [
       ...issueRequests,
@@ -343,7 +344,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const reviewerRoleInfo = await getLiveUserRoleInfo(userData.login, true);
+    const reviewerRoleInfo = await getLiveUserRoleInfo(userData.login, true, token);
     const body = await request.json();
     const { requestId, action, assignedRole, expectedRole, expectedVertical } = body;
 
@@ -383,7 +384,8 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    let roles = await getLiveClubRoles(true);
+    const { roles: liveRolesForWrite, sha: rolesSha } = await getLiveClubRolesForWrite(token);
+    let roles = liveRolesForWrite;
     if (!targetReq) {
       targetReq = roles.pending_requests?.find((r) => r.id === requestId) || null;
     }
@@ -486,11 +488,12 @@ export async function PATCH(request: NextRequest) {
       const commitMessage = `chore(governance): @${userData.login} approved & invited @${targetReq.username} as ${effectiveRole} (${targetReq.vertical})${isRoleAdjusted ? ` [adjusted from ${targetReq.requestedRole}]` : ""}`;
 
       // Layer 1: Cryptographic Git author attestation with fallback to GITHUB_ADMIN_TOKEN
-      await writeRolesAndSyncCodeowners(roles, token, {
-        name: reviewerDisplayName,
-        email: reviewerEmail,
-        message: commitMessage,
-      });
+      await writeRolesAndSyncCodeowners(
+        roles,
+        token,
+        { name: reviewerDisplayName, email: reviewerEmail, message: commitMessage },
+        rolesSha
+      );
 
       // Dispatch repository collaborator invitation if admin token is available
       let inviteDispatched = false;
@@ -550,7 +553,7 @@ export async function PATCH(request: NextRequest) {
         if (r) {
           r.status = "rejected";
           r.reviewedBy = userData.login;
-          await writeRolesAndSyncCodeowners(roles, token);
+          await writeRolesAndSyncCodeowners(roles, token, undefined, rolesSha);
         }
       }
 
@@ -590,6 +593,7 @@ export async function PATCH(request: NextRequest) {
     });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Failed to review request";
-    return NextResponse.json({ error: errorMsg }, { status: 500 });
+    const status = (err as { status?: number }).status;
+    return NextResponse.json({ error: errorMsg }, { status: status === 409 || status === 503 ? status : 500 });
   }
 }

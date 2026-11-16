@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
   // Check cache first
   const cached = userLookupCache.get(username);
   if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
-    const currentRole = getUserRoleInfo(username, await getLiveClubRoles());
+    const currentRole = getUserRoleInfo(username, await getLiveClubRoles(false, { token }));
     return NextResponse.json({
       exists: cached.exists,
       user: cached.user,
@@ -84,13 +84,17 @@ export async function GET(request: NextRequest) {
       headers,
     });
 
-    if (!res.ok) {
+    if (res.status === 404) {
       userLookupCache.set(username, { exists: false, cachedAt: Date.now() });
       return NextResponse.json({ exists: false, error: "GitHub user not found" });
     }
+    if (!res.ok) {
+      // Rate limits, expired tokens and outages are not "no such user", and must not be cached as such.
+      return NextResponse.json({ exists: false, error: "Couldn't reach GitHub to check this user. Try again shortly." }, { status: 502 });
+    }
 
     const ghUser = await res.json();
-    const currentRole = getUserRoleInfo(ghUser.login, await getLiveClubRoles());
+    const currentRole = getUserRoleInfo(ghUser.login, await getLiveClubRoles(false, { token }));
     const userInfo = {
       login: ghUser.login,
       name: ghUser.name || ghUser.login,

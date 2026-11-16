@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { setSessionCookie } from "@/lib/session";
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] as string);
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
@@ -20,7 +24,7 @@ export async function GET(request: NextRequest) {
       <html>
         <body style="font-family: sans-serif; padding: 2rem; text-align: center;">
           <h2>Authentication Failed</h2>
-          <p>${errorDescription || error}</p>
+          <p>${escapeHtml(errorDescription || error || "")}</p>
         </body>
       </html>
     `;
@@ -63,7 +67,10 @@ export async function GET(request: NextRequest) {
 
     if (data.error || !data.access_token) {
       const errMessage = data.error_description || data.error || "Failed to exchange token";
-      return new NextResponse(`GitHub token exchange error: ${errMessage}`, { status: 400 });
+      return new NextResponse(`GitHub token exchange error: ${String(errMessage)}`, {
+        status: 400,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
     }
 
     const token = data.access_token;

@@ -30,13 +30,17 @@ export async function GET(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const roleInfo = getUserRoleInfo(userData.login, await getLiveClubRoles());
+    const roleInfo = getUserRoleInfo(userData.login, await getLiveClubRoles(false, { token }));
 
     const { searchParams } = new URL(request.url);
     const previewPullNumber = searchParams.get("previewPullNumber");
 
     if (previewPullNumber) {
-      const article = await getPRArticleContent(token, parseInt(previewPullNumber, 10));
+      const n = Number(previewPullNumber);
+      if (!Number.isInteger(n) || n <= 0) {
+        return NextResponse.json({ error: "Invalid previewPullNumber." }, { status: 400 });
+      }
+      const article = await getPRArticleContent(token, n);
       return NextResponse.json({ success: true, article });
     }
     const prs = await listPendingReviewPRs(token);
@@ -49,10 +53,8 @@ export async function GET(request: NextRequest) {
       if (roleInfo.role === "superadmin") {
         return true;
       }
-      if (roleInfo.role === "vertical_head" || roleInfo.role === "deputy") {
-        return roleInfo.verticals.includes(pr.vertical);
-      }
-      return false;
+      const roleHere = roleInfo.rolesByVertical?.[pr.vertical];
+      return roleHere === "vertical_head" || roleHere === "deputy";
     });
 
     return NextResponse.json({
@@ -86,20 +88,41 @@ export async function POST(request: NextRequest) {
 
     const userData = await userRes.json();
     // Authorization must use live roles.json from main, never the build-time copy or a stale cache
-    const allRoles = await getLiveClubRoles(true);
+    const allRoles = await getLiveClubRoles(true, { token });
     const reviewerRoleInfo = getUserRoleInfo(userData.login, allRoles);
-    const body = await request.json();
-    const { pullNumber, action = "approve", reason } = body;
+    let body: { pullNumber?: unknown; action?: unknown; reason?: unknown; expectedHeadSha?: unknown };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+    }
+    const pullNumber = Number(body.pullNumber);
+    const action = body.action === undefined ? "approve" : body.action;
+    const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+    const expectedHeadSha = typeof body.expectedHeadSha === "string" ? body.expectedHeadSha : "";
 
-    if (!pullNumber) {
-      return NextResponse.json({ error: "pullNumber is required" }, { status: 400 });
+    if (!Number.isInteger(pullNumber) || pullNumber <= 0) {
+      return NextResponse.json({ error: "A valid pullNumber is required." }, { status: 400 });
+    }
+    if (action !== "approve" && action !== "reject") {
+      return NextResponse.json({ error: "action must be 'approve' or 'reject'." }, { status: 400 });
+    }
+    if (!/^[0-9a-f]{40}$/.test(expectedHeadSha)) {
+      return NextResponse.json(
+        { error: "Reopen the article preview and review again (missing reviewed version)." },
+        { status: 400 }
+      );
+    }
+    if (action === "reject" && !reason) {
+      return NextResponse.json(
+        { error: "A feedback reason is required when requesting changes or rejecting." },
+        { status: 400 }
+      );
     }
 
-    // Anti-IDOR: Fetch actual PR from GitHub to verify true target vertical
+    // Anti-IDOR: the PR author and the vertical come from GitHub, never from the request
     const prData = await getPRDetails(token, pullNumber);
     const authorUsername = prData.user?.login || "unknown";
-
-    // Strictly enforce anti-self-review: Authors can NEVER review or approve their own PRs
     if (userData.login.toLowerCase() === authorUsername.toLowerCase()) {
       return NextResponse.json(
         {
@@ -109,19 +132,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Determine the true vertical from the article file location (fail closed: no title/branch fallback)
+    // The true vertical comes from the article file location (fail closed: no title/branch fallback)
     let actualVertical: string;
     let articleAuthorUsername = "";
+    let articleTitle = "";
     try {
       const article = await getPRArticleContent(token, pullNumber);
       actualVertical = article.vertical.toLowerCase();
       articleAuthorUsername = article.authorUsername || "";
+      articleTitle = article.title || "";
     } catch (articleErr) {
       const msg = articleErr instanceof Error ? articleErr.message : "Could not read the article in this PR.";
       return NextResponse.json({ error: `Cannot review this PR: ${msg}` }, { status: 400 });
     }
 
-    // Verify reviewer authority
     if (!canUserApproveVertical(userData.login, actualVertical, allRoles)) {
       return NextResponse.json(
         {
@@ -131,43 +155,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Handling Rejection with Reason
-    if (action === "reject") {
-      if (!reason || !reason.trim()) {
-        return NextResponse.json(
-          { error: "A feedback reason is required when requesting changes or rejecting." },
-          { status: 400 }
-        );
-      }
-
-      const rejectResult = await rejectPR(token, pullNumber, userData.login, reason.trim());
-      if (!rejectResult.success) {
-        return NextResponse.json({ error: rejectResult.message }, { status: 400 });
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: rejectResult.message,
-      });
-    }
-
-    // Handling Approval (Multi-Deputy Quorum check)
     const authorRoleInfo = getUserRoleInfo(authorUsername, allRoles);
-    const deputiesInVertical = allRoles.deputies[actualVertical] || [];
-
-    const result = await approveAndMergePR({
+    const reviewOptions = {
       token,
       pullNumber,
-      reviewerUsername: userData.login,
+      reviewerUsername: userData.login as string,
       reviewerRole: roleInVertical(reviewerRoleInfo, actualVertical),
       targetVertical: actualVertical,
       authorRole: roleInVertical(authorRoleInfo, actualVertical),
-      deputyUsernames: deputiesInVertical,
+      deputyUsernames: allRoles.deputies[actualVertical] || [],
       articleAuthorUsername,
-    });
+      expectedHeadSha,
+      articleTitle,
+    };
 
+    if (action === "reject") {
+      const rejectResult = await rejectPR({ ...reviewOptions, reason });
+      if (!rejectResult.success) {
+        return NextResponse.json({ error: rejectResult.message }, { status: rejectResult.status || 400 });
+      }
+      return NextResponse.json({ success: true, message: rejectResult.message });
+    }
+
+    const result = await approveAndMergePR(reviewOptions);
     if (!result.success) {
-      return NextResponse.json({ error: result.message }, { status: 400 });
+      return NextResponse.json({ error: result.message }, { status: result.status || 400 });
     }
 
     return NextResponse.json({
@@ -177,6 +189,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Failed to process review";
-    return NextResponse.json({ error: errorMsg }, { status: 500 });
+    const status = (err as { status?: number }).status;
+    return NextResponse.json({ error: errorMsg }, { status: status === 404 || status === 503 ? status : 500 });
   }
 }

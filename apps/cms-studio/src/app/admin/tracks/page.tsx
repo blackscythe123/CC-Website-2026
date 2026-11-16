@@ -86,6 +86,9 @@ export default function TracksPage() {
         const a = data.article;
         if (!ok || !a) throw new Error(data.error || `Couldn't load PR #${prNumber}`);
         if (a.kind !== "track") throw new Error(`PR #${prNumber} is an article, not a track. Open it from Write instead.`);
+        if (!a.track) {
+          throw new Error(`PR #${prNumber}'s track file is invalid (it was changed outside the Studio). Close it and start a new proposal.`);
+        }
         let placedCounts: Record<string, number> = {};
         const published = await readApiJson(await fetch(`/api/tracks?vertical=${encodeURIComponent(a.vertical)}&slug=${encodeURIComponent(a.slug)}`));
         if (published.ok) placedCounts = published.data.placedCounts || {};

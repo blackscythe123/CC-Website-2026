@@ -25,7 +25,8 @@ export interface PreviewArticle {
   placementLabel?: string | null;
   /** Present for learning-track proposals. */
   kind?: "publish" | "unpublish" | "track";
-  track?: Track;
+  track?: Track | null;
+  trackErrors?: string[];
   slug?: string;
 }
 
@@ -114,6 +115,16 @@ export default function ReviewPreviewDrawer({
                 <TrackView track={article.track} vertical={article.vertical} slug={article.slug || "preview"} placed={{}} readOnly />
               </div>
               <p className="mt-4 text-xs text-neutral-500">Blogs placed in each section by their authors appear after its links and videos on the live page.</p>
+            </div>
+          ) : null}
+          {article.kind === "track" && !article.track ? (
+            <div role="alert" className="rounded-lg bg-danger-bg p-4 text-sm text-danger">
+              <p className="font-semibold">This track proposal is invalid and can&apos;t be approved. Request changes so the author can fix it:</p>
+              <ul className="mt-2 list-disc pl-5">
+                {(article.trackErrors || []).slice(0, 6).map((e) => (
+                  <li key={e}>{e}</li>
+                ))}
+              </ul>
             </div>
           ) : null}
           {article.kind === "track" ? null : <ArticlePreview

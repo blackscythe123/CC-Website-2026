@@ -17,6 +17,7 @@ export interface PostSummary {
   coverImage?: string;
   targetPortals?: string[];
   tags: string[];
+  readMinutes: number;
 }
 
 export interface PostDetail extends PostSummary {
@@ -33,6 +34,11 @@ export function normalizeDate(d: unknown): string {
     return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
   }
   return String(d).slice(0, 10);
+}
+
+function estimateReadMinutes(markdown: string): number {
+  const words = markdown.split(/s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 200));
 }
 
 const SAFE_SEGMENT = /^[a-z0-9-]+$/;
@@ -79,7 +85,7 @@ export function getAllPosts(portalId: string = "main-portal"): PostSummary[] {
           if (file.endsWith(".md")) {
             const filePath = path.join(postsDir, file);
             const content = fs.readFileSync(filePath, "utf8");
-            const { data } = matter(content);
+            const { data, content: body } = matter(content);
             const slug = file.replace(/\.md$/, "");
 
             if (!isPostVisibleOnPortal(data.targetPortals, portalId)) {
@@ -98,6 +104,7 @@ export function getAllPosts(portalId: string = "main-portal"): PostSummary[] {
               coverImage: data.coverImage || "",
               targetPortals: Array.isArray(data.targetPortals) ? data.targetPortals : ["main-portal"],
               tags: Array.isArray(data.tags) ? data.tags : [],
+              readMinutes: estimateReadMinutes(body),
             });
           }
         }
@@ -113,7 +120,7 @@ export function getAllPosts(portalId: string = "main-portal"): PostSummary[] {
       if (file.endsWith(".md")) {
         const filePath = path.join(clubPostsDir, file);
         const content = fs.readFileSync(filePath, "utf8");
-        const { data } = matter(content);
+        const { data, content: body } = matter(content);
         const slug = file.replace(/\.md$/, "");
 
         if (!isPostVisibleOnPortal(data.targetPortals, portalId)) {
@@ -132,6 +139,7 @@ export function getAllPosts(portalId: string = "main-portal"): PostSummary[] {
           coverImage: data.coverImage || "",
           targetPortals: Array.isArray(data.targetPortals) ? data.targetPortals : ["main-portal"],
           tags: Array.isArray(data.tags) ? data.tags : [],
+          readMinutes: estimateReadMinutes(body),
         });
       }
     }
@@ -253,6 +261,7 @@ export async function getPost(
     summary: data.summary || "",
     coverImage: data.coverImage || "",
     tags: Array.isArray(data.tags) ? data.tags : [],
+    readMinutes: estimateReadMinutes(content),
     contentHtml,
   };
 }

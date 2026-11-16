@@ -12,9 +12,10 @@ import JoinUs from './JoinUs';
 import ProjectsIsolated from './ProjectsIsolated';
 import EventsBooks from './EventsBooks';
 import BlogsIsolated from './BlogsIsolated';
+import type {Blog} from '@coding-club/scrapbook-ui';
 import {events} from '../data/events';
 const ids=['home','about','verticals','projects','events','blogs','people','roadmap','join'];
-export default function ScrollHome(){
+export default function ScrollHome({blogs}:{blogs:Blog[]}){
  const reload=useRef<boolean|null>(null);
  useSectionEntrances();
  useEffect(()=>rememberVisibleSection(ids.map(id=>'section-'+id),'.ssn-global-navbar'),[]);
@@ -30,5 +31,5 @@ export default function ScrollHome(){
   window.scrollTo({top:Math.max(0,y),behavior:'instant'});
   window.dispatchEvent(new CustomEvent('ssn:section-change',{detail:{id}}));
  },[]);
- return <div className="ssn-scroll-site"><section id="section-home" className="ssn-scroll-panel ssn-hero-panel"><Landing onNavigate={go}/></section><section id="section-about" className="ssn-scroll-panel"><AboutLetter/></section><section id="section-verticals" className="ssn-scroll-panel"><Verticals/></section><section id="section-projects" className="ssn-scroll-panel"><ProjectsIsolated/></section><section id="section-events" className="ssn-scroll-panel"><EventsBooks events={events}/></section><section id="section-blogs" className="ssn-scroll-panel"><BlogsIsolated/></section><section id="section-people" className="ssn-scroll-panel"><People/></section><section id="section-roadmap" className="vertical-roadmap-section" aria-label="SSN Coding Club roadmap"><ClubRoadmap vertical="Coding Club"/></section><section id="section-join" className="ssn-scroll-panel"><JoinUs/></section></div>;
+ return <div className="ssn-scroll-site"><section id="section-home" className="ssn-scroll-panel ssn-hero-panel"><Landing onNavigate={go}/></section><section id="section-about" className="ssn-scroll-panel"><AboutLetter/></section><section id="section-verticals" className="ssn-scroll-panel"><Verticals/></section><section id="section-projects" className="ssn-scroll-panel"><ProjectsIsolated/></section><section id="section-events" className="ssn-scroll-panel"><EventsBooks events={events}/></section><section id="section-blogs" className="ssn-scroll-panel"><BlogsIsolated items={blogs}/></section><section id="section-people" className="ssn-scroll-panel"><People/></section><section id="section-roadmap" className="vertical-roadmap-section" aria-label="SSN Coding Club roadmap"><ClubRoadmap vertical="Coding Club"/></section><section id="section-join" className="ssn-scroll-panel"><JoinUs/></section></div>;
 }

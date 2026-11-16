@@ -1,6 +1,5 @@
 import {sampleProjects} from './data/projects';
 import {events} from './data/events';
-import {blogs} from './data/blogs';
 
 export const verticalCategories={
  'ai-ml':'AI / ML',
@@ -19,6 +18,5 @@ export function getVerticalContent(slug:VerticalSlug){
   category,
   projects:sampleProjects.filter(project=>project.category===category),
   events:events.filter(event=>event.vertical===category),
-  blogs:blogs.filter(blog=>blog.category===category),
  };
 }

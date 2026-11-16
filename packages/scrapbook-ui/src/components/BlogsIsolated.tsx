@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { standaloneCSS } from "./blogsStandaloneCSS";
 import NewspaperBlogs from "./NewspaperBlogs";
-import { blogs, type Blog } from "../data/blogs";
-export default function BlogsIsolated({items=blogs,title}:{items?:Blog[];title?:string}={}) {
+import type { Blog } from "../blog";
+export default function BlogsIsolated({items,title}:{items:Blog[];title?:string}) {
   const host = useRef<HTMLDivElement>(null);
   const [root, setRoot] = useState<ShadowRoot | null>(null);
   useEffect(() => {

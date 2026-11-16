@@ -12,8 +12,8 @@ import ProjectsIsolated from './ProjectsIsolated';
 import EventsBooks from './EventsBooks';
 import BlogsIsolated from './BlogsIsolated';
 import {getVerticalContent,type VerticalSlug} from '../vertical-content';
-type PublishedPost={slug:string;title:string;summary:string;date:string;author:string};
-export default function VerticalPortalHome({slug,publishedPosts=[],broadcastItems=[],preview=false}:{slug:VerticalSlug;publishedPosts?:PublishedPost[];broadcastItems?:BroadcastItem[];preview?:boolean}){
+import type {Blog} from '../blog';
+export default function VerticalPortalHome({slug,blogs=[],broadcastItems=[],preview=false}:{slug:VerticalSlug;blogs?:Blog[];broadcastItems?:BroadcastItem[];preview?:boolean}){
  const reload=useRef<boolean|null>(null);
  const [arrived]=useState(()=>!preview&&isStickyArrival(slug));
  const [motionReady,setMotionReady]=useState(!arrived);
@@ -33,13 +33,12 @@ export default function VerticalPortalHome({slug,publishedPosts=[],broadcastItem
   <VerticalArrival slug={slug}/>
   <section id="section-projects" className="ssn-scroll-panel" aria-label={`${content.category} projects`}><div className="vertical-project-surface"><ProjectsIsolated projects={content.projects} settled={arrived}/></div></section>
   <section id="section-events" className="ssn-scroll-panel" aria-label={`${content.category} events`}><EventsBooks events={content.events}/></section>
-  <section id="section-blogs" className="ssn-scroll-panel" aria-label={`${content.category} blogs`}><BlogsIsolated items={content.blogs}/>
-   {publishedPosts.length>0&&<div className="vertical-published"><h2>Published articles</h2><div>{publishedPosts.map(post=><article key={post.slug}><p>{post.date} · {post.author}</p><a href={`/posts/${post.slug}`}>{post.title} ↗</a><p>{post.summary}</p></article>)}</div></div>}
+  <section id="section-blogs" className="ssn-scroll-panel" aria-label={`${content.category} blogs`}><BlogsIsolated items={blogs}/>
   </section>
   {(slug==='ai-ml'||slug==='cybersecurity')&&<ClubBroadcast items={broadcastItems}/>}
   {(slug==='competitive-programming'||slug==='cybersecurity')&&<CodingLeaderboard vertical={slug==='cybersecurity'?'Cybersecurity':'CP'}/>}
   {slug==='ssnhacks'&&<HallOfFame/>}
-  {(slug==='competitive-programming'||slug==='ai-ml'||slug==='cybersecurity')&&<ResourceRoom vertical={slug==='ai-ml'?'AI / ML':slug==='cybersecurity'?'Cybersecurity':'CP'} blogs={content.blogs}/>}
+  {(slug==='competitive-programming'||slug==='ai-ml'||slug==='cybersecurity')&&<ResourceRoom vertical={slug==='ai-ml'?'AI / ML':slug==='cybersecurity'?'Cybersecurity':'CP'} blogs={blogs}/>}
   {(slug==='competitive-programming'||slug==='ai-ml')&&<section id="section-roadmap" className="vertical-roadmap-section" aria-label={`${content.category} learning roadmap`}><RoadmapJourney vertical={slug==='ai-ml'?'AI / ML':'CP'}/></section>}
  </div>;
 }

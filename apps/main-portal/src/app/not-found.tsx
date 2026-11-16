@@ -38,7 +38,7 @@ export default function NotFound() {
             browse blog feed
           </Link>
           <Link
-            href="/#verticals"
+            href="/#section-verticals"
             className="rounded-xl border border-rose-200 bg-rose-50 px-5 py-2.5 text-[#F43F5E] hover:bg-rose-100 transition"
           >
             view 8 verticals

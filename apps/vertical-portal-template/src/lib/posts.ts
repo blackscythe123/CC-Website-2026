@@ -14,6 +14,7 @@ export interface PortalPostSummary {
   summary: string;
   coverImage?: string;
   tags: string[];
+  readMinutes: number;
 }
 
 export interface PortalPostDetail extends PortalPostSummary {
@@ -32,16 +33,21 @@ export function normalizeDate(d: unknown): string {
   return String(d).slice(0, 10);
 }
 
+function estimateReadMinutes(markdown: string): number {
+  const words = markdown.split(/s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 200));
+}
+
 const SAFE_SLUG = /^[a-z0-9-]+$/;
 
+/** Visible when the post names no portals, or names this portal (or a wildcard). */
 function isVisibleOnThisPortal(rawTargetPortals: unknown): boolean {
   const targetPortals: string[] = Array.isArray(rawTargetPortals) ? rawTargetPortals : [];
   return (
     targetPortals.length === 0 ||
     targetPortals.includes(portalConfig.portalId) ||
     targetPortals.includes("*") ||
-    targetPortals.includes("all") ||
-    targetPortals.includes("main-portal")
+    targetPortals.includes("all")
   );
 }
 
@@ -74,7 +80,7 @@ export function getPortalPosts(): PortalPostSummary[] {
     if (file.endsWith(".md")) {
       const filePath = path.join(postsDir, file);
       const raw = fs.readFileSync(filePath, "utf8");
-      const { data } = matter(raw);
+      const { data, content } = matter(raw);
       const slug = file.replace(/\.md$/, "");
 
       if (isVisibleOnThisPortal(data.targetPortals)) {
@@ -87,6 +93,7 @@ export function getPortalPosts(): PortalPostSummary[] {
           summary: data.summary || "",
           coverImage: data.coverImage || "",
           tags: Array.isArray(data.tags) ? data.tags : [],
+          readMinutes: estimateReadMinutes(content),
         });
       }
     }
@@ -126,6 +133,7 @@ export async function getPortalPost(slug: string): Promise<PortalPostDetail | nu
     summary: data.summary || "",
     coverImage: data.coverImage || "",
     tags: Array.isArray(data.tags) ? data.tags : [],
+    readMinutes: estimateReadMinutes(content),
     contentHtml: processed.toString(),
   };
 }

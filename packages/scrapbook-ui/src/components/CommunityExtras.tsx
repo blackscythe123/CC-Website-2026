@@ -4,7 +4,7 @@ import gsap from 'gsap';
 import {Trophy,Medal,Star,Code2,ArrowUpRight,ArrowUp,ArrowDown,Search,Bookmark,BookOpen,Play,ExternalLink,X,ChevronRight,GitBranch,BrainCircuit,ChartNoAxesColumnIncreasing,Library,Check,ShieldCheck} from 'lucide-react';
 import SectionHeadingText from './SectionHeadingText';
 import OptimizedDecorImage from './OptimizedDecorImage';
-import type {Blog} from '../data/blogs';
+import type {Blog} from '../blog';
 
 function useReveal(key:string=''){
  const ref=useRef<HTMLElement>(null);
@@ -113,7 +113,7 @@ export function ResourceRoom({vertical,blogs}:{vertical:'CP'|'AI / ML'|'Cybersec
  const key='ssn-demo-resources-'+vertical;const [storageReady,setStorageReady]=useState(false);
  useEffect(()=>{try{const value=JSON.parse(localStorage.getItem(key)||'[]');setSaved(Array.isArray(value)?value.filter(v=>typeof v==='string'):[])}catch{}setStorageReady(true)},[key]);
  useEffect(()=>{if(storageReady)try{localStorage.setItem(key,JSON.stringify(saved))}catch{}},[saved,key,storageReady]);
- const resources:Resource[]=[...blogs.map((blog,i)=>({id:blog.id,title:blog.title,description:blog.excerpt,type:'article' as const,difficulty:(i%2?'Intermediate':'Beginner') as Resource['difficulty'],accent:blog.accent,source:'Club reading room',content:blog.content})),...(vertical==='CP'?[
+ const resources:Resource[]=[...blogs.map((blog,i)=>({id:blog.id,title:blog.title,description:blog.excerpt,type:'article' as const,difficulty:(i%2?'Intermediate':'Beginner') as Resource['difficulty'],accent:blog.accent,source:'Club reading room',url:blog.href,content:blog.content.length?blog.content:undefined})),...(vertical==='CP'?[
  {id:'cp-algorithms',title:'Algorithms, explained',description:'A reference shelf for algorithms, data structures and implementation ideas.',type:'article' as const,difficulty:'Intermediate' as const,accent:'#c9ddbd',source:'CP-Algorithms',url:'https://cp-algorithms.com/'},
  {id:'cpp-reference',title:'Keep your C++ reference handy',description:'Look up standard containers, algorithms and language features while you practise.',type:'article' as const,difficulty:'Intermediate' as const,accent:'#d3c8e5',source:'C++ Reference',url:'https://en.cppreference.com/w/'},
  {id:'cs50',title:'Build your foundations',description:'Explore CS50’s programming lectures and start with the fundamentals.',type:'video' as const,difficulty:'Beginner' as const,accent:'#f1c3d2',source:'CS50',url:'https://www.youtube.com/@cs50'}]:vertical==='Cybersecurity'?[

@@ -1,2 +1,4 @@
+import {postsToBlogs} from '@coding-club/scrapbook-ui';
 import ScrollHome from '../components/ScrollHome';
-export default function Home(){return <ScrollHome/>;}
+import {getAllPosts} from '../lib/posts';
+export default function Home(){return <ScrollHome blogs={postsToBlogs(getAllPosts(),post=>`/blog/${post.vertical}/${post.slug}`)}/>;}

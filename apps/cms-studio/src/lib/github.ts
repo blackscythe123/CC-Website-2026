@@ -1,5 +1,6 @@
 import { Octokit } from "@octokit/rest";
 import matter from "gray-matter";
+import { parsePlacement, placementErrors, validateTrack, type Track } from "@coding-club/content-schema/tracks";
 
 const REPO_OWNER = "blackscythe123";
 const REPO_NAME = "CC-Website-2026";
@@ -174,6 +175,8 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
   // Revisions must keep editing the PR's one existing article file (no second .md, no type crossover),
   // and must preserve the original author's byline.
   let preservedAuthor: { author?: unknown; authorUsername?: unknown; authorAvatar?: unknown; date?: unknown } | null = null;
+  // A learning-track placement isn't edited by this form yet; carry it over so a revision never drops it.
+  let preservedPlacement: unknown = undefined;
   if (pullNumber) {
     const prFiles = await octokit.paginate(octokit.pulls.listFiles, {
       owner: REPO_OWNER,
@@ -203,6 +206,7 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
       if (!Array.isArray(existing) && "content" in existing && typeof existing.content === "string") {
         const fm = matter(Buffer.from(existing.content, "base64").toString("utf-8")).data;
         preservedAuthor = { author: fm.author, authorUsername: fm.authorUsername, authorAvatar: fm.authorAvatar, date: fm.date };
+        preservedPlacement = fm.placement;
       }
     } catch {
       // fall through: treated as the author's own first write
@@ -309,6 +313,7 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     vertical,
     ...(processedCoverImage ? { coverImage: processedCoverImage } : {}),
     tags: tags && tags.length > 0 ? tags : [vertical],
+    ...(vertical !== "club" && parsePlacement(preservedPlacement) ? { placement: parsePlacement(preservedPlacement) } : {}),
   };
 
   const fileContent = matter.stringify(processedBody, fileData);
@@ -845,16 +850,6 @@ async function checkReviewPreconditions(octokit: Octokit, o: ReviewOptions): Pro
   if (fileCheck.kind === "unpublish" && o.authorRole !== "vertical_head" && o.authorRole !== "superadmin") {
     return fail("Unpublish requests can only come from the Vertical Head or a Superadmin.", 403);
   }
-  if (fileCheck.kind === "unpublish") {
-    const postSlug = fileCheck.articlePath.replace(/^.*\/([a-z0-9-]+)\.md$/, "$1");
-    const usedIn = await findTracksUsingPost(octokit, prData.base.sha, fileCheck.vertical, postSlug);
-    if (usedIn.length > 0) {
-      return fail(
-        `This article is part of the learning track${usedIn.length > 1 ? "s" : ""} ${usedIn.map((t) => `"${t}"`).join(", ")}. Remove it from the track first, then unpublish.`,
-        409
-      );
-    }
-  }
 
   // Editing an article that is already published must be approved as if its ORIGINAL author's work
   // were being changed: a Member can't rewrite a Head's article under Member-level quorum.
@@ -946,6 +941,11 @@ export async function approveAndMergePR(
     if (!check.ok) return { success: false, merged: false, status: check.status, message: check.message };
     const { headSha, headBranch, prAuthor, contributors, decision } = check;
     const cleanReviewer = reviewerUsername.toLowerCase();
+
+    if (check.kind === "publish") {
+      const problem = await placementProblemAtMerge(octokit, check.articlePath, headSha);
+      if (problem) return { success: false, merged: false, status: 409, message: problem };
+    }
 
     // Record the approval pinned to the reviewed commit
     try {
@@ -1471,38 +1471,39 @@ export async function getPersonalDraftBranch(token: string, branchName: string) 
 }
 
 
+
 /**
- * Titles of the tracks (on the given commit) that reference a post in this vertical. Unpublishing such a
- * post would leave the track pointing at nothing, so the unpublish request is refused until it's removed.
+ * A blog being merged may say where it sits in a learning track (frontmatter `placement`). Re-check it
+ * against the track on CURRENT main (not the PR's recorded base), so a topic removed after the PR was
+ * opened can't leave a dangling placement. Returns a reason to refuse, or null.
  */
-export async function findTracksUsingPost(octokit: Octokit, ref: string, vertical: string, postSlug: string): Promise<string[]> {
-  if (vertical === "club") return [];
-  let listing: unknown;
+export async function placementProblemAtMerge(octokit: Octokit, articlePath: string, headSha: string): Promise<string | null> {
+  const { data: file } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path: articlePath, ref: headSha });
+  if (Array.isArray(file) || !("content" in file) || typeof file.content !== "string") return null;
+  const raw = matter(Buffer.from(file.content, "base64").toString("utf-8")).data.placement;
+  if (raw === undefined) return null;
+  const vertical = articlePath.match(/^content\/verticals\/([^/]+)\/posts\//)?.[1];
+  if (!vertical) return "Only vertical blogs can be placed in a learning track. Remove the placement.";
+  const placement = parsePlacement(raw);
+  if (!placement) return "This blog's placement is malformed. Edit the blog and pick its place again (or none).";
+  let track: unknown = null;
   try {
-    ({ data: listing } = await octokit.repos.getContent({
+    const { data: tf } = await octokit.repos.getContent({
       owner: REPO_OWNER,
       repo: REPO_NAME,
-      path: `content/verticals/${vertical}/tracks`,
-      ref,
-    }));
-  } catch (err) {
-    if ((err as { status?: number }).status === 404) return [];
-    throw err;
-  }
-  if (!Array.isArray(listing)) return [];
-  const found: string[] = [];
-  for (const entry of listing as { name: string; path: string; type: string }[]) {
-    if (entry.type !== "file" || !entry.name.endsWith(".json")) continue;
-    const { data: file } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path: entry.path, ref });
-    if (Array.isArray(file) || !("content" in file) || typeof file.content !== "string") continue;
-    let track: { title?: string; topics?: { items?: { type: string; slug?: string }[]; subtopics?: { items?: { type: string; slug?: string }[] }[] }[] };
-    try {
-      track = JSON.parse(Buffer.from(file.content, "base64").toString("utf8"));
-    } catch {
-      continue;
+      path: `content/verticals/${vertical}/tracks/${placement.track}.json`,
+      ref: MAIN_BRANCH,
+    });
+    if (!Array.isArray(tf) && "content" in tf && typeof tf.content === "string") {
+      const parsed = validateTrack(JSON.parse(Buffer.from(tf.content, "base64").toString("utf-8")), { vertical });
+      track = parsed.track;
     }
-    const items = (track.topics || []).flatMap((t) => [...(t.items || []), ...(t.subtopics || []).flatMap((s) => s.items || [])]);
-    if (items.some((i) => i.type === "post" && i.slug === postSlug)) found.push(track.title || entry.name.slice(0, -5));
+  } catch (err) {
+    const status = (err as { status?: number }).status;
+    if (status !== 404 && !(err instanceof SyntaxError)) throw err;
   }
-  return found;
+  const problems = placementErrors(placement, { vertical, tracks: track ? { [placement.track]: track as Track } : {} });
+  if (problems.length === 0) return null;
+  const where = [placement.track, placement.topic, placement.subtopic].filter(Boolean).join(" › ");
+  return `This blog is placed under "${where}", which doesn't exist on main any more. Edit the blog and pick another place (or none).`;
 }

@@ -167,6 +167,7 @@ export async function POST(request: NextRequest) {
       articleAuthorUsername,
       expectedHeadSha,
       articleTitle,
+      roleOf: (login: string) => roleInVertical(getUserRoleInfo(login, allRoles), actualVertical),
     };
 
     if (action === "reject") {

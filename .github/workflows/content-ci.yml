@@ -114,6 +114,9 @@ jobs:
     needs: detect-changed-apps
     if: needs.detect-changed-apps.outputs.apps != '[]' && needs.detect-changed-apps.outputs.apps != ''
     runs-on: ubuntu-latest
+    # VERCEL_TOKEN lives in this environment, which only `main` may deploy to, so a workflow pushed on
+    # any other branch (every role holder has push access) can never read it.
+    environment: vercel-production
     strategy:
       fail-fast: false
       matrix:

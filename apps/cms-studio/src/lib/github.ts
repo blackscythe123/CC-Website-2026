@@ -181,6 +181,9 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
       pull_number: pullNumber,
       per_page: 100,
     });
+    const { data: prMeta } = await octokit.pulls.get({ owner: REPO_OWNER, repo: REPO_NAME, pull_number: pullNumber });
+    const listingError = assertCompletePRListing(prMeta, prFiles.length);
+    if (listingError) throw new Error(listingError);
     const check = validateArticlePRFiles(prFiles);
     if (!check.ok || check.kind !== "publish") {
       throw new Error(check.ok ? "This pull request is not an article submission." : check.error);
@@ -203,6 +206,20 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
       }
     } catch {
       // fall through: treated as the author's own first write
+    }
+  }
+
+  if (!pullNumber) {
+    // A new submission must not replace someone's published article (that would be an edit approved
+    // under the submitter's quorum). Published articles are changed only by reviewed edit/unpublish PRs.
+    try {
+      await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path: filePath, ref: MAIN_BRANCH });
+      throw Object.assign(
+        new Error(`An article called "${cleanSlug}" is already published in ${vertical}. Give your article a different title.`),
+        { status: 409 }
+      );
+    } catch (err) {
+      if ((err as { status?: number }).status !== 404) throw err;
     }
   }
 
@@ -539,8 +556,35 @@ const ARTICLE_PATH_RE = /^content\/(?:verticals\/([a-z0-9-]+)|(club))\/posts\/([
 const UPLOAD_PATH_RE = /^apps\/main-portal\/public\/uploads\/[A-Za-z0-9_-][A-Za-z0-9._-]*\.(?:png|jpe?g|webp|gif)$/;
 const EDITORIAL_VERTICALS = new Set(ALLOWED_VERTICALS);
 
+/** A CMS PR is one article plus a handful of images; anything bigger is refused outright. */
+export const MAX_EDITORIAL_PR_FILES = 40;
+const MAX_PR_COMMITS = 200;
+
+/**
+ * GitHub's "list PR files" stops at 3,000 entries and "list PR commits" at 250. Validating a truncated
+ * list would let extra files (e.g. roles.json) ride along unseen, so the lists must be complete.
+ */
+export function assertCompletePRListing(
+  pr: { changed_files?: number; commits?: number },
+  filesSeen: number,
+  commitsSeen?: number
+): string | null {
+  if (typeof pr.changed_files !== "number" || pr.changed_files !== filesSeen) {
+    return "This pull request's file list could not be fully verified.";
+  }
+  if (filesSeen > MAX_EDITORIAL_PR_FILES) {
+    return `This pull request changes ${filesSeen} files; CMS articles may change at most ${MAX_EDITORIAL_PR_FILES}.`;
+  }
+  if (commitsSeen !== undefined) {
+    if (typeof pr.commits !== "number" || pr.commits !== commitsSeen || commitsSeen > MAX_PR_COMMITS) {
+      return "This pull request's commit history could not be fully verified.";
+    }
+  }
+  return null;
+}
+
 export type PRFileCheck =
-  | { ok: true; kind: "publish" | "unpublish"; articlePath: string; vertical: string }
+  | { ok: true; kind: "publish" | "unpublish"; articlePath: string; vertical: string; articleStatus?: string }
   | { ok: false; error: string };
 
 type PRFile = string | { filename: string; status?: string };
@@ -580,12 +624,16 @@ export function validateArticlePRFiles(files: PRFile[]): PRFileCheck {
   }
   if (article.status === "removed") {
     if (uploads.length > 0) return { ok: false, error: "An unpublish request may only remove the article." };
-    return { ok: true, kind: "unpublish", articlePath: article.filename, vertical };
+    return { ok: true, kind: "unpublish", articlePath: article.filename, vertical, articleStatus: article.status };
   }
-  return { ok: true, kind: "publish", articlePath: article.filename, vertical };
+  return { ok: true, kind: "publish", articlePath: article.filename, vertical, articleStatus: article.status };
 }
 
 export type EditorialRole = "superadmin" | "vertical_head" | "deputy" | "member" | "none";
+
+export function editorialRank(r: EditorialRole): number {
+  return { none: 0, member: 1, deputy: 2, vertical_head: 3, superadmin: 4 }[r] ?? 0;
+}
 
 /** Role of a user *in a specific vertical*; superadmin applies everywhere. */
 export function roleInVertical(
@@ -726,6 +774,8 @@ export interface ReviewOptions {
   expectedHeadSha: string;
   /** Article title from the frontmatter, used for the squash-merge subject. */
   articleTitle?: string;
+  /** Resolves a user's role in targetVertical (used when an existing article is being edited). */
+  roleOf?: (login: string) => EditorialRole;
 }
 export type ApproveAndMergeOptions = ReviewOptions;
 
@@ -781,6 +831,12 @@ async function checkReviewPreconditions(octokit: Octokit, o: ReviewOptions): Pro
     const login = c.author?.login?.toLowerCase();
     if (login) contributors.add(login);
   }
+  for (const c of commits) {
+    const committer = c.committer?.login?.toLowerCase();
+    if (committer && committer !== "web-flow") contributors.add(committer);
+  }
+  const listingError = assertCompletePRListing(prData, files.length, commits.length);
+  if (listingError) return fail(listingError);
   if (o.articleAuthorUsername) contributors.add(o.articleAuthorUsername.toLowerCase());
   if (contributors.has(o.reviewerUsername.toLowerCase())) {
     return fail("Self-review is forbidden. You authored or edited this article, so you cannot review it.", 403);
@@ -790,7 +846,30 @@ async function checkReviewPreconditions(octokit: Octokit, o: ReviewOptions): Pro
     return fail("Unpublish requests can only come from the Vertical Head or a Superadmin.", 403);
   }
 
-  const decision = evaluateReviewerAuthority(o.reviewerRole as EditorialRole, o.authorRole as EditorialRole);
+  // Editing an article that is already published must be approved as if its ORIGINAL author's work
+  // were being changed: a Member can't rewrite a Head's article under Member-level quorum.
+  let effectiveAuthorRole = o.authorRole as EditorialRole;
+  if (fileCheck.kind === "publish" && fileCheck.articleStatus === "modified") {
+    if (!o.roleOf) return fail("Edits to published articles can't be verified right now.", 503);
+    try {
+      const { data: baseFile } = await octokit.repos.getContent({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        path: fileCheck.articlePath,
+        ref: prData.base.sha,
+      });
+      const raw = !Array.isArray(baseFile) && "content" in baseFile && typeof baseFile.content === "string"
+        ? Buffer.from(baseFile.content, "base64").toString("utf-8")
+        : "";
+      const baseAuthor = String(matter(raw).data.authorUsername || "").toLowerCase();
+      const baseRole = baseAuthor ? o.roleOf(baseAuthor) : "superadmin";
+      if (editorialRank(baseRole) > editorialRank(effectiveAuthorRole)) effectiveAuthorRole = baseRole;
+    } catch {
+      return fail("Couldn't read the published version of this article to check who may approve the edit.");
+    }
+  }
+
+  const decision = evaluateReviewerAuthority(o.reviewerRole as EditorialRole, effectiveAuthorRole);
   if (decision !== "merge" && decision !== "count-deputies") return fail(decision, 403);
 
   return {

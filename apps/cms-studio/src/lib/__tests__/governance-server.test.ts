@@ -197,3 +197,43 @@ describe("assertSafePendingImages", () => {
     expect(() => assertSafePendingImages([{ filename: "big.png", base64: big, placeholderUrl: "blob:x" }])).toThrow(/rejected/);
   });
 });
+
+import { assertCompletePRListing, editorialRank } from "@/lib/github";
+import { getSessionToken, isSameOriginJsonRequest, sealSession } from "@/lib/session";
+import { NextRequest } from "next/server";
+
+describe("assertCompletePRListing", () => {
+  it("refuses truncated or oversized file and commit listings", () => {
+    expect(assertCompletePRListing({ changed_files: 2, commits: 1 }, 2, 1)).toBeNull();
+    expect(assertCompletePRListing({ changed_files: 3001, commits: 1 }, 3000, 1)).not.toBeNull(); // GitHub cut-off
+    expect(assertCompletePRListing({ changed_files: 41, commits: 1 }, 41, 1)).not.toBeNull();
+    expect(assertCompletePRListing({ changed_files: 2, commits: 260 }, 2, 250)).not.toBeNull();
+    expect(assertCompletePRListing({}, 2, 1)).not.toBeNull();
+  });
+  it("ranks roles", () => {
+    expect(editorialRank("vertical_head")).toBeGreaterThan(editorialRank("deputy"));
+  });
+});
+
+describe("CSRF guard for cookie sessions", () => {
+  process.env.SESSION_SECRET = process.env.SESSION_SECRET || "test-secret-for-unit-tests";
+  const cookie = () => `cc_token=${sealSession({ token: "gho_test", login: "u" })}`;
+  const req = (method: string, headers: Record<string, string>) =>
+    new NextRequest("https://studio.example/api/roles", { method, headers: { host: "studio.example", cookie: cookie(), ...headers } });
+
+  it("accepts same-origin JSON writes and plain reads", () => {
+    expect(getSessionToken(req("POST", { origin: "https://studio.example", "content-type": "application/json" }))).toBe("gho_test");
+    expect(getSessionToken(req("GET", {}))).toBe("gho_test");
+  });
+  it("rejects writes from sibling sites, text/plain bodies and missing origin", () => {
+    expect(getSessionToken(req("POST", { origin: "https://ai.codingclub.tech", "content-type": "application/json" }))).toBeNull();
+    expect(getSessionToken(req("POST", { origin: "https://studio.example", "content-type": "text/plain" }))).toBeNull();
+    expect(getSessionToken(req("PATCH", { "content-type": "application/json" }))).toBeNull();
+    expect(getSessionToken(req("DELETE", { "content-type": "application/json", "sec-fetch-site": "same-site" }))).toBeNull();
+  });
+  it("still accepts explicit Bearer tokens (never sent automatically by browsers)", () => {
+    const r = new NextRequest("https://studio.example/api/roles", { method: "POST", headers: { authorization: "Bearer gho_x" } });
+    expect(getSessionToken(r)).toBe("gho_x");
+    expect(isSameOriginJsonRequest(r)).toBe(false);
+  });
+});

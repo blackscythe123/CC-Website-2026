@@ -95,15 +95,48 @@ export function unsealSession(sealed: string): SessionData | null {
   }
 }
 
+function isSafeMethod(method: string): boolean {
+  const m = method.toUpperCase();
+  return m === "GET" || m === "HEAD" || m === "OPTIONS";
+}
+
+/**
+ * CSRF guard for cookie-authenticated writes: the browser-set Origin must be this Studio's own host,
+ * and the body must be declared JSON (a cross-site "simple" text/plain form post can't do that without
+ * a CORS preflight, which we never grant).
+ */
+export function isSameOriginJsonRequest(request: NextRequest): boolean {
+  const contentType = (request.headers.get("content-type") || "").toLowerCase();
+  if (!contentType.startsWith("application/json")) return false;
+
+  const host = (request.headers.get("x-forwarded-host") || request.headers.get("host") || "").toLowerCase();
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      return new URL(origin).host.toLowerCase() === host;
+    } catch {
+      return false;
+    }
+  }
+  // Some browsers omit Origin on same-origin requests; fall back to Fetch Metadata.
+  return request.headers.get("sec-fetch-site") === "same-origin";
+}
+
 /**
  * Extracts and unseals the GitHub token from the request.
  * Supports encrypted HttpOnly cookie or Bearer Authorization header.
  */
 export function getSessionToken(request: NextRequest): string | null {
-  // Check Authorization header first
+  // Check Authorization header first. Browsers never attach it on their own, so it isn't CSRF-able.
   const authHeader = request.headers.get("authorization");
   if (authHeader && authHeader.startsWith("Bearer ")) {
     return authHeader.replace("Bearer ", "").trim();
+  }
+
+  // The cookie IS sent automatically, including from sibling *.codingclub.tech sites (same-site,
+  // SameSite=Lax). So a cookie-authenticated state change must prove it came from the Studio itself.
+  if (!isSafeMethod(request.method) && !isSameOriginJsonRequest(request)) {
+    return null;
   }
 
   // Check HttpOnly cookie

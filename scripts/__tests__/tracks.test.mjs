@@ -131,6 +131,11 @@ test("validate-content: track and placement rules in CI", () => {
     post("zz-ok", "placement:\n  track: zz-test\n  topic: arrays\n  subtopic: videos\n");
     assert.equal(run(tmp).status, 0, run(tmp).out);
 
+    // a blank `placement:` (YAML null) means no placement
+    reset();
+    post("zz-blank", "placement:\n");
+    assert.equal(run(tmp).status, 0, run(tmp).out);
+
     // dangling placement only warns
     reset();
     post("zz-dangling", "placement:\n  track: zz-test\n  topic: graphs\n");

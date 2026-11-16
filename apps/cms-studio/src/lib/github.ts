@@ -1481,7 +1481,7 @@ export async function placementProblemAtMerge(octokit: Octokit, articlePath: str
   const { data: file } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path: articlePath, ref: headSha });
   if (Array.isArray(file) || !("content" in file) || typeof file.content !== "string") return null;
   const raw = matter(Buffer.from(file.content, "base64").toString("utf-8")).data.placement;
-  if (raw === undefined) return null;
+  if (raw === undefined || raw === null) return null; // a blank `placement:` means none
   const vertical = articlePath.match(/^content\/verticals\/([^/]+)\/posts\//)?.[1];
   if (!vertical) return "Only vertical blogs can be placed in a learning track. Remove the placement.";
   const placement = parsePlacement(raw);

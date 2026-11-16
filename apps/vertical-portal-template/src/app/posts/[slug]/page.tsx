@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPortalPosts, getPortalPost } from "@/lib/posts";
+import { getPlacementCrumb } from "@/lib/tracks";
 import portalConfig from "../../../../portal.config.json";
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
@@ -47,6 +48,18 @@ export default async function PostDetailPage({
         <ArrowLeft className="h-3.5 w-3.5" />
         <span>Back to {portalConfig.name}</span>
       </Link>
+
+      {(() => {
+        const crumb = getPlacementCrumb(post.placement);
+        return crumb ? (
+          <p className="font-mono text-xs text-neutral-600 border border-black px-3 py-2">
+            Part of{" "}
+            <Link href={crumb.href} className="font-bold text-black underline underline-offset-4">
+              {crumb.label}
+            </Link>
+          </p>
+        ) : null;
+      })()}
 
       <header className="border-b border-black pb-8 space-y-4">
         <div className="font-mono text-xs text-neutral-500 flex items-center gap-2">

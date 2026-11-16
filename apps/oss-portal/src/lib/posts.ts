@@ -4,6 +4,7 @@ import matter from "gray-matter";
 import { remark } from "remark";
 import html from "remark-html";
 import { extractEmbeds, injectEmbeds } from "@coding-club/content-render";
+import { parsePlacement, type Placement } from "@coding-club/content-schema/tracks";
 import portalConfig from "../../portal.config.json";
 
 export interface PortalPostSummary {
@@ -16,6 +17,8 @@ export interface PortalPostSummary {
   coverImage?: string;
   tags: string[];
   readMinutes: number;
+  /** Where this blog sits in a learning track (frontmatter `placement`), if anywhere. */
+  placement: Placement | null;
 }
 
 export interface PortalPostDetail extends PortalPostSummary {
@@ -95,6 +98,7 @@ export function getPortalPosts(): PortalPostSummary[] {
           coverImage: data.coverImage || "",
           tags: Array.isArray(data.tags) ? data.tags : [],
           readMinutes: estimateReadMinutes(content),
+          placement: parsePlacement(data.placement),
         });
       }
     }
@@ -137,6 +141,7 @@ export async function getPortalPost(slug: string): Promise<PortalPostDetail | nu
     coverImage: data.coverImage || "",
     tags: Array.isArray(data.tags) ? data.tags : [],
     readMinutes: estimateReadMinutes(content),
+    placement: parsePlacement(data.placement),
     contentHtml: injectEmbeds(processed.toString(), embeds),
   };
 }

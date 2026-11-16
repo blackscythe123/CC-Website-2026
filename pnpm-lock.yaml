@@ -20,6 +20,9 @@ importers:
       '@coding-club/content-render':
         specifier: workspace:*
         version: link:../../packages/content-render
+      '@coding-club/content-schema':
+        specifier: workspace:*
+        version: link:../../packages/content-schema
       '@coding-club/scrapbook-ui':
         specifier: workspace:*
         version: link:../../packages/scrapbook-ui
@@ -72,6 +75,9 @@ importers:
       '@coding-club/content-render':
         specifier: workspace:*
         version: link:../../packages/content-render
+      '@coding-club/content-schema':
+        specifier: workspace:*
+        version: link:../../packages/content-schema
       '@coding-club/scrapbook-ui':
         specifier: workspace:*
         version: link:../../packages/scrapbook-ui
@@ -124,6 +130,9 @@ importers:
       '@coding-club/content-render':
         specifier: workspace:*
         version: link:../../packages/content-render
+      '@coding-club/content-schema':
+        specifier: workspace:*
+        version: link:../../packages/content-schema
       '@octokit/rest':
         specifier: ^22.0.1
         version: 22.0.1
@@ -179,6 +188,9 @@ importers:
       '@coding-club/content-render':
         specifier: workspace:*
         version: link:../../packages/content-render
+      '@coding-club/content-schema':
+        specifier: workspace:*
+        version: link:../../packages/content-schema
       '@coding-club/scrapbook-ui':
         specifier: workspace:*
         version: link:../../packages/scrapbook-ui
@@ -231,6 +243,9 @@ importers:
       '@coding-club/content-render':
         specifier: workspace:*
         version: link:../../packages/content-render
+      '@coding-club/content-schema':
+        specifier: workspace:*
+        version: link:../../packages/content-schema
       '@coding-club/scrapbook-ui':
         specifier: workspace:*
         version: link:../../packages/scrapbook-ui
@@ -283,6 +298,9 @@ importers:
       '@coding-club/content-render':
         specifier: workspace:*
         version: link:../../packages/content-render
+      '@coding-club/content-schema':
+        specifier: workspace:*
+        version: link:../../packages/content-schema
       '@coding-club/scrapbook-ui':
         specifier: workspace:*
         version: link:../../packages/scrapbook-ui
@@ -335,6 +353,9 @@ importers:
       '@coding-club/content-render':
         specifier: workspace:*
         version: link:../../packages/content-render
+      '@coding-club/content-schema':
+        specifier: workspace:*
+        version: link:../../packages/content-schema
       '@coding-club/scrapbook-ui':
         specifier: workspace:*
         version: link:../../packages/scrapbook-ui
@@ -448,6 +469,9 @@ importers:
       '@coding-club/content-render':
         specifier: workspace:*
         version: link:../../packages/content-render
+      '@coding-club/content-schema':
+        specifier: workspace:*
+        version: link:../../packages/content-schema
       '@coding-club/scrapbook-ui':
         specifier: workspace:*
         version: link:../../packages/scrapbook-ui
@@ -500,6 +524,9 @@ importers:
       '@coding-club/content-render':
         specifier: workspace:*
         version: link:../../packages/content-render
+      '@coding-club/content-schema':
+        specifier: workspace:*
+        version: link:../../packages/content-schema
       '@coding-club/scrapbook-ui':
         specifier: workspace:*
         version: link:../../packages/scrapbook-ui
@@ -552,6 +579,9 @@ importers:
       '@coding-club/content-render':
         specifier: workspace:*
         version: link:../../packages/content-render
+      '@coding-club/content-schema':
+        specifier: workspace:*
+        version: link:../../packages/content-schema
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3

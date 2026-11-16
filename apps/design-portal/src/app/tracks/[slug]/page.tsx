@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import TrackView from "@coding-club/content-render/track-view";
 import { ArrowLeft } from "lucide-react";
 import portalConfig from "../../../../portal.config.json";
-import { getTrack, getTrackPosts, getTracks } from "@/lib/tracks";
+import { getPlacedPosts, getTrack, getTracks } from "@/lib/tracks";
 
 export const dynamicParams = false;
 
@@ -38,7 +38,7 @@ export default async function TrackPage({ params }: { params: Promise<{ slug: st
         <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-black leading-tight">{track.title}</h1>
         {track.summary ? <p className="text-lg text-neutral-700">{track.summary}</p> : null}
       </header>
-      <TrackView track={track} vertical={portalConfig.verticalSlug} slug={slug} posts={getTrackPosts()} />
+      <TrackView track={track} vertical={portalConfig.verticalSlug} slug={slug} placed={getPlacedPosts(loaded)} />
     </article>
   );
 }

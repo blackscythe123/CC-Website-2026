@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@coding-club/content-render": "workspace:*",
+    "@coding-club/content-schema": "workspace:*",
     "@coding-club/scrapbook-ui": "workspace:*",
     "gray-matter": "^4.0.3",
     "lucide-react": "^1.16.0",

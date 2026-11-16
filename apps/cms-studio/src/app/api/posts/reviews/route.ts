@@ -40,7 +40,13 @@ export async function GET(request: NextRequest) {
       if (!Number.isInteger(n) || n <= 0) {
         return NextResponse.json({ error: "Invalid previewPullNumber." }, { status: 400 });
       }
-      const article = await getPRArticleContent(token, n);
+      const [article, prInfo] = await Promise.all([getPRArticleContent(token, n), getPRDetails(token, n)]);
+      // Only the PR's author and people who can act on that vertical may preview an unpublished draft.
+      const isAuthor = (prInfo.user?.login || "").toLowerCase() === String(userData.login).toLowerCase();
+      const roleHere = roleInfo.role === "superadmin" ? "superadmin" : roleInfo.rolesByVertical?.[article.vertical];
+      if (!isAuthor && roleHere !== "superadmin" && roleHere !== "vertical_head" && roleHere !== "deputy") {
+        return NextResponse.json({ error: "You can't preview drafts for this vertical." }, { status: 403 });
+      }
       return NextResponse.json({ success: true, article });
     }
     const prs = await listPendingReviewPRs(token);

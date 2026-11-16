@@ -6,6 +6,7 @@ import {
   getLiveUserRoleInfo,
   writeRolesAndSyncCodeowners,
   getLiveClubRolesForWrite,
+  cloneRoles,
   getUserRoleInfo,
   canApproveRoleRequest,
   assignRole,
@@ -385,7 +386,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const { roles: liveRolesForWrite, sha: rolesSha } = await getLiveClubRolesForWrite(token);
-    let roles = liveRolesForWrite;
+    let roles = cloneRoles(liveRolesForWrite);
     if (!targetReq) {
       targetReq = roles.pending_requests?.find((r) => r.id === requestId) || null;
     }

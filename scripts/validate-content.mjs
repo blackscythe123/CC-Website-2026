@@ -230,7 +230,15 @@ for (const filePath of allPostFiles) {
     }
 
     // Slug collision check within vertical
-    const verticalKey = data.vertical || "global";
+    const folderMatch = relativePath.match(/^content\/verticals\/([^/]+)\//);
+    const verticalKey = folderMatch ? folderMatch[1] : relativePath.startsWith("content/club/") ? "club" : "global";
+    if (data.vertical && data.vertical !== verticalKey) {
+      hasErrors = true;
+      errors.push({
+        file: relativePath,
+        issue: `Frontmatter vertical '${data.vertical}' does not match its folder '${verticalKey}'.`,
+      });
+    }
     if (!seenSlugsByVertical.has(verticalKey)) {
       seenSlugsByVertical.set(verticalKey, new Set());
     }

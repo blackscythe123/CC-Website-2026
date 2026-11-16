@@ -7,6 +7,7 @@ import {
   deletePublishedPost,
   listAllPublishedPostsFromGitHub,
 } from "@/lib/github";
+import { normalizeContentDate } from "@/lib/github";
 
 import { getSessionToken } from "@/lib/session";
 
@@ -51,11 +52,16 @@ export async function GET(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const liveRoles = await getLiveClubRoles();
+    const liveRoles = await getLiveClubRoles(false, { token });
     const roleInfo = getUserRoleInfo(userData.login, liveRoles);
 
     // 1. Primary Source: Fetch live published posts tree directly from GitHub (Serverless/Vercel Safe)
-    let gitHubPosts = await listAllPublishedPostsFromGitHub(token);
+    let gitHubPosts;
+    try {
+      gitHubPosts = await listAllPublishedPostsFromGitHub(token);
+    } catch {
+      return NextResponse.json({ error: "Couldn't load articles from GitHub right now. Please try again." }, { status: 502 });
+    }
 
     if (gitHubPosts.length > 0) {
       const posts: PublishedPostItem[] = gitHubPosts.map((p) => ({
@@ -93,7 +99,7 @@ export async function GET(request: NextRequest) {
             slug,
             vertical: "club",
             title: data.title || slug,
-            date: data.date ? String(data.date).split("T")[0] : "",
+            date: normalizeContentDate(data.date),
             author: data.author || "SSN Coding Club",
             summary: data.summary || "",
             canDelete: canDeletePost(userData.login, "club", liveRoles),
@@ -118,7 +124,7 @@ export async function GET(request: NextRequest) {
               slug,
               vertical: vert,
               title: data.title || slug,
-              date: data.date ? String(data.date).split("T")[0] : "",
+              date: normalizeContentDate(data.date),
               author: data.author || "Anonymous",
               summary: data.summary || "",
               canDelete: canDeletePost(userData.login, vert, liveRoles),
@@ -162,8 +168,14 @@ export async function DELETE(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const body = await request.json();
-    const { vertical, slug } = body;
+    let body: { vertical?: unknown; slug?: unknown };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+    }
+    const vertical = typeof body.vertical === "string" ? body.vertical : "";
+    const slug = typeof body.slug === "string" ? body.slug : "";
 
     if (!vertical || !slug) {
       return NextResponse.json(
@@ -191,7 +203,7 @@ export async function DELETE(request: NextRequest) {
     // Vertical Head can delete posts ONLY in their vertical.
     // Super Admin can delete posts in ANY vertical.
     // Deputies and Members cannot delete published posts.
-    const isAllowed = canDeletePost(userData.login, vertical, await getLiveClubRoles(true));
+    const isAllowed = canDeletePost(userData.login, vertical, await getLiveClubRoles(true, { token }));
     if (!isAllowed) {
       return NextResponse.json(
         {
@@ -209,6 +221,8 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: result.message,
+      pullNumber: result.pullNumber,
+      prUrl: result.prUrl,
     });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Failed to delete article";

@@ -88,63 +88,97 @@ export function normalizeClubRoles(raw: any): ClubRoles {
   };
 }
 
-export async function getLiveClubRoles(forceFresh = false): Promise<ClubRoles> {
-  const now = Date.now();
-  if (!forceFresh && inMemoryRoles && now - lastRolesFetchTime < CACHE_TTL_MS) {
-    return inMemoryRoles;
-  }
+/** Thrown when the live roles file can't be read and a stale copy must not be used. */
+export class RolesUnavailableError extends Error {
+  status = 503;
+}
+/** Thrown when roles.json changed on main between our read and our write. */
+export class RolesConflictError extends Error {
+  status = 409;
+}
 
-  // 1. Live read through the GitHub Contents API. Unlike raw.githubusercontent.com (CDN-cached
-  //    for ~5 minutes), this returns the current file on main, so role removals apply immediately.
-  //    Uses the server PAT when configured; otherwise an unauthenticated call (60 requests/hour per IP).
-  const contentsUrl =
-    "https://api.github.com/repos/blackscythe123/CC-Website-2026/contents/content/club/roles.json?ref=main";
+const ROLES_CONTENTS_URL =
+  "https://api.github.com/repos/blackscythe123/CC-Website-2026/contents/content/club/roles.json?ref=main";
+
+/**
+ * Live read of roles.json on main via the Contents API, returning the blob sha too.
+ * Auth order: server PAT, then the signed-in user's own token (5,000 req/h), then anonymous
+ * (60 req/h per IP, which is what made the People page show stale roles).
+ */
+async function fetchLiveRoles(userToken?: string): Promise<{ roles: ClubRoles; sha: string } | null> {
   const pat = process.env.GITHUB_ADMIN_TOKEN || process.env.GITHUB_PAT || process.env.GITHUB_TOKEN;
-  const apiAttempts: Record<string, string>[] = [];
-  if (pat) apiAttempts.push({ Authorization: `Bearer ${pat}` });
-  apiAttempts.push({});
-
-  for (const authHeader of apiAttempts) {
+  const tokens = [pat, userToken].filter((t): t is string => Boolean(t));
+  const attempts: Record<string, string>[] = [...new Set(tokens)].map((t) => ({ Authorization: `Bearer ${t}` }));
+  attempts.push({});
+  for (const authHeader of attempts) {
     try {
-      const res = await fetch(contentsUrl, {
+      const res = await fetch(ROLES_CONTENTS_URL, {
         cache: "no-store",
         headers: {
-          Accept: "application/vnd.github.raw+json",
+          Accept: "application/vnd.github+json",
           "X-GitHub-Api-Version": "2022-11-28",
           "User-Agent": "coding-club-cms-studio",
           ...authHeader,
         },
       });
       if (res.ok) {
-        const normalized = normalizeClubRoles(await res.json());
-        setCachedRoles(normalized);
-        return normalized;
+        const data = (await res.json()) as { content?: string; sha?: string };
+        if (typeof data.content === "string" && typeof data.sha === "string") {
+          const parsed = JSON.parse(Buffer.from(data.content, "base64").toString("utf-8"));
+          return { roles: normalizeClubRoles(parsed), sha: data.sha };
+        }
       }
-      console.warn(`GitHub Contents API roles fetch failed (${res.status})${authHeader.Authorization ? " with PAT" : ""}.`);
+      console.warn(`GitHub Contents API roles fetch failed (${res.status})${authHeader.Authorization ? " (authenticated)" : ""}.`);
     } catch (apiErr) {
       console.warn("GitHub Contents API roles fetch errored:", apiErr);
     }
   }
+  return null;
+}
 
-  // 2. Last-resort network fallback: raw CDN copy (may lag main by a few minutes).
+/**
+ * Read roles.json.
+ * - forceFresh: authorization and mutations. Must be the live file; fails closed (503) instead of
+ *   ever falling back to a cached, CDN or build-time copy.
+ * - otherwise: live file when possible, else the last good copy this server read or wrote. The CDN
+ *   copy (can lag ~5 min) is only used when we have nothing better, and never replaces the cache.
+ */
+export async function getLiveClubRoles(forceFresh = false, opts: { token?: string } = {}): Promise<ClubRoles> {
+  const now = Date.now();
+  if (!forceFresh && inMemoryRoles && now - lastRolesFetchTime < CACHE_TTL_MS) {
+    return inMemoryRoles;
+  }
+
+  const live = await fetchLiveRoles(opts.token);
+  if (live) {
+    setCachedRoles(live.roles);
+    return live.roles;
+  }
+  if (forceFresh) {
+    throw new RolesUnavailableError("Couldn't read the latest roles from GitHub. Please try again in a minute.");
+  }
+  if (inMemoryRoles) return inMemoryRoles;
+
   try {
     const rawRes = await fetch(
       "https://raw.githubusercontent.com/blackscythe123/CC-Website-2026/main/content/club/roles.json",
       { cache: "no-store", headers: { "User-Agent": "coding-club-cms-studio" } }
     );
-    if (rawRes.ok) {
-      const normalized = normalizeClubRoles(await rawRes.json());
-      setCachedRoles(normalized);
-      return normalized;
-    }
+    if (rawRes.ok) return normalizeClubRoles(await rawRes.json());
   } catch (rawErr) {
     console.warn("Raw GitHub roles fetch failed:", rawErr);
   }
+  return readRoles();
+}
 
-  // Fallback to local file read
-  const diskRoles = readRoles();
-  setCachedRoles(diskRoles);
-  return diskRoles;
+/** Live roles plus the blob sha they came from, for a read-modify-write that must not clobber others. */
+export async function getLiveClubRolesForWrite(token: string): Promise<{ roles: ClubRoles; sha: string }> {
+  const live = await fetchLiveRoles(token);
+  if (!live) {
+    throw new RolesUnavailableError("Couldn't read the latest roles from GitHub. Please try again in a minute.");
+  }
+  setCachedRoles(live.roles);
+  return live;
 }
 
 export function readRoles(): ClubRoles {
@@ -243,9 +277,10 @@ export function getUserRoleInfo(username: string, rolesOverride?: ClubRoles): Us
 
 export async function getLiveUserRoleInfo(
   username: string,
-  forceFresh = false
+  forceFresh = false,
+  token?: string
 ): Promise<UserRoleInfo> {
-  const roles = await getLiveClubRoles(forceFresh);
+  const roles = await getLiveClubRoles(forceFresh, { token });
   return getUserRoleInfo(username, roles);
 }
 
@@ -496,7 +531,9 @@ export function removeRole(
 export async function writeRolesAndSyncCodeowners(
   roles: ClubRoles,
   githubToken?: string,
-  authorAttestation?: { name: string; email: string; message?: string }
+  authorAttestation?: { name: string; email: string; message?: string },
+  /** Blob sha of roles.json the change was computed from; the write is refused if main moved on. */
+  expectedRolesSha?: string
 ): Promise<void> {
   const rolesJsonContent = JSON.stringify(roles, null, 2);
 
@@ -520,8 +557,11 @@ export async function writeRolesAndSyncCodeowners(
     codeownersContent += `content/verticals/${vertical}/** ${reviewers}\n`;
   }
 
-  // 1. Try local write if filesystem is writable
-  try {
+  const activeToken = process.env.GITHUB_ADMIN_TOKEN || githubToken;
+
+  // 1. Offline/local-only mode: write the files on disk. Skipped when committing to GitHub, so a local
+  //    dev server doesn't leave the working tree dirty with changes that already live on main.
+  if (!activeToken) try {
     const rolesPath = getRolesFilePath();
     const dir = path.dirname(rolesPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -535,8 +575,7 @@ export async function writeRolesAndSyncCodeowners(
     console.warn("Local file write skipped (read-only environment):", err);
   }
 
-  // 2. Commit to GitHub directly using admin token or reviewer session token
-  const activeToken = process.env.GITHUB_ADMIN_TOKEN || githubToken;
+  // 2. Commit to GitHub as one atomic commit (roles.json + CODEOWNERS), refusing to overwrite a newer roles.json.
   if (activeToken) {
     try {
       const octokit = new Octokit({ auth: activeToken });
@@ -564,6 +603,19 @@ export async function writeRolesAndSyncCodeowners(
           commit_sha: latestCommitSha,
         });
         const baseTreeSha = commitData.tree.sha;
+
+        if (expectedRolesSha) {
+          const { data: current } = await octokit.repos.getContent({
+            owner,
+            repo,
+            path: "content/club/roles.json",
+            ref: latestCommitSha,
+          });
+          const currentSha = !Array.isArray(current) && "sha" in current ? current.sha : undefined;
+          if (currentSha !== expectedRolesSha) {
+            throw new RolesConflictError("Roles were changed by someone else just now. Refresh the page and try again.");
+          }
+        }
 
         const { data: newTree } = await octokit.git.createTree({
           owner,
@@ -594,60 +646,26 @@ export async function writeRolesAndSyncCodeowners(
           ...(commitAuthor ? { author: commitAuthor } : {}),
         });
 
-        await octokit.git.updateRef({
-          owner,
-          repo,
-          ref: "heads/main",
-          sha: newCommit.sha,
-        });
+        try {
+          // Not forced: fails if main moved since we read it, instead of overwriting someone else's change.
+          await octokit.git.updateRef({
+            owner,
+            repo,
+            ref: "heads/main",
+            sha: newCommit.sha,
+            force: false,
+          });
+        } catch (refErr) {
+          const status = (refErr as { status?: number }).status;
+          if (status === 422 || status === 409) {
+            throw new RolesConflictError("Roles were changed by someone else just now. Refresh the page and try again.");
+          }
+          throw refErr;
+        }
       } catch (atomicErr) {
-        console.warn("Atomic Git Tree commit failed, falling back to sequential createOrUpdateFileContents:", atomicErr);
-        // Fallback to sequential commits if Git Tree API encounters an error
-        let rolesSha: string | undefined;
-        try {
-          const { data } = await octokit.repos.getContent({
-            owner,
-            repo,
-            path: "content/club/roles.json",
-          });
-          if (!Array.isArray(data) && data.sha) rolesSha = data.sha;
-        } catch {
-          // file doesn't exist yet
-        }
-
-        await octokit.repos.createOrUpdateFileContents({
-          owner,
-          repo,
-          path: "content/club/roles.json",
-          message: commitMessage,
-          content: Buffer.from(rolesJsonContent, "utf-8").toString("base64"),
-          sha: rolesSha,
-          branch: "main",
-          ...(commitAuthor ? { author: commitAuthor } : {}),
-        });
-
-        let codeownersSha: string | undefined;
-        try {
-          const { data } = await octokit.repos.getContent({
-            owner,
-            repo,
-            path: ".github/CODEOWNERS",
-          });
-          if (!Array.isArray(data) && data.sha) codeownersSha = data.sha;
-        } catch {
-          // file doesn't exist yet
-        }
-
-        await octokit.repos.createOrUpdateFileContents({
-          owner,
-          repo,
-          path: ".github/CODEOWNERS",
-          message: "chore(governance): update CODEOWNERS review mapping",
-          content: Buffer.from(codeownersContent, "utf-8").toString("base64"),
-          sha: codeownersSha,
-          branch: "main",
-          ...(commitAuthor ? { author: commitAuthor } : {}),
-        });
+        // Never fall back to file-by-file writes: they can't detect conflicts and can split
+        // roles.json and CODEOWNERS across two commits.
+        throw atomicErr;
       }
     } catch (gitErr) {
       console.error("Error committing roles update to GitHub:", gitErr);

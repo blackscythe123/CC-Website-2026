@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userData = await res.json();
-    const roleInfo = await getLiveUserRoleInfo(userData.login, true);
+    const roleInfo = await getLiveUserRoleInfo(userData.login, false, token);
 
     // Check collaborator permissions on the repository
     let isCollaborator = false;

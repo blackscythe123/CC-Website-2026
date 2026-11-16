@@ -11,13 +11,32 @@ describe("validateArticlePRFiles", () => {
   it("accepts one article plus uploads and derives the vertical from the path", () => {
     expect(
       validateArticlePRFiles(["content/verticals/ai-ml/posts/intro.md", "apps/main-portal/public/uploads/1-a.png"])
-    ).toEqual({ ok: true, articlePath: "content/verticals/ai-ml/posts/intro.md", vertical: "ai-ml" });
+    ).toEqual({ ok: true, kind: "publish", articlePath: "content/verticals/ai-ml/posts/intro.md", vertical: "ai-ml" });
     expect(validateArticlePRFiles(["content/club/posts/news.md"])).toMatchObject({ ok: true, vertical: "club" });
   });
   it("rejects PRs that touch governance, workflows or code", () => {
     for (const extra of ["content/club/roles.json", ".github/workflows/x.yml", "apps/cms-studio/src/lib/roles.ts"]) {
       expect(validateArticlePRFiles(["content/verticals/ai-ml/posts/intro.md", extra]).ok).toBe(false);
     }
+  });
+  it("only accepts newly added raster images as uploads", () => {
+    const art = { filename: "content/verticals/ai-ml/posts/intro.md", status: "added" };
+    for (const bad of ["x.html", "x.svg", "x.js", ".htaccess", "x.png.html"]) {
+      expect(validateArticlePRFiles([art, { filename: `apps/main-portal/public/uploads/${bad}`, status: "added" }]).ok).toBe(false);
+    }
+    expect(validateArticlePRFiles([art, { filename: "apps/main-portal/public/uploads/1-a.webp", status: "added" }]).ok).toBe(true);
+    // replacing or deleting someone else's existing upload is refused
+    expect(validateArticlePRFiles([art, { filename: "apps/main-portal/public/uploads/old.png", status: "modified" }]).ok).toBe(false);
+    expect(validateArticlePRFiles([art, { filename: "apps/main-portal/public/uploads/old.png", status: "removed" }]).ok).toBe(false);
+  });
+  it("recognises an unpublish request: one removed article and nothing else", () => {
+    const removed = { filename: "content/verticals/cybersecurity/posts/old.md", status: "removed" };
+    expect(validateArticlePRFiles([removed])).toMatchObject({ ok: true, kind: "unpublish", vertical: "cybersecurity" });
+    expect(validateArticlePRFiles([removed, { filename: "apps/main-portal/public/uploads/1-a.png", status: "added" }]).ok).toBe(false);
+    expect(validateArticlePRFiles([{ filename: "content/verticals/ai-ml/posts/a.md", status: "renamed" }]).ok).toBe(false);
+  });
+  it("rejects unknown vertical folders", () => {
+    expect(validateArticlePRFiles(["content/verticals/fullstack/posts/a.md"]).ok).toBe(false);
   });
   it("rejects zero or multiple articles", () => {
     expect(validateArticlePRFiles(["apps/main-portal/public/uploads/a.png"]).ok).toBe(false);
@@ -96,5 +115,85 @@ describe("checkRoleChangeAllowed", () => {
     expect(checkRoleChangeAllowed(roles, "headA", "x", "assign", "vertical_head", "ai-ml")).not.toBeNull();
     expect(checkRoleChangeAllowed(roles, "boss", "x", "assign", "vertical_head", "ai-ml")).toBeNull();
     expect(checkRoleChangeAllowed(roles, "boss", "boss", "remove", "superadmin")).toBe("Cannot remove the last Superadmin.");
+  });
+});
+
+import {
+  summarizeReviewsForHead,
+  buildMergeSubject,
+  resolveTargetPortals,
+  normalizeContentDate,
+  assertSafePendingImages,
+} from "@/lib/github";
+
+describe("summarizeReviewsForHead", () => {
+  it("only counts approvals and change requests on the current head commit", () => {
+    const s = summarizeReviewsForHead(
+      [
+        { user: { login: "d1" }, state: "APPROVED", commit_id: "old" },
+        { user: { login: "d2" }, state: "APPROVED", commit_id: "head" },
+        { user: { login: "d3" }, state: "CHANGES_REQUESTED", commit_id: "old", body: "fix typos" },
+      ],
+      "head"
+    );
+    expect(s.approvers).toEqual(["d2"]);
+    expect(s.changesRequested).toBe(false); // feedback was on an older revision
+  });
+  it("uses each reviewer's latest decisive state and ignores comment-only reviews", () => {
+    const s = summarizeReviewsForHead(
+      [
+        { user: { login: "d1" }, state: "APPROVED", commit_id: "head" },
+        { user: { login: "d1" }, state: "COMMENTED", commit_id: "head" },
+        { user: { login: "d2" }, state: "APPROVED", commit_id: "head" },
+        { user: { login: "d2" }, state: "CHANGES_REQUESTED", commit_id: "head", body: "needs sources" },
+      ],
+      "head"
+    );
+    expect(s.approvers).toEqual(["d1"]);
+    expect(s.changesRequested).toBe(true);
+    expect(s.latestFeedback).toBe("needs sources");
+  });
+});
+
+describe("buildMergeSubject", () => {
+  it("builds the subject server-side, ignoring the editable PR title", () => {
+    expect(buildMergeSubject("publish", "ai-ml", "Intro to\nTransformers", "intro", 7)).toBe("feat(ai-ml): Intro to Transformers (#7)");
+    expect(buildMergeSubject("unpublish", "cybersecurity", "", "old-post", 8)).toBe("chore(cybersecurity): unpublish old-post (#8)");
+  });
+  it("caps long titles so the commit check (max 24 words) passes", () => {
+    const subject = buildMergeSubject("publish", "cp", Array(40).fill("word").join(" "), "x", 9);
+    expect(subject.split(/\s+/).length).toBeLessThanOrEqual(24);
+  });
+});
+
+describe("resolveTargetPortals", () => {
+  it("always includes the main portal and the article's own vertical portal", () => {
+    expect(resolveTargetPortals("full-stack", ["main-portal"])).toEqual(["main-portal", "full-stack-portal"]);
+    expect(resolveTargetPortals("open-source", undefined)).toEqual(["main-portal", "oss-portal"]);
+    expect(resolveTargetPortals("club", [])).toEqual(["main-portal"]);
+  });
+  it("drops unknown portal ids", () => {
+    expect(resolveTargetPortals("ai-ml", ["evil-portal", "cp-portal"])).toEqual(["main-portal", "ai-ml-portal", "cp-portal"]);
+  });
+});
+
+describe("normalizeContentDate", () => {
+  it("turns YAML Date objects into YYYY-MM-DD", () => {
+    expect(normalizeContentDate(new Date("2026-10-10T00:00:00Z"))).toBe("2026-10-10");
+    expect(normalizeContentDate("2026-10-10T12:00:00Z")).toBe("2026-10-10");
+    expect(normalizeContentDate(undefined)).toBe("");
+  });
+});
+
+describe("assertSafePendingImages", () => {
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]).toString("base64");
+  it("accepts real images and rejects disguised or oversized files", () => {
+    expect(() => assertSafePendingImages([{ filename: "a.png", base64: png, placeholderUrl: "blob:x" }])).not.toThrow();
+    expect(() => assertSafePendingImages([{ filename: "a.svg", base64: png, placeholderUrl: "blob:x" }])).toThrow(/rejected/);
+    expect(() =>
+      assertSafePendingImages([{ filename: "a.png", base64: Buffer.from("<script>").toString("base64"), placeholderUrl: "blob:x" }])
+    ).toThrow(/rejected/);
+    const big = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(3 * 1024 * 1024)]).toString("base64");
+    expect(() => assertSafePendingImages([{ filename: "big.png", base64: big, placeholderUrl: "blob:x" }])).toThrow(/rejected/);
   });
 });

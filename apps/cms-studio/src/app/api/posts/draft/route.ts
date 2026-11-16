@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const roleInfo = getUserRoleInfo(userData.login, await getLiveClubRoles());
+    const roleInfo = getUserRoleInfo(userData.login, await getLiveClubRoles(true, { token }));
 
     // Strictly enforce repository collaborator permission (Internal Tool)
     const repoRes = await fetch("https://api.github.com/repos/blackscythe123/CC-Website-2026", {
@@ -146,6 +146,19 @@ export async function POST(request: NextRequest) {
         }
         if (prDetails.state !== "open") {
           return NextResponse.json({ error: `PR #${parsedPull} is not open.` }, { status: 400 });
+        }
+        // Revisions may only ever write to a CMS draft branch in this repository, on a PR into main.
+        // (A PR's head can be any branch, including `main` itself via a fork, so never trust it blindly.)
+        if (
+          prDetails.base.ref !== "main" ||
+          prDetails.head.repo?.full_name !== prDetails.base.repo?.full_name ||
+          !/^(?:draft|cms)\/[a-z0-9_-]+\/[a-z0-9-]+$/.test(prDetails.head.ref) ||
+          !prDetails.head.ref.startsWith(`draft/${vertical}/`) && !prDetails.head.ref.startsWith(`cms/${vertical}/`)
+        ) {
+          return NextResponse.json(
+            { error: `PR #${parsedPull} is not a CMS draft for '${vertical}', so it can't be revised here.` },
+            { status: 400 }
+          );
         }
         verifiedPullNumber = parsedPull;
         verifiedBranch = prDetails.head.ref;

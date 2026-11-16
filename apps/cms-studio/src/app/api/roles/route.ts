@@ -9,9 +9,11 @@ import {
   assignRole,
   removeRole,
   checkRoleChangeAllowed,
+  getLiveClubRolesForWrite,
   ALL_VERTICAL_SLUGS,
   GITHUB_USERNAME_REGEX,
 } from "@/lib/roles";
+import type { UserRoleType } from "@/lib/roles";
 import { getSessionToken } from "@/lib/session";
 
 const REPO_OWNER = "blackscythe123";
@@ -37,7 +39,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const roleInfo = await getLiveUserRoleInfo(userData.login);
+    const roleInfo = await getLiveUserRoleInfo(userData.login, false, token);
 
     if (
       roleInfo.role !== "superadmin" &&
@@ -50,7 +52,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const roles = await getLiveClubRoles();
+    const roles = await getLiveClubRoles(false, { token });
 
     // Collect all candidate users
     const candidateMap = new Map<string, { login: string; name?: string; avatar_url?: string; status?: string }>();
@@ -145,10 +147,18 @@ export async function POST(request: NextRequest) {
     }
 
     const userData = await userRes.json();
-    const roleInfo = await getLiveUserRoleInfo(userData.login, true);
-
-    const body = await request.json();
-    const { action, targetUsername, role, vertical } = body;
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+    }
+    const { action, targetUsername, role, vertical } = body as {
+      action?: "assign" | "remove";
+      targetUsername?: string;
+      role?: UserRoleType;
+      vertical?: string;
+    };
 
     if (!action || !["assign", "remove"].includes(action)) {
       return NextResponse.json(
@@ -189,17 +199,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Role Allocation Governance Check (per-vertical authority + target rank), on fresh roles
-    let roles = await getLiveClubRoles(true);
-    const governanceError = checkRoleChangeAllowed(roles, userData.login, cleanUsername, action, role, vertical);
+    // Role Allocation Governance Check (per-vertical authority + target rank), on the LIVE file only.
+    const { roles: liveRoles, sha: rolesSha } = await getLiveClubRolesForWrite(token);
+    const governanceError = checkRoleChangeAllowed(liveRoles, userData.login, cleanUsername, action, role, vertical);
     if (governanceError) {
       return NextResponse.json({ error: governanceError }, { status: 403 });
     }
 
-    if (action === "assign") {
-      roles = assignRole(roles, cleanUsername, role, vertical);
-    } else if (action === "remove") {
-      roles = removeRole(roles, cleanUsername, role, vertical);
+    const isTargetSuperadmin = liveRoles.superadmins.some((u) => u.toLowerCase() === cleanUsername.toLowerCase());
+    if (action === "assign" && role !== "superadmin" && isTargetSuperadmin) {
+      return NextResponse.json(
+        { error: `@${cleanUsername} is a Superadmin, which already covers every vertical. Remove the Superadmin role first if you want to give them a vertical role instead.` },
+        { status: 400 }
+      );
+    }
+
+    const roles =
+      action === "assign"
+        ? assignRole(liveRoles, cleanUsername, role, vertical)
+        : removeRole(liveRoles, cleanUsername, role, vertical);
+    const changed = JSON.stringify(roles) !== JSON.stringify(liveRoles);
+    if (!changed) {
+      return NextResponse.json({
+        success: true,
+        message: action === "assign" ? `@${cleanUsername} already has that role.` : `@${cleanUsername} didn't have that role.`,
+        roles: liveRoles,
+        inviteDispatched: false,
+      });
     }
 
     const reviewerDisplayName = userData.name || userData.login;
@@ -211,17 +237,19 @@ export async function POST(request: NextRequest) {
     }`;
 
     // Serverless-safe commit with GitHub Token to main
-    await writeRolesAndSyncCodeowners(roles, token, {
-      name: reviewerDisplayName,
-      email: reviewerEmail,
-      message: commitMessage,
-    });
+    await writeRolesAndSyncCodeowners(
+      roles,
+      token,
+      { name: reviewerDisplayName, email: reviewerEmail, message: commitMessage },
+      rolesSha
+    );
 
     // Automatically manage repository collaborator access
     const activeAdminToken = process.env.GITHUB_ADMIN_TOKEN || token;
     let inviteDispatched = false;
 
-    if (action === "assign") {
+    const isRepoOwner = cleanUsername.toLowerCase() === REPO_OWNER.toLowerCase();
+    if (action === "assign" && !isRepoOwner) {
       try {
         const adminOctokit = new Octokit({ auth: activeAdminToken });
         await adminOctokit.repos.addCollaborator({
@@ -234,9 +262,12 @@ export async function POST(request: NextRequest) {
       } catch (invErr) {
         console.warn("Could not dispatch repo collaborator invite:", invErr);
       }
-    } else if (action === "remove") {
+    } else if (action === "remove" && !isRepoOwner) {
+      // Only revoke repo access when this removal actually took away the user's last club role.
+      const hadRole = getUserRoleInfo(cleanUsername, liveRoles).verticals.length > 0 || isTargetSuperadmin;
       const remainingInfo = getUserRoleInfo(cleanUsername, roles);
-      if (remainingInfo.role === "member" && remainingInfo.verticals.length === 0) {
+      const stillSuperadmin = roles.superadmins.some((u) => u.toLowerCase() === cleanUsername.toLowerCase());
+      if (hadRole && !stillSuperadmin && remainingInfo.verticals.length === 0) {
         try {
           const adminOctokit = new Octokit({ auth: activeAdminToken });
           await adminOctokit.repos.removeCollaborator({
@@ -260,6 +291,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Failed to update roles";
-    return NextResponse.json({ error: errorMsg }, { status: 500 });
+    const status = (err as { status?: number }).status;
+    return NextResponse.json({ error: errorMsg }, { status: status === 409 || status === 503 ? status : 500 });
   }
 }

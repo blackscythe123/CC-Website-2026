@@ -56,3 +56,11 @@ describe("reviewProgress with head-scoped approvers", () => {
     expect(reviewProgress("member", ["d1"], ["d1", "d2"]).text).toBe("1/2 approvals");
   });
 });
+
+import { MAX_IMAGE_BYTES } from "@/lib/hooks/useArticleDraft";
+describe("image size limits agree", () => {
+  it("the largest image the editor accepts still fits in one submit request", () => {
+    const base64Len = Math.ceil(MAX_IMAGE_BYTES / 3) * 4;
+    expect(imagesTooLarge([{ base64: "A".repeat(base64Len) } as never])).toBe(false);
+  });
+});

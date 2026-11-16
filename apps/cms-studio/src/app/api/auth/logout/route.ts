@@ -11,7 +11,21 @@ export async function GET(request: NextRequest) {
   return response;
 }
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  // A sibling site must not be able to sign Studio users out.
+  const origin = request.headers.get("origin");
+  const host = (request.headers.get("x-forwarded-host") || request.headers.get("host") || "").toLowerCase();
+  let sameOrigin = request.headers.get("sec-fetch-site") === "same-origin";
+  if (origin) {
+    try {
+      sameOrigin = new URL(origin).host.toLowerCase() === host;
+    } catch {
+      sameOrigin = false;
+    }
+  }
+  if (!sameOrigin) {
+    return NextResponse.json({ error: "Cross-site sign-out refused." }, { status: 403 });
+  }
   const response = NextResponse.json({ success: true, message: "Logged out" });
   clearSessionCookie(response);
   return response;

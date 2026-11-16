@@ -29,7 +29,7 @@ export const VERTICAL_PORTAL_MAP = {
 // Content markdown (content/**) is deliberately NOT here: posts are the database.
 const GLOBAL_IGNORE_PATTERNS = [
   /^(README|CLAUDE|AGENTS)\.md$/i,
-  /^apps\/[^/]+\/README\.md$/i,
+  /^apps\/[^/]+\/(README|AGENTS|CLAUDE)\.md$/i,
   /^docs\//,
   /^\.githooks\//,
   /^\.github\//,

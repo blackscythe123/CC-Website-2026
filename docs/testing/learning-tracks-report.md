@@ -87,3 +87,18 @@ Scope from an EGM review (code inventory + design gaps): edit published articles
 | Second of two edits to the same article/track is refused at merge (409); a stale revision is refused (409) | Automated (integration, mutation-checked) |
 
 Test PRs #36–#38 were withdrawn through the new UI and their branches deleted.
+
+## Self-publishing for Heads and Superadmins (2026-11-17)
+
+Owner decision: Superadmins have full access in every vertical and Vertical Heads full control in their own vertical, including publishing their own work. Deputies and Members are unchanged. Earlier rows in this report that say "needs another superadmin" describe the rule at the time they were run.
+
+| Leg | Evidence |
+|---|---|
+| Heads publish anything in their vertical (own, Member's, Deputy's, Superadmin's; articles, edits, unpublish, tracks); Superadmins publish anything anywhere; Deputies/Members never approve their own or co-edited work; Heads have no power in other verticals | Automated (integration + unit; the fake GitHub now enforces main's "1 approving review" rule like the real ruleset) |
+| A self-publish is merged server-side with the publish token only after every Studio check, CI green on the exact sha, and the previewed version; the merge carries `Self-published-by` and a PR comment; a missing token returns 503 | Automated (integration) + reviewed by three EGM passes |
+| Publish waits for CI (not started / running / failed / cancelled each refused); retrying while CI runs adds no approvals | Automated (integration) |
+| Heads withdraw or revise requests in their vertical; the vertical comes from the PR's files, never the branch name | Automated (integration) |
+| Commit checker accepts `Self-published-by` only for superadmin/vertical_head with the reviewer's own address, and enforces the trailer set on feat/chore Studio subjects | Automated (script tests) |
+| Own requests show "you can publish" and "Review & publish"; the preview shows Publish; vertical without tracks shows "Create a track" | Rendered (Playwright Chromium, local CMS); Publish was not clicked (it would change the live site) |
+| GitHub `main` ruleset and branch protection unchanged; Heads keep write access | Confirmed via the GitHub API before and after |
+| Production CMS has `GITHUB_ADMIN_TOKEN` set | Confirmed by name via the Vercel CLI (value not read). That it bypasses the review rule is **inferred** from it being the repo admin's token; the first real self-publish verifies it. |

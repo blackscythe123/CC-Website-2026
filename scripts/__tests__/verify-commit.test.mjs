@@ -179,3 +179,17 @@ test("a self-published CMS merge counts as a CMS merge (subject may name a tool)
   ok(`feat(ai-ml): Apps Made with ChatGPT (#7)${self}`);
   bad(`feat(ai-ml): Apps Made with ChatGPT (#7)${self}\nApproved-by: @sa1 <sa1@users.noreply.github.com> (superadmin)`);
 });
+
+test("CMS trailers are enforced as a set (one Authored-by + one Approved-by or Self-published-by) on feat/chore Studio subjects", () => {
+  const A = "Authored-by: @m1 <m1@users.noreply.github.com>";
+  const P = "Approved-by: @h1 <h1@users.noreply.github.com> (vertical_head)";
+  const S = "Self-published-by: @h1 <h1@users.noreply.github.com> (vertical_head)";
+  ok(`feat(ai-ml): Post (#5)\n\n${A}\n${P}`);
+  ok(`chore(ai-ml): unpublish old-post (#6)\n\n${A}\n${S}`);
+  ok(`chore(ai-ml): remove track ml-basics (#7)\n\n${A}\n${P}`);
+  bad(`feat(ai-ml): Post (#5)\n\n${P}`); // missing Authored-by
+  bad(`feat(ai-ml): Post (#5)\n\n${A}`); // missing approval
+  bad(`feat(ai-ml): Post (#5)\n\n${A}\n${A}\n${P}`); // duplicate Authored-by
+  bad(`feat(ai-ml): Post (#5)\n\n${A}\n${P}\n${S}`); // both kinds
+  bad(`feat(ai-ml): hand-made commit\n\n${A}\n${P}`); // not a Studio merge subject
+});

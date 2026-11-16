@@ -62,7 +62,8 @@ const cmsApprovedRegex = new RegExp(
 const cmsSelfPublishedRegex = new RegExp(
   `^Self-published-by: @(${GH_USER}) <\\1@users\\.noreply\\.github\\.com> \\((superadmin|vertical_head)\\)$`
 );
-const cmsSubjectRegex = /^feat\([a-z0-9-]+\):\s+.+\s\(#\d+\)$/;
+// Studio squash subjects: feat (publish/edit/track), chore (unpublish, remove track) — see buildMergeSubject.
+const cmsSubjectRegex = /^(?:feat|chore)\([a-z0-9-]+\):\s+.+\s\(#\d+\)$/;
 const trailerLikeRegex = /^[A-Za-z][A-Za-z-]*-by:/i;
 const validEmailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
@@ -168,6 +169,12 @@ function checkMessage(rawMsg, { hookMode = false, isMerge = false } = {}) {
 
   // A CMS Studio squash merge carries exactly one Authored-by and exactly one Approved-by OR Self-published-by.
   const isCmsMerge = cmsAuthored === 1 && cmsApproved + cmsSelfPublished === 1 && cmsSubjectRegex.test(firstLine);
+  if (!isCmsMerge && cmsAuthored + cmsApproved + cmsSelfPublished > 0) {
+    fail(
+      "CMS Studio trailers must come as a set: one Authored-by plus exactly one Approved-by or Self-published-by, on a Studio merge subject.",
+      `Message: "${firstLine}"`
+    );
+  }
 
   if (!isCmsMerge && hasSubjectAttribution(firstLine)) {
     fail("Subject line MUST NOT contain AI attribution.", `Message: "${firstLine}"`);

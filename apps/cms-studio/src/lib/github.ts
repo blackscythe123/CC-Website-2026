@@ -1150,7 +1150,9 @@ Superadmins and a vertical's head may publish their own work. Published version:
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Merge failed";
-    return { success: false, merged: false, message: errorMsg };
+    // Keep GitHub's own refusal codes (e.g. 409 head changed, 405 not mergeable) so the UI can say why.
+    const status = (err as { status?: number }).status;
+    return { success: false, merged: false, status: status && status >= 400 && status < 500 ? status : undefined, message: errorMsg };
   }
 }
 

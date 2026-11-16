@@ -75,7 +75,11 @@ export default function ReviewPreviewDrawer({
           Load &amp; revise
         </Link>
       ) : null}
-      {canReview && pr ? (
+      {canReview && pr && isMine ? (
+        <Button size="sm" variant="primary" icon={ShieldCheck} loading={approving} disabled={stale} onClick={onApprove}>
+          Publish
+        </Button>
+      ) : canReview && pr ? (
         <>
           <Button size="sm" onClick={onRequestChanges} disabled={stale}>
             Request changes

@@ -129,14 +129,6 @@ export async function POST(request: NextRequest) {
     // Anti-IDOR: the PR author and the vertical come from GitHub, never from the request
     const prData = await getPRDetails(token, pullNumber);
     const authorUsername = prData.user?.login || "unknown";
-    if (userData.login.toLowerCase() === authorUsername.toLowerCase()) {
-      return NextResponse.json(
-        {
-          error: "Access Denied: Self-review is strictly forbidden. Authors cannot review, approve, or request changes on their own pull requests.",
-        },
-        { status: 403 }
-      );
-    }
 
     // The true vertical comes from the article file location (fail closed: no title/branch fallback)
     let actualVertical: string;
@@ -150,6 +142,19 @@ export async function POST(request: NextRequest) {
     } catch (articleErr) {
       const msg = articleErr instanceof Error ? articleErr.message : "Could not read the article in this PR.";
       return NextResponse.json({ error: `Cannot review this PR: ${msg}` }, { status: 400 });
+    }
+
+    // Only Superadmins (anywhere) and the vertical's Head may publish their own requests.
+    const reviewerRoleHere = roleInVertical(reviewerRoleInfo, actualVertical);
+    if (
+      userData.login.toLowerCase() === authorUsername.toLowerCase() &&
+      reviewerRoleHere !== "superadmin" &&
+      reviewerRoleHere !== "vertical_head"
+    ) {
+      return NextResponse.json(
+        { error: "You can't approve your own request. A Deputy's or Member's work needs someone else's review." },
+        { status: 403 }
+      );
     }
 
     if (!canUserApproveVertical(userData.login, actualVertical, allRoles)) {

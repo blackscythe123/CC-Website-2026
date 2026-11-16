@@ -25,7 +25,7 @@ const edit = (login: string, extra: Record<string, unknown> = {}) =>
   w.submit(login, { vertical: "ai-ml", slug: "existing-ai-post", title: "Existing AI Post (fixed)", body: "Fixed typo.", cover: false, editPublished: true, ...extra });
 
 describe("16. editing a published article", () => {
-  it("opens an edit PR that keeps the byline and date; main is untouched until approved; quorum follows the original author", async () => {
+  it("opens an edit PR that keeps the byline and date; main is untouched until approved; deputies can't approve an edit of the head's article", async () => {
     const before = w.fake.readText("main", AI_POST)!;
     const r = await edit("m1");
     expect(r.status).toBe(200);
@@ -39,9 +39,9 @@ describe("16. editing a published article", () => {
     expect(fm.content).toContain("Fixed typo.");
     expect(w.fake.readText("main", AI_POST)).toBe(before);
 
-    // m1 edited h1's article: Deputies and the Head can't approve it (h1 is the original author); a Superadmin can
-    for (const u of ["d1", "d2", "h1"]) expect((await w.review(u, r.pull, "approve")).status, u).toBe(403);
-    const ok = await w.review("sa1", r.pull, "approve");
+    // m1 edited h1's article: Deputies can't approve it; the vertical's Head (full control) can
+    for (const u of ["d1", "d2", "h2"]) expect((await w.review(u, r.pull, "approve")).status, u).toBe(403);
+    const ok = await w.review("h1", r.pull, "approve");
     expect(ok.json.merged).toBe(true);
     expect(matter(w.fake.readText("main", AI_POST)!).content).toContain("Fixed typo.");
   });
@@ -66,9 +66,9 @@ describe("16. editing a published article", () => {
     expect(fm.authorUsername).toBeUndefined();
     expect(fm.authorAvatar).toBeUndefined();
     expect(String(fm.date)).toMatch(/^2026-01-05/);
-    // unknown original author = treated as the strictest case: only a Superadmin may approve the edit
-    expect((await w.review("h1", r.pull, "approve")).status).toBe(403);
-    expect((await w.review("sa1", r.pull, "approve")).json.merged).toBe(true);
+    // unknown original author = strictest case: Deputies can't approve; the Head or a Superadmin can
+    expect((await w.review("d1", r.pull, "approve")).status).toBe(403);
+    expect((await w.review("h1", r.pull, "approve")).json.merged).toBe(true);
   });
 
   it("keeps the placement unless the edit changes it", async () => {

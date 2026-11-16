@@ -37,8 +37,8 @@ This document serves as the single source of truth for all human developers, ver
 
 | Role | Permissions & Authority | Editorial Quorum Required to Merge Post |
 |---|---|---|
-| **Superadmin** | Global club governance. Full access to write for all wings, publish club-wide announcements, review and merge PRs across all verticals, manage roles in `roles.json` / `CODEOWNERS`. Self-approval is strictly forbidden (another superadmin must review). | Another Superadmin review |
-| **Vertical Head** | Sovereign authority over assigned vertical(s). Authorized to draft, review, request changes, and merge PRs within their specific vertical. Can appoint Deputies and Members in their vertical. Strictly 1 Head per vertical. | Superadmin review |
+| **Superadmin** | Global club governance with full access in every vertical: write for all wings, publish club-wide announcements, review and merge PRs across all verticals (including their own), manage roles in `roles.json` / `CODEOWNERS`. | None — may publish their own work (any Superadmin) |
+| **Vertical Head** | Full authority over assigned vertical(s): draft, edit, unpublish/restore, manage learning tracks, review and merge any PR within their vertical (including their own and a Superadmin's). No authority outside their vertical. Can appoint Deputies and Members in their vertical. Strictly 1 Head per vertical. | None in their own vertical — may publish their own work (or any Superadmin) |
 | **Deputy** | Second-in-command for assigned vertical(s). Authorized to review Member articles and manage assigned vertical content. Can appoint Members in their vertical. | 1 Vertical Head OR 1 Superadmin |
 | **Member** | Technical club member. Can draft articles for their assigned vertical via CMS Studio. Articles are automatically staged onto draft Git branches (`draft/[vertical]/[slug]-[id]`) and submitted as PRs for review. | 2 Deputy approvals OR 1 Vertical Head OR 1 Superadmin |
 
@@ -49,8 +49,9 @@ This document serves as the single source of truth for all human developers, ver
 1. **No Direct Pushes to Main**:
    - CMS Studio creates feature draft branches (`draft/[vertical]/[slug]-[id]`) and opens Pull Requests.
    - Direct merges or direct media uploads to `main` are strictly forbidden for content.
-2. **Strict Anti-Self-Review**:
-   - Authors can NEVER approve or merge their own articles under any role (enforced at API route level and natively blocked by GitHub on `github.com`).
+2. **Anti-Self-Review for Deputies and Members**:
+   - Deputies and Members can NEVER approve or merge work they wrote or edited (enforced at API route level).
+   - Superadmins (everywhere) and a Vertical Head (in their own vertical) have full control and may publish their own work through the Studio's "Publish" button. It still goes through a PR, never a direct push to `main` (owner decision, 2026-11-16).
 3. **Anti-IDOR Verification**:
    - The review and draft APIs never trust client-supplied metadata. The server parses the real PR markdown file, author ownership, and branch ref directly from GitHub before authorizing revisions or approvals.
 4. **Media Deferred Upload & Draft Isolation**:

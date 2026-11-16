@@ -32,6 +32,9 @@ export interface ReviewCardProps {
 }
 
 export default function ReviewCard({ pr, progress, isMine, canReview, hasApproved, approving, previewing, onPreview, onApprove, onRequestChanges, onWithdraw }: ReviewCardProps) {
+  // Superadmins and the vertical's Head may publish their own requests directly.
+  const selfPublish = isMine && canReview;
+  const badge = selfPublish ? { text: "you can publish", tone: "success" as const, title: "Superadmins and the vertical's head can publish their own work" } : progress;
   return (
     <article className="rounded-xl border border-border bg-bg p-4 shadow-card sm:p-5">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
@@ -48,8 +51,8 @@ export default function ReviewCard({ pr, progress, isMine, canReview, hasApprove
           #{pr.number} · @{pr.author} · {timeAgo(pr.createdAt)}
         </span>
         <span className="flex-1" />
-        <Badge tone={progress.tone} icon={progress.tone === "success" ? Check : undefined} title={progress.title}>
-          {progress.text}
+        <Badge tone={badge.tone} icon={badge.tone === "success" ? Check : undefined} title={badge.title}>
+          {badge.text}
         </Badge>
       </div>
 
@@ -104,7 +107,11 @@ export default function ReviewCard({ pr, progress, isMine, canReview, hasApprove
               Load &amp; revise
             </Link>
           ) : null}
-          {canReview ? (
+          {selfPublish ? (
+            <Button size="sm" variant="primary" icon={ShieldCheck} loading={approving} onClick={onApprove}>
+              Publish
+            </Button>
+          ) : canReview ? (
             <>
               <Button size="sm" onClick={onRequestChanges}>
                 Request changes

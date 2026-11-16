@@ -164,38 +164,33 @@ describe("5. head / superadmin / self / contributor rules", () => {
     expect(w.fake.reviewsOf(pull)).toEqual([]);
   });
 
-  it("h1 approving a superadmin's ai-ml article is refused; sa2 can", async () => {
+  it("the vertical's head has full control there: h1 may publish a superadmin's ai-ml article", async () => {
     const { pull } = await w.submit("sa1", { title: "Superadmin Take", slug: "superadmin-take" });
+    expect((await w.review("d1", pull, "approve")).status).toBe(403);
     const r = await w.review("h1", pull, "approve");
-    expect(r.status).toBe(403);
-    expect(w.fake.pull(pull).merged).toBe(false);
-    expect(w.fake.reviewsOf(pull).filter((x) => x.user.login === "h1")).toEqual([]);
-    const ok = await w.review("sa2", pull, "approve");
-    expect(ok.json.merged).toBe(true);
+    expect(r.status).toBe(200);
+    expect(r.json.merged).toBe(true);
     expect(w.fake.readText("main", AI("superadmin-take"))).toBeTruthy();
   });
 
-  it("a head's own ai-ml article needs a superadmin; deputies and other heads cannot merge it", async () => {
+  it("a head publishes their own ai-ml article; deputies and other verticals' heads cannot", async () => {
     const { pull } = await w.submit("h1", { title: "Head Article", slug: "head-article" });
     expect((await w.review("d1", pull, "approve")).status).toBe(403);
     expect((await w.review("h2", pull, "approve")).status).toBe(403);
     expect(w.fake.pull(pull).merged).toBe(false);
-    const ok = await w.review("sa1", pull, "approve");
+    const ok = await w.review("h1", pull, "approve");
     expect(ok.json.merged).toBe(true);
   });
 
-  it("sa2 approves sa1's article -> merged; sa1 approving its own -> 403", async () => {
+  it("a superadmin publishes their own article without anyone else", async () => {
     const { pull } = await w.submit("sa1", { title: "SA Post", slug: "sa-post" });
     const self = await w.review("sa1", pull, "approve", { sha: w.fake.headSha(pull) });
-    expect(self.status).toBe(403);
-    expect(w.fake.reviewsOf(pull)).toEqual([]);
-    const ok = await w.review("sa2", pull, "approve");
-    expect(ok.status).toBe(200);
-    expect(ok.json.merged).toBe(true);
-    expect(w.fake.reviewsOf(pull).map((r) => r.user.login)).toEqual(["sa2"]);
+    expect(self.status).toBe(200);
+    expect(self.json.merged).toBe(true);
+    expect(w.fake.readText("main", AI("sa-post"))).toBeTruthy();
   });
 
-  it("an author can never approve or reject their own article, whatever their role", async () => {
+  it("deputies and members can never approve or reject their own article", async () => {
     const { pull } = await w.submit("d1", { title: "Deputy Post", slug: "deputy-post" });
     for (const action of ["approve", "reject"] as const) {
       const r = await w.review("d1", pull, action, { sha: w.fake.headSha(pull), reason: "x" });
@@ -204,17 +199,13 @@ describe("5. head / superadmin / self / contributor rules", () => {
     expect(w.fake.reviewsOf(pull)).toEqual([]);
   });
 
-  it("a reviewer who pushed a commit to the PR (sa1 revising m1's PR) cannot approve it", async () => {
+  it("a superadmin who revised a member's PR may still publish it (full control); the byline stays the member's", async () => {
     const { pull, branch } = await w.submit("m1");
     const rev = await w.submit("sa1", { pullNumber: pull, existingBranch: branch, body: "Edited by sa1.", cover: false });
     expect(rev.status).toBe(200);
-    // the original author byline is preserved
     expect(matter(w.fake.readText(branch, AI("intro-to-transformers"))!).data.authorUsername).toBe("m1");
-    const self = await w.review("sa1", pull, "approve");
-    expect(self.status).toBe(403);
-    expect(w.fake.reviewsOf(pull)).toEqual([]);
-    expect(w.fake.pull(pull).merged).toBe(false);
-    const ok = await w.review("sa2", pull, "approve");
+    const ok = await w.review("sa1", pull, "approve");
+    expect(ok.status).toBe(200);
     expect(ok.json.merged).toBe(true);
   });
 

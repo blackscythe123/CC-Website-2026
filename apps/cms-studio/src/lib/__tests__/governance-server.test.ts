@@ -50,11 +50,10 @@ describe("evaluateReviewerAuthority (quorum rules)", () => {
   it("superadmin can approve anything", () => {
     expect(evaluateReviewerAuthority("superadmin", "superadmin")).toBe("merge");
   });
-  it("head merges member and deputy articles but not head or superadmin articles", () => {
-    expect(evaluateReviewerAuthority("vertical_head", "member")).toBe("merge");
-    expect(evaluateReviewerAuthority("vertical_head", "deputy")).toBe("merge");
-    expect(evaluateReviewerAuthority("vertical_head", "vertical_head")).not.toMatch(/^(merge|count)/);
-    expect(evaluateReviewerAuthority("vertical_head", "superadmin")).not.toMatch(/^(merge|count)/);
+  it("head has full control in their vertical: merges any author's article", () => {
+    for (const a of ["member", "deputy", "vertical_head", "superadmin", "none"] as const) {
+      expect(evaluateReviewerAuthority("vertical_head", a)).toBe("merge");
+    }
   });
   it("deputies only count toward member articles", () => {
     expect(evaluateReviewerAuthority("deputy", "member")).toBe("count-deputies");

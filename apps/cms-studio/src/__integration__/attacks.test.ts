@@ -89,7 +89,7 @@ describe("9. PRs created outside the CMS that smuggle extra changes are never me
     expect(w.fake.pull(pr.number).merged).toBe(false);
   });
 
-  it("an edit of a published head's article authored by a member needs a superadmin, not deputies", async () => {
+  it("an edit of a published head's article authored by a member needs the head or a superadmin, not deputies", async () => {
     // m1 pushes (outside the CMS) a modification of h1's published article
     const branch = "draft/ai-ml/existing-ai-post-33333";
     w.fake.createBranch(branch);
@@ -97,9 +97,10 @@ describe("9. PRs created outside the CMS that smuggle extra changes are never me
     const pr = w.fake.openPull({ author: "m1", head: branch, title: "feat(ai-ml): edit" });
     const sha = w.fake.headSha(pr.number);
     expect((await w.review("d1", pr.number, "approve", { sha })).status).toBe(403);
-    expect((await w.review("h1", pr.number, "approve", { sha })).status).toBe(403);
+    expect((await w.review("d2", pr.number, "approve", { sha })).status).toBe(403);
+    expect((await w.review("h2", pr.number, "approve", { sha })).status).toBe(403);
     expect(w.fake.pull(pr.number).merged).toBe(false);
-    expect((await w.review("sa1", pr.number, "approve", { sha })).json.merged).toBe(true);
+    expect((await w.review("h1", pr.number, "approve", { sha })).json.merged).toBe(true);
   });
 
   it("a new submission cannot overwrite an already published article", async () => {

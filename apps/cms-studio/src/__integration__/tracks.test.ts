@@ -149,8 +149,14 @@ describe("15. learning-track proposals", () => {
 
     w.fake.push(branch, { [PATH]: JSON.stringify({ ...track([{ id: "basics" }]), topics: [{ id: "basics", title: "b", items: [{ id: "x", type: "link", title: "x", url: "http://evil.example" }] }] }) }, { author: "h1", message: "x" });
     const bad = await w.review("sa1", pull, "approve");
-    expect(bad.status).toBe(400);
+    expect(bad.status).toBe(409);
     expect(w.fake.pull(pull).merged).toBe(false);
+    // the reviewer can still see the problems and send it back
+    const preview = await w.call("sa1", "GET", `/api/posts/reviews?previewPullNumber=${pull}`);
+    expect(preview.json.article).toMatchObject({ kind: "track", track: null });
+    expect(preview.json.article.trackErrors.join(" ")).toMatch(/https link/);
+    const sentBack = await w.review("sa1", pull, "reject", { reason: "Use https links." });
+    expect(sentBack.status).toBe(200);
 
     w.fake.push(branch, { [PATH]: JSON.stringify(track([{ id: "basics" }])), ".github/workflows/x.yml": "on: push" }, { author: "h1", message: "y" });
     const extra = await w.review("sa1", pull, "approve");

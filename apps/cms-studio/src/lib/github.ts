@@ -826,7 +826,7 @@ type ReviewCheck =
 const REVIEWABLE_BRANCH_RE = /^(?:draft|cms|track)\/[a-z0-9_-]+\/[a-z0-9-]+$/;
 
 /** Everything both "approve" and "request changes" must satisfy before touching GitHub. */
-async function checkReviewPreconditions(octokit: Octokit, o: ReviewOptions): Promise<ReviewCheck> {
+async function checkReviewPreconditions(octokit: Octokit, o: ReviewOptions, intent: "approve" | "reject"): Promise<ReviewCheck> {
   const fail = (message: string, status = 400): ReviewCheck => ({ ok: false, status, message });
   const { data: prData } = await octokit.pulls.get({ owner: REPO_OWNER, repo: REPO_NAME, pull_number: o.pullNumber });
 
@@ -885,8 +885,11 @@ async function checkReviewPreconditions(octokit: Octokit, o: ReviewOptions): Pro
       return fail("Learning tracks can only be proposed by the Vertical Head or a Superadmin.", 403);
     }
     // Re-validate the exact commit being approved (collaborators can push to the branch after submit).
-    const problem = await trackProblemAt(octokit, fileCheck.articlePath, fileCheck.vertical, prData.head.sha);
-    if (problem) return fail(problem, 409);
+    // Requesting changes stays possible on a broken track, so the author can be told what to fix.
+    if (intent === "approve") {
+      const problem = await trackProblemAt(octokit, fileCheck.articlePath, fileCheck.vertical, prData.head.sha);
+      if (problem) return fail(problem, 409);
+    }
   }
 
   // Editing an article that is already published must be approved as if its ORIGINAL author's work
@@ -942,7 +945,7 @@ export async function rejectPR(
 ): Promise<{ success: boolean; status?: number; message: string }> {
   const octokit = getOctokit(options.token);
   try {
-    const check = await checkReviewPreconditions(octokit, options);
+    const check = await checkReviewPreconditions(octokit, options, "reject");
     if (!check.ok) return { success: false, status: check.status, message: check.message };
 
     await octokit.pulls.createReview({
@@ -978,7 +981,7 @@ export async function approveAndMergePR(
   const octokit = getOctokit(token);
 
   try {
-    const check = await checkReviewPreconditions(octokit, options);
+    const check = await checkReviewPreconditions(octokit, options, "approve");
     if (!check.ok) return { success: false, merged: false, status: check.status, message: check.message };
     const { headSha, headBranch, prAuthor, contributors, decision } = check;
     const cleanReviewer = reviewerUsername.toLowerCase();
@@ -1687,17 +1690,21 @@ async function getPRTrackContent(
 ) {
   const slug = check.articlePath.replace(/^.*\/([a-z0-9-]+)\.json$/, "$1");
   const head = await readTrackAt(octokit, check.articlePath, prData.head.sha);
-  if (!head || head.json === undefined) throw new Error("This pull request's track file can't be read.");
-  const result = validateTrack(head.json, { vertical: check.vertical, slug, bytes: Buffer.byteLength(head.raw) });
-  if (!result.track) throw new Error(`The track in this pull request has problems: ${result.errors.slice(0, 3).join(" ")}`);
+  if (!head) throw new Error("This pull request's track file can't be read.");
+  const result =
+    head.json === undefined
+      ? { track: null, errors: ["The track file isn't valid JSON."] }
+      : validateTrack(head.json, { vertical: check.vertical, slug, bytes: Buffer.byteLength(head.raw) });
   return {
     kind: "track" as const,
     filePath: check.articlePath,
     vertical: check.vertical,
     slug,
+    /** null when the file at the PR head is invalid; it can then only be sent back (approve re-checks). */
     track: result.track,
-    title: result.track.title,
-    summary: result.track.summary,
+    trackErrors: result.errors,
+    title: result.track?.title || slug,
+    summary: result.track?.summary || "",
     markdownBody: "",
     tags: [] as string[],
     coverImage: "",

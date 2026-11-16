@@ -334,7 +334,7 @@ for (const filePath of allPostFiles) {
   } catch {
     continue; // already reported by the post checks above
   }
-  if (data.placement === undefined) continue;
+  if (data.placement === undefined || data.placement === null) continue; // a blank `placement:` means none
   const m = rel.match(/^content\/verticals\/([^/]+)\/posts\//);
   if (!m) {
     hasErrors = true;

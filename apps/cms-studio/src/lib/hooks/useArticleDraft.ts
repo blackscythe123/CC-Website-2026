@@ -27,7 +27,8 @@ export interface DraftFields {
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 /** Per-image cap: the whole submit/sync payload must stay under the ~4 MB request limit. */
-export const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+// base64 adds ~33%, and the request budget for images is ~3.5 MB (Vercel caps bodies at 4.5 MB).
+export const MAX_IMAGE_BYTES = Math.floor(2.5 * 1024 * 1024);
 const EXT_FOR_MIME: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
 
 /**
@@ -299,8 +300,11 @@ export function useArticleDraft(initialVertical: string, login: string | null | 
     }
   }, []);
 
-  const markSynced = useCallback(() => {
-    reportEditorSynced(fingerprintOf(latest.current));
+  /** Fingerprint of the editor right now; capture it BEFORE a sync request and pass it to markSynced. */
+  const fingerprint = useCallback(() => fingerprintOf(latest.current), []);
+
+  const markSynced = useCallback((sentFingerprint?: string) => {
+    reportEditorSynced(sentFingerprint ?? fingerprintOf(latest.current));
     setSaveState({ kind: "synced", at: new Date() });
   }, []);
 
@@ -358,7 +362,7 @@ export function useArticleDraft(initialVertical: string, login: string | null | 
       throw new Error("Only JPEG, PNG, WebP and GIF images are supported.");
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      throw new Error(`Image is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). The limit is 3 MB per image.`);
+      throw new Error(`Image is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). The limit is 2.5 MB per image.`);
     }
     setUploadingImage(true);
     try {
@@ -388,6 +392,7 @@ export function useArticleDraft(initialVertical: string, login: string | null | 
     saveState,
     saveNow,
     markSynced,
+    fingerprint,
     recovered,
     restoreRecovered,
     discardRecovered,

@@ -71,3 +71,10 @@ test("real repo: scrapbook-ui does not redeploy cms-studio but does redeploy mai
   assert.equal(shouldDeployApp("main-portal", files).build, true);
   assert.ok(DEPLOYABLE_APPS.includes("cms-studio"));
 });
+
+test("content/club/portals.json redeploys every portal (it feeds their link back to the main portal)", async () => {
+  const { DEPLOYABLE_APPS, shouldDeployApp } = await import("../lib/affected-apps.mjs");
+  const hit = DEPLOYABLE_APPS.filter((a) => shouldDeployApp(a, ["content/club/portals.json"]).build);
+  assert.ok(hit.includes("main-portal") && hit.includes("cp-portal") && hit.includes("ssnhacks-portal"));
+  assert.ok(!hit.includes("cms-studio"));
+});

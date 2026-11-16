@@ -242,6 +242,8 @@ export default function AdminEditorPage() {
     setSyncing(true);
     try {
       await editor.saveNow();
+      // Edits typed while the request is in flight are NOT on GitHub; only this snapshot is.
+      const sentFingerprint = editor.fingerprint();
       const res = await fetch("/api/posts/drafts/remote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -257,7 +259,7 @@ export default function AdminEditorPage() {
       });
       const { ok, data } = await readApiJson(res);
       if (!ok) throw new Error(data.error || "Couldn't sync to GitHub");
-      editor.markSynced();
+      editor.markSynced(sentFingerprint);
       toast.success(`Synced to GitHub · ${data.branch}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't sync to GitHub");

@@ -34,7 +34,7 @@ export function normalizeDate(d: unknown): string {
 }
 
 function estimateReadMinutes(markdown: string): number {
-  const words = markdown.split(/s+/).filter(Boolean).length;
+  const words = markdown.split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.round(words / 200));
 }
 

@@ -3,7 +3,8 @@ export type SaveState =
   | { kind: "saving" }
   | { kind: "local"; at: Date }
   | { kind: "synced"; at: Date }
-  | { kind: "restored"; source: string };
+  | { kind: "restored"; source: string }
+  | { kind: "failed" };
 
 function clock(at: Date) {
   return at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -20,6 +21,8 @@ export function saveStatusText(state: SaveState, compact = false): string {
       return compact ? clock(state.at) : `Saved on this device · ${clock(state.at)}`;
     case "synced":
       return compact ? clock(state.at) : `Synced to GitHub · ${clock(state.at)}`;
+    case "failed":
+      return compact ? "Not saved" : "Not saved on this device";
     case "restored":
       return compact ? "Restored" : `Restored from ${state.source}`;
   }

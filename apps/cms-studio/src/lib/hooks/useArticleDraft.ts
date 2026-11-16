@@ -5,9 +5,13 @@ import {
   base64ToBlobUrl,
   clearLocalDraft,
   getLocalDraft,
+  isSignedOutLogin,
+  reportEditorSynced,
+  reportEditorWork,
   saveLocalDraft,
   type PendingDraftImage,
   type StoredDraft,
+  type StoredRevision,
 } from "@/lib/draftStorage";
 import type { SaveState } from "@/lib/saveStatus";
 
@@ -22,7 +26,24 @@ export interface DraftFields {
 }
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+/** Per-image cap: the whole submit/sync payload must stay under the ~4 MB request limit. */
+export const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+const EXT_FOR_MIME: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
+
+/**
+ * Filename stored for an upload: a safe base plus the extension implied by the MIME type, so the
+ * server (which validates by extension) accepts names like "image", "download" or "photo.jfif".
+ */
+export function normalizedImageName(originalName: string, mimeType: string): string {
+  const ext = EXT_FOR_MIME[mimeType] || "png";
+  const stem = originalName.replace(/^.*[\\/]/, "").replace(/\.[^.]*$/, "");
+  const safeBase = stem.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "image";
+  return `${safeBase}.${ext}`;
+}
+
+function fingerprintOf(d: DraftFields) {
+  return `${d.title}\u0000${d.content}\u0000${d.coverImage}\u0000${d.pendingImages.length}`;
+}
 const AUTOSAVE_MS = 2000;
 
 function emptyDraft(vertical: string): DraftFields {
@@ -50,9 +71,10 @@ export function parseArticlePath(filePath: string | null | undefined): { vertica
   return { vertical: m[1] || "club", slug: m[2] };
 }
 
-async function persist(login: string | null, d: DraftFields) {
+/** Resolves false when the browser refused the write (private mode, quota). */
+async function persist(login: string | null, d: DraftFields, revision: StoredRevision | null): Promise<boolean> {
   const cover = d.pendingImages.find((img) => img.placeholderUrl === d.coverImage);
-  await saveLocalDraft(login, {
+  return saveLocalDraft(login, {
     title: d.title,
     content: d.content,
     coverImage: d.coverImage,
@@ -62,6 +84,7 @@ async function persist(login: string | null, d: DraftFields) {
     summary: d.summary,
     tags: d.tags,
     pendingImages: d.pendingImages,
+    revision,
   });
 }
 
@@ -129,6 +152,7 @@ export function useArticleDraft(initialVertical: string, login: string | null | 
   const [recovered, setRecovered] = useState<StoredDraft | null>(null);
   const [storageReadyFor, setStorageReadyFor] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [revisionCtx, setRevisionCtx] = useState<StoredRevision | null>(null);
 
   const storageReady = userLogin !== null && storageReadyFor === userLogin;
   const autosaveAllowed = canAutosave({ login: userLogin, storageReady, recoveryPending: recovered !== null });
@@ -142,6 +166,9 @@ export function useArticleDraft(initialVertical: string, login: string | null | 
   loginRef.current = userLogin;
   const allowedRef = useRef(autosaveAllowed);
   allowedRef.current = autosaveAllowed;
+  const revisionRef = useRef(revisionCtx);
+  revisionRef.current = revisionCtx;
+  const everHadContent = useRef(false);
 
   const set = useCallback(<K extends keyof DraftFields>(key: K, value: DraftFields[K]) => {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -171,14 +198,33 @@ export function useArticleDraft(initialVertical: string, login: string | null | 
     }
     if (!dirty.current || !allowedRef.current || !hasAnyContent(latest.current)) return;
     dirty.current = false;
-    persist(loginRef.current, latest.current).catch(() => {
-      dirty.current = true;
-    });
+    persist(loginRef.current, latest.current, revisionRef.current)
+      .then((ok) => {
+        if (!ok) dirty.current = true;
+      })
+      .catch(() => {
+        dirty.current = true;
+      });
   }, []);
 
   // Debounced autosave to IndexedDB (suspended while a recovery offer is pending).
   useEffect(() => {
-    if (!hasAnyContent(draft)) return;
+    reportEditorWork(hasAnyContent(draft), fingerprintOf(draft));
+    if (!hasAnyContent(draft)) {
+      // The user emptied the editor after content had been saved: a stale snapshot must not be offered back later.
+      if (everHadContent.current && autosaveAllowed) {
+        everHadContent.current = false;
+        dirty.current = false;
+        if (timer.current) {
+          clearTimeout(timer.current);
+          timer.current = null;
+        }
+        void clearLocalDraft(loginRef.current);
+        setSaveState({ kind: "idle" });
+      }
+      return;
+    }
+    everHadContent.current = true;
     dirty.current = true;
     if (!autosaveAllowed) return; // written once storage is ready and the user picks Restore / Discard
     const quiet = keepStatusOnNextSave.current;
@@ -189,11 +235,16 @@ export function useArticleDraft(initialVertical: string, login: string | null | 
       timer.current = null;
       dirty.current = false;
       try {
-        await persist(loginRef.current, latest.current);
-        if (!quiet) setSaveState({ kind: "local", at: new Date() });
+        const ok = await persist(loginRef.current, latest.current, revisionRef.current);
+        if (ok) {
+          if (!quiet) setSaveState({ kind: "local", at: new Date() });
+        } else {
+          dirty.current = true;
+          setSaveState({ kind: "failed" });
+        }
       } catch {
         dirty.current = true;
-        setSaveState({ kind: "idle" });
+        setSaveState({ kind: "failed" });
       }
     }, AUTOSAVE_MS);
     return () => {
@@ -201,7 +252,7 @@ export function useArticleDraft(initialVertical: string, login: string | null | 
       if (timer.current) clearTimeout(timer.current);
       timer.current = null;
     };
-  }, [draft, autosaveAllowed]);
+  }, [draft, autosaveAllowed, revisionCtx]);
 
   // Flush pending edits on in-app navigation (unmount), tab hide and page unload.
   useEffect(() => {
@@ -221,6 +272,8 @@ export function useArticleDraft(initialVertical: string, login: string | null | 
   // Warn before leaving with work in the editor.
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      // After sign-out the draft is gone and autosave is blocked: never trap the user on the page.
+      if (isSignedOutLogin(loginRef.current)) return;
       if (hasAnyContent(latest.current)) {
         e.preventDefault();
         e.returnValue = "";
@@ -238,11 +291,18 @@ export function useArticleDraft(initialVertical: string, login: string | null | 
     }
     if (!allowedRef.current) return; // never overwrite a pending recovery offer
     dirty.current = false;
-    await persist(loginRef.current, latest.current);
-    setSaveState({ kind: "local", at: new Date() });
+    const ok = await persist(loginRef.current, latest.current, revisionRef.current);
+    if (ok) setSaveState({ kind: "local", at: new Date() });
+    else {
+      dirty.current = true;
+      setSaveState({ kind: "failed" });
+    }
   }, []);
 
-  const markSynced = useCallback(() => setSaveState({ kind: "synced", at: new Date() }), []);
+  const markSynced = useCallback(() => {
+    reportEditorSynced(fingerprintOf(latest.current));
+    setSaveState({ kind: "synced", at: new Date() });
+  }, []);
 
   const restoreRecovered = useCallback(() => {
     if (!recovered) return;
@@ -278,6 +338,8 @@ export function useArticleDraft(initialVertical: string, login: string | null | 
     }
     dirty.current = false;
     await clearLocalDraft(loginRef.current);
+    everHadContent.current = false;
+    setRevisionCtx(null);
     setDraft((d) => emptyDraft(d.selectedVertical));
     setSaveState({ kind: "idle" });
     setRecovered(null);
@@ -296,7 +358,7 @@ export function useArticleDraft(initialVertical: string, login: string | null | 
       throw new Error("Only JPEG, PNG, WebP and GIF images are supported.");
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      throw new Error(`Image is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). The limit is 5 MB.`);
+      throw new Error(`Image is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). The limit is 3 MB per image.`);
     }
     setUploadingImage(true);
     try {
@@ -304,7 +366,7 @@ export function useArticleDraft(initialVertical: string, login: string | null | 
       const placeholderUrl = URL.createObjectURL(file);
       setDraft((d) => ({
         ...d,
-        pendingImages: [...d.pendingImages, { filename: file.name, base64, mimeType: file.type || "image/png", placeholderUrl }],
+        pendingImages: [...d.pendingImages, { filename: normalizedImageName(file.name, file.type), base64, mimeType: file.type || "image/png", placeholderUrl }],
       }));
       return placeholderUrl;
     } catch {
@@ -332,6 +394,10 @@ export function useArticleDraft(initialVertical: string, login: string | null | 
     hasContent: hasAnyContent(draft),
     reset,
     loadFrom,
+    /** Tell the draft which open PR it revises, so a later Restore doesn't open a second PR. */
+    setRevisionContext: setRevisionCtx,
+    /** Add images (e.g. cloud-draft images) that Submit must upload. */
+    addPendingImages: (imgs: PendingDraftImage[]) => setDraft((d) => ({ ...d, pendingImages: [...d.pendingImages, ...imgs] })),
     addImage,
     uploadingImage,
     activeImages,

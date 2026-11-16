@@ -86,7 +86,10 @@ export default function ArticlesPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Couldn't unpublish the article");
-      toast.success(data.message || `Unpublished “${unpublishing.title}”`);
+      const prLink = typeof data.prUrl === "string" && data.prUrl ? ` ${data.prUrl}` : "";
+      toast.success(
+        `${data.message || `Unpublish request opened for “${unpublishing.title}”`}${data.pullNumber ? ` (PR #${data.pullNumber})` : ""}${prLink}`
+      );
       setUnpublishing(null);
       await load();
     } catch (err) {
@@ -169,19 +172,19 @@ export default function ArticlesPage() {
 
       <ConfirmDialog
         open={Boolean(unpublishing)}
-        title="Unpublish this article?"
+        title="Request to unpublish this article?"
         loading={deleting}
-        confirmLabel="Unpublish"
+        confirmLabel="Open unpublish request"
         onConfirm={unpublish}
         onCancel={() => setUnpublishing(null)}
         message={
           unpublishing ? (
             <>
               <p>
-                <strong className="text-text">“{unpublishing.title}”</strong> will be removed from {unpublishing.vertical === "club" ? "club announcements" : unpublishing.vertical}.
+                <strong className="text-text">“{unpublishing.title}”</strong> will be requested for removal from {unpublishing.vertical === "club" ? "club announcements" : unpublishing.vertical}.
               </p>
               <p className="rounded-lg bg-warning-bg p-3 text-warning">
-                This commits a deletion straight to <code className="font-mono">main</code> under your GitHub account (@{user.login}). It can be restored from Git history.
+                This opens an unpublish pull request under your GitHub account (@{user.login}) that needs approval before the article is removed. It stays live until that request is merged.
               </p>
             </>
           ) : null

@@ -21,6 +21,16 @@ export interface PendingDraftImage {
   placeholderUrl: string;
 }
 
+/** The open pull request a draft is a revision of, so Restore doesn't make a second PR. */
+export interface StoredRevision {
+  number: number;
+  branch: string;
+  title: string;
+  filePath: string | null;
+  slug: string | null;
+  vertical: string | null;
+}
+
 export interface StoredDraft {
   title: string;
   content: string;
@@ -31,6 +41,8 @@ export interface StoredDraft {
   summary: string;
   tags: string[];
   pendingImages: PendingDraftImage[];
+  /** Set while the draft is a revision of an open PR; re-verified against GitHub on Restore. */
+  revision?: StoredRevision | null;
   updatedAt: number;
 }
 
@@ -75,23 +87,39 @@ function usableLogin(login: string | null | undefined): login is string {
   return typeof login === "string" && login.trim().length > 0;
 }
 
-export async function saveLocalDraft(login: string | null | undefined, draft: Omit<StoredDraft, "updatedAt">): Promise<void> {
-  if (!usableLogin(login) || signedOutLogins.has(draftKeyFor(login))) return;
+/**
+ * Writes this user's draft. Resolves true when it is stored (or when there is nothing to write
+ * because nobody is signed in / the user just signed out), false when storage failed
+ * (private mode, quota, blocked IndexedDB) so the UI can say "Not saved on this device".
+ */
+export async function saveLocalDraft(login: string | null | undefined, draft: Omit<StoredDraft, "updatedAt">): Promise<boolean> {
+  if (!usableLogin(login) || signedOutLogins.has(draftKeyFor(login))) return true;
   try {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, "readwrite");
-      const store = tx.objectStore(STORE_NAME);
-      const dataToSave: StoredDraft = {
-        ...draft,
-        updatedAt: Date.now(),
-      };
-      const req = store.put(dataToSave, draftKeyFor(login));
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+    return await new Promise<boolean>((resolve) => {
+      try {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const hasTxEvents = "oncomplete" in tx; // real IDBTransaction; minimal fakes lack it
+        const store = tx.objectStore(STORE_NAME);
+        const dataToSave: StoredDraft = {
+          ...draft,
+          updatedAt: Date.now(),
+        };
+        const req = store.put(dataToSave, draftKeyFor(login));
+        req.onerror = () => resolve(false);
+        tx.onerror = () => resolve(false);
+        tx.onabort = () => resolve(false);
+        // Only report success once the transaction has committed.
+        tx.oncomplete = () => resolve(true);
+        if (!hasTxEvents) req.onsuccess = () => resolve(true);
+      } catch (err) {
+        console.warn("Failed to save draft to IndexedDB:", err);
+        resolve(false);
+      }
     });
   } catch (err) {
     console.warn("Failed to save draft to IndexedDB:", err);
+    return false;
   }
 }
 
@@ -165,4 +193,44 @@ export async function clearLocalDraftOnSignOut(login: string | null | undefined)
   if (!usableLogin(login)) return;
   signedOutLogins.add(draftKeyFor(login));
   await clearLocalDraft(login);
+}
+
+/** True once this user has signed out on this page (autosave is blocked; unload guards must not nag). */
+export function isSignedOutLogin(login: string | null | undefined): boolean {
+  return usableLogin(login) && signedOutLogins.has(draftKeyFor(login));
+}
+
+// What the editor currently holds, so sign-out can warn before discarding unsynced work.
+const editorWork = { tracked: false, hasContent: false, fingerprint: "", syncedFingerprint: null as string | null };
+
+/** Called by the editor on every change. */
+export function reportEditorWork(hasContent: boolean, fingerprint: string): void {
+  editorWork.tracked = true;
+  editorWork.hasContent = hasContent;
+  editorWork.fingerprint = fingerprint;
+}
+
+/** Called after a successful sync to GitHub of the content with this fingerprint. */
+export function reportEditorSynced(fingerprint: string): void {
+  editorWork.syncedFingerprint = fingerprint;
+}
+
+/**
+ * Whether signing out would discard work that isn't on GitHub. Uses the live editor when it has
+ * reported in; otherwise falls back to whatever this device has stored for the user.
+ */
+export async function hasUnsyncedWork(login: string | null | undefined): Promise<boolean> {
+  if (editorWork.tracked) {
+    return editorWork.hasContent && editorWork.fingerprint !== editorWork.syncedFingerprint;
+  }
+  const stored = await getLocalDraft(login);
+  return Boolean(stored && (stored.title?.trim() || stored.content?.trim() || stored.pendingImages?.length));
+}
+
+/** Test hook: forget what the editor reported. */
+export function resetEditorWorkForTests(): void {
+  editorWork.tracked = false;
+  editorWork.hasContent = false;
+  editorWork.fingerprint = "";
+  editorWork.syncedFingerprint = null;
 }

@@ -134,3 +134,79 @@ describe("parseArticlePath", () => {
     expect(parseArticlePath("content/verticals/ai-ml/posts/../x.md")).toBeNull();
   });
 });
+
+describe("draftStorage: failures and revision context", () => {
+  beforeEach(installFakeIndexedDB);
+
+  it("saveLocalDraft resolves true on success and keeps the revision context", async () => {
+    const revision = { number: 12, branch: "draft/x/y-1", title: "T", filePath: "content/club/posts/y.md", slug: "y", vertical: "club" };
+    expect(await saveLocalDraft("ivan", { ...fields("Rev"), revision })).toBe(true);
+    expect((await getLocalDraft("ivan"))?.revision).toEqual(revision);
+  });
+
+  it("saveLocalDraft resolves false when IndexedDB is unavailable (private mode)", async () => {
+    (globalThis as unknown as { window: unknown }).window = {}; // no indexedDB
+    expect(await saveLocalDraft("judy", fields("x"))).toBe(false);
+  });
+
+  it("saveLocalDraft resolves false when the put request fails", async () => {
+    const failing = {
+      objectStoreNames: { contains: () => true },
+      transaction: () => ({
+        objectStore: () => ({
+          put: () => {
+            const req: Req = {};
+            queueMicrotask(() => req.onerror?.());
+            return req;
+          },
+        }),
+      }),
+    };
+    (globalThis as unknown as { window: unknown }).window = {
+      indexedDB: {
+        open: () => {
+          const req: Req = {};
+          queueMicrotask(() => {
+            req.result = failing;
+            req.onsuccess?.();
+          });
+          return req;
+        },
+      },
+    };
+    expect(await saveLocalDraft("kim", fields("x"))).toBe(false);
+  });
+
+  it("a signed-out user's skipped autosave is not reported as a failure", async () => {
+    await clearLocalDraftOnSignOut("leo");
+    expect(await saveLocalDraft("leo", fields("late"))).toBe(true);
+    expect(await getLocalDraft("leo")).toBeNull();
+  });
+});
+
+describe("hasUnsyncedWork (sign-out warning)", () => {
+  beforeEach(async () => {
+    installFakeIndexedDB();
+    const m = await import("@/lib/draftStorage");
+    m.resetEditorWorkForTests();
+  });
+
+  it("falls back to the stored draft before the editor has reported", async () => {
+    const m = await import("@/lib/draftStorage");
+    expect(await m.hasUnsyncedWork("mia")).toBe(false);
+    await saveLocalDraft("mia", fields("Something"));
+    expect(await m.hasUnsyncedWork("mia")).toBe(true);
+  });
+
+  it("uses the live editor once it reports: content is unsynced until that exact content is synced", async () => {
+    const m = await import("@/lib/draftStorage");
+    m.reportEditorWork(true, "v1");
+    expect(await m.hasUnsyncedWork("nina")).toBe(true);
+    m.reportEditorSynced("v1");
+    expect(await m.hasUnsyncedWork("nina")).toBe(false);
+    m.reportEditorWork(true, "v2");
+    expect(await m.hasUnsyncedWork("nina")).toBe(true);
+    m.reportEditorWork(false, "");
+    expect(await m.hasUnsyncedWork("nina")).toBe(false);
+  });
+});

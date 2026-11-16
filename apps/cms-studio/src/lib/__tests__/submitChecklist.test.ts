@@ -37,3 +37,21 @@ describe("getSubmitChecklist", () => {
     expect(r.items.find((i) => i.id === "cover")).toMatchObject({ ok: false, level: "optional" });
   });
 });
+
+describe("getSubmitChecklist slug check (matches the server's slug rule)", () => {
+  it("blocks titles that slugify to fewer than two characters", async () => {
+    const { slugFromTitle } = await import("@/lib/submitChecklist");
+    expect(slugFromTitle("C++")).toBe("c");
+    const r = getSubmitChecklist({ ...base, title: "C++" });
+    expect(r.canSubmit).toBe(false);
+    expect(r.blockingReason).toBe("Title needs at least two letters or digits");
+  });
+  it("allows 'C++ tips' and 'Go 1' and a fixed slug when revising", () => {
+    expect(getSubmitChecklist({ ...base, title: "C++ tips" }).canSubmit).toBe(true);
+    expect(getSubmitChecklist({ ...base, title: "Go 1" }).canSubmit).toBe(true);
+    expect(getSubmitChecklist({ ...base, title: "C++", hasFixedSlug: true }).canSubmit).toBe(true);
+  });
+  it("still reports the length message for very short titles", () => {
+    expect(getSubmitChecklist({ ...base, title: "ab" }).blockingReason).toBe("Add a title (at least 3 characters) to submit");
+  });
+});

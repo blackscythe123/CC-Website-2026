@@ -11,3 +11,11 @@ describe("saveStatusText", () => {
   it("restored", () => expect(saveStatusText({ kind: "restored", source: "drafts/a/b" })).toBe("Restored from drafts/a/b"));
   it("compact shows only the time", () => expect(saveStatusText({ kind: "local", at }, true)).toMatch(/^\d{1,2}:31/));
 });
+
+describe("failed save state", () => {
+  it("says the draft was not saved on this device", async () => {
+    const { saveStatusText } = await import("@/lib/saveStatus");
+    expect(saveStatusText({ kind: "failed" })).toBe("Not saved on this device");
+    expect(saveStatusText({ kind: "failed" }, true)).toBe("Not saved");
+  });
+});

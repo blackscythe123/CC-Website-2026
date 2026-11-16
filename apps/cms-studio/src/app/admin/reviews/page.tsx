@@ -5,7 +5,8 @@ import { RefreshCw } from "lucide-react";
 import { useStudio } from "@/components/shell/StudioContext";
 import { useToast } from "@/components/toast/ToastProvider";
 import { approvalTarget } from "@/lib/governance";
-import { authorRoleIn, reviewProgress, type RoleLists } from "@/lib/reviewProgress";
+import { authorRoleIn, reviewProgress } from "@/lib/reviewProgress";
+import { readApiJson } from "@/lib/hooks/apiClient";
 import type { ReviewPr } from "@/lib/hooks/useReviewQueue";
 import { Button, EmptyState, Skeleton, TabPanel, Tabs } from "@/components/ui";
 import { AllCaughtUp, NoDrafts } from "@/components/illustrations";
@@ -15,25 +16,18 @@ import RequestChangesDialog from "@/components/reviews/RequestChangesDialog";
 
 type TabId = "needs" | "changes" | "mine";
 
+const STALE_MESSAGE = "This article changed since you opened it — reopen the preview to review the latest version";
+
 export default function ReviewsPage() {
   const { user, roleInfo, queue } = useStudio();
   const toast = useToast();
   const login = user.login.toLowerCase();
   const isReviewer = roleInfo?.role === "superadmin" || roleInfo?.role === "vertical_head" || roleInfo?.role === "deputy";
 
-  // Reviewers can read the role lists, which tells us each author's role (for the approval progress badge).
-  const [roles, setRoles] = useState<RoleLists | null>(null);
-  useEffect(() => {
-    if (!isReviewer) return;
-    fetch("/api/roles")
-      .then((r) => r.json())
-      .then((d) => d.roles && setRoles(d.roles))
-      .catch(() => {});
-  }, [isReviewer]);
-
-  const canReview = (pr: ReviewPr) =>
-    pr.author.toLowerCase() !== login &&
-    (roleInfo?.role === "superadmin" || ((roleInfo?.role === "vertical_head" || roleInfo?.role === "deputy") && roleInfo.verticals.includes(pr.vertical)));
+  // Role lists (loaded by the queue hook for reviewers) tell us each author's role.
+  const roles = queue.roles;
+  // Same predicate as the inbox / "Needs my review" / sidebar badge: role in the PR's vertical + the author's role.
+  const canReview = (pr: ReviewPr) => queue.canReview(pr);
 
   const lists = useMemo(() => {
     const changes = queue.prs.filter((p) => p.changesRequested && p.author.toLowerCase() !== login);
@@ -66,16 +60,33 @@ export default function ReviewsPage() {
     return reviewProgress(authorRole, pr.approvers, roles ? roles.deputies[pr.vertical] || [] : null);
   };
 
+  /** The head commit the reviewer saw: the open preview's if it is for this PR, else the list item's. */
+  const seenHeadSha = (pr: ReviewPr) => (preview && preview.pullNumber === pr.number && preview.headSha ? preview.headSha : pr.headSha);
+
+  /** 409 = the PR changed since it was opened: say so and reload the queue. */
+  const handleStale = async () => {
+    toast.error(STALE_MESSAGE);
+    setPreview(null);
+    setChangesFor(null);
+    await queue.refresh();
+  };
+
   const approve = async (pr: ReviewPr) => {
+    const expectedHeadSha = seenHeadSha(pr);
+    if (!expectedHeadSha) {
+      toast.error(STALE_MESSAGE);
+      return;
+    }
     setApproving(pr.number);
     try {
       const res = await fetch("/api/posts/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pullNumber: pr.number, action: "approve" }),
+        body: JSON.stringify({ pullNumber: pr.number, action: "approve", expectedHeadSha }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Couldn't approve this post");
+      const { ok, status, data } = await readApiJson(res);
+      if (status === 409) return await handleStale();
+      if (!ok) throw new Error(data.error || "Couldn't approve this post");
       toast.success(data.message || `Approval recorded for PR #${pr.number}`);
       setPreview(null);
       await queue.refresh();
@@ -90,8 +101,8 @@ export default function ReviewsPage() {
     setPreviewing(pr.number);
     try {
       const res = await fetch(`/api/posts/reviews?previewPullNumber=${pr.number}`);
-      const data = await res.json();
-      if (!res.ok || !data.article) throw new Error(data.error || "Couldn't load the article");
+      const { ok, data } = await readApiJson(res);
+      if (!ok || !data.article) throw new Error(data.error || "Couldn't load the article");
       setPreview(data.article);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't load the article");
@@ -102,15 +113,21 @@ export default function ReviewsPage() {
 
   const sendChanges = async (reason: string) => {
     if (!changesFor) return;
+    const expectedHeadSha = seenHeadSha(changesFor);
+    if (!expectedHeadSha) {
+      toast.error(STALE_MESSAGE);
+      return;
+    }
     setSendingChanges(true);
     try {
       const res = await fetch("/api/posts/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pullNumber: changesFor.number, action: "reject", reason }),
+        body: JSON.stringify({ pullNumber: changesFor.number, action: "reject", reason, expectedHeadSha }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Couldn't send the feedback");
+      const { ok, status, data } = await readApiJson(res);
+      if (status === 409) return await handleStale();
+      if (!ok) throw new Error(data.error || "Couldn't send the feedback");
       toast.success(data.message || `Changes requested on PR #${changesFor.number}`);
       setChangesFor(null);
       setPreview(null);
@@ -129,6 +146,8 @@ export default function ReviewsPage() {
   ];
   const current = lists[tab];
   const previewPr = preview ? queue.prs.find((p) => p.number === preview.pullNumber) : undefined;
+  // The queue moved on (new commits) while the preview was open: reviewing it would be reviewing an old version.
+  const previewStale = Boolean(preview?.headSha && previewPr?.headSha && preview.headSha !== previewPr.headSha);
 
   const empty =
     tab === "needs" ? (
@@ -193,6 +212,7 @@ export default function ReviewsPage() {
         canReview={previewPr ? canReview(previewPr) : false}
         isMine={previewPr ? previewPr.author.toLowerCase() === login : false}
         hasApproved={previewPr ? previewPr.approvers.some((a) => a.toLowerCase() === login) : false}
+        stale={previewStale}
         approving={previewPr ? approving === previewPr.number : false}
         onClose={() => setPreview(null)}
         onApprove={() => previewPr && approve(previewPr)}

@@ -101,3 +101,47 @@ describe("published-post listing", () => {
     });
   });
 });
+
+describe("12b. unpublish is blocked while a learning track uses the article", () => {
+  const TRACK = "content/verticals/ai-ml/tracks/ml-basics.json";
+  const track = (slugs: string[]) =>
+    JSON.stringify({
+      title: "ML Basics",
+      summary: "",
+      vertical: "ai-ml",
+      topics: [{ title: "Start", items: slugs.map((s, i) => ({ id: `p${i}`, type: "post", slug: s })) }],
+    });
+
+  it("refuses to merge the unpublish with a clear message, and allows it once the track no longer uses the post", async () => {
+    w.fake.push("main", { [TRACK]: track(["existing-ai-post"]) }, { message: "feat(ai-ml): add track", author: "h1" });
+
+    const r = await w.call("h1", "DELETE", "/api/posts/manage", { vertical: "ai-ml", slug: "existing-ai-post" });
+    expect(r.status).toBe(200);
+    const pull = r.json.pullNumber as number;
+
+    const blocked = await w.review("sa1", pull, "approve");
+    expect(blocked.status).toBe(409);
+    expect(blocked.json.error).toMatch(/learning track "ML Basics"/);
+    expect(w.fake.pull(pull).merged).toBe(false);
+    expect(w.fake.readText("main", POST)).toBeTruthy();
+
+    // the track is edited (post removed) on main; the unpublish can now go through
+    w.fake.push("main", { [TRACK]: track([]) .replace('"items":[]', '"items":[{"id":"l1","type":"link","title":"Docs","url":"https://example.com/"}]') }, { message: "fix(ai-ml): update track", author: "h1" });
+    const ok = await w.review("sa1", pull, "approve");
+    expect(ok.status).toBe(200);
+    expect(ok.json.merged).toBe(true);
+    expect(w.fake.readFile("main", POST)).toBeNull();
+  });
+
+  it("is not affected by tracks in other verticals or tracks that don't use the post", async () => {
+    w.fake.push(
+      "main",
+      { "content/verticals/full-stack/tracks/web.json": track(["existing-ai-post"]).replace(/ai-ml/g, "full-stack") },
+      { message: "feat(full-stack): add track", author: "h2" }
+    );
+    const r = await w.call("h1", "DELETE", "/api/posts/manage", { vertical: "ai-ml", slug: "existing-ai-post" });
+    const ok = await w.review("sa1", r.json.pullNumber, "approve");
+    expect(ok.status).toBe(200);
+    expect(ok.json.merged).toBe(true);
+  });
+});

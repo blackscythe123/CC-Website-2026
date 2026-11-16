@@ -845,6 +845,16 @@ async function checkReviewPreconditions(octokit: Octokit, o: ReviewOptions): Pro
   if (fileCheck.kind === "unpublish" && o.authorRole !== "vertical_head" && o.authorRole !== "superadmin") {
     return fail("Unpublish requests can only come from the Vertical Head or a Superadmin.", 403);
   }
+  if (fileCheck.kind === "unpublish") {
+    const postSlug = fileCheck.articlePath.replace(/^.*\/([a-z0-9-]+)\.md$/, "$1");
+    const usedIn = await findTracksUsingPost(octokit, prData.base.sha, fileCheck.vertical, postSlug);
+    if (usedIn.length > 0) {
+      return fail(
+        `This article is part of the learning track${usedIn.length > 1 ? "s" : ""} ${usedIn.map((t) => `"${t}"`).join(", ")}. Remove it from the track first, then unpublish.`,
+        409
+      );
+    }
+  }
 
   // Editing an article that is already published must be approved as if its ORIGINAL author's work
   // were being changed: a Member can't rewrite a Head's article under Member-level quorum.
@@ -1460,3 +1470,39 @@ export async function getPersonalDraftBranch(token: string, branchName: string) 
   }
 }
 
+
+/**
+ * Titles of the tracks (on the given commit) that reference a post in this vertical. Unpublishing such a
+ * post would leave the track pointing at nothing, so the unpublish request is refused until it's removed.
+ */
+export async function findTracksUsingPost(octokit: Octokit, ref: string, vertical: string, postSlug: string): Promise<string[]> {
+  if (vertical === "club") return [];
+  let listing: unknown;
+  try {
+    ({ data: listing } = await octokit.repos.getContent({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: `content/verticals/${vertical}/tracks`,
+      ref,
+    }));
+  } catch (err) {
+    if ((err as { status?: number }).status === 404) return [];
+    throw err;
+  }
+  if (!Array.isArray(listing)) return [];
+  const found: string[] = [];
+  for (const entry of listing as { name: string; path: string; type: string }[]) {
+    if (entry.type !== "file" || !entry.name.endsWith(".json")) continue;
+    const { data: file } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path: entry.path, ref });
+    if (Array.isArray(file) || !("content" in file) || typeof file.content !== "string") continue;
+    let track: { title?: string; topics?: { items?: { type: string; slug?: string }[]; subtopics?: { items?: { type: string; slug?: string }[] }[] }[] };
+    try {
+      track = JSON.parse(Buffer.from(file.content, "base64").toString("utf8"));
+    } catch {
+      continue;
+    }
+    const items = (track.topics || []).flatMap((t) => [...(t.items || []), ...(t.subtopics || []).flatMap((s) => s.items || [])]);
+    if (items.some((i) => i.type === "post" && i.slug === postSlug)) found.push(track.title || entry.name.slice(0, -5));
+  }
+  return found;
+}

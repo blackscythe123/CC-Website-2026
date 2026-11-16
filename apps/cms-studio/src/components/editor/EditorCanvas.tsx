@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { Bold, Code, Heading2, Heading3, Image as ImageIcon, ImagePlus, Italic, Link2, List, Minus, Quote, UploadCloud, X } from "lucide-react";
+import { Bold, Code, Heading2, Heading3, Image as ImageIcon, ImagePlus, Italic, Link2, List, Minus, Quote, UploadCloud, SquarePlay, X } from "lucide-react";
+import { parseYouTubeUrl } from "@coding-club/content-render";
 import type { UserRoleInfo } from "@/lib/roles";
 import type { UserProfile } from "@/lib/hooks/useStudioSession";
 import { applyCode, applyInline, applyLinePrefix, insertBlock, type EditResult } from "@/lib/markdownEditing";
 import { verticalLabel } from "@/lib/verticals";
-import { Avatar, Badge, Button, IconButton, Spinner } from "@/components/ui";
+import { Avatar, Badge, Button, Dialog, IconButton, Input, Spinner } from "@/components/ui";
 import { roleLabel } from "@/components/shell/AccountMenu";
 
 type Transform = (text: string, start: number, end: number) => EditResult;
@@ -63,6 +64,11 @@ export default function EditorCanvas(props: EditorCanvasProps) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const pendingSelection = useRef<{ start: number; end: number } | null>(null);
   const [coverDragOver, setCoverDragOver] = useState(false);
+  // "Embed video": remember where the caret was, because the dialog takes focus.
+  const [embedOpen, setEmbedOpen] = useState(false);
+  const [embedUrl, setEmbedUrl] = useState("");
+  const [embedError, setEmbedError] = useState("");
+  const embedSelection = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
 
   // Grow the body with its text, and restore the caret / selection after a programmatic edit.
   useEffect(() => {
@@ -104,6 +110,28 @@ export default function EditorCanvas(props: EditorCanvasProps) {
     } catch (err) {
       props.onError(err instanceof Error ? err.message : "Couldn't add that image.");
     }
+  };
+
+  const openEmbed = () => {
+    const el = textareaRef.current;
+    embedSelection.current = el ? { start: el.selectionStart, end: el.selectionEnd } : { start: content.length, end: content.length };
+    setEmbedUrl("");
+    setEmbedError("");
+    setEmbedOpen(true);
+  };
+
+  const confirmEmbed = () => {
+    const url = embedUrl.trim();
+    if (!parseYouTubeUrl(url)) {
+      setEmbedError("That isn't a YouTube video or playlist link.");
+      return;
+    }
+    const { start, end } = embedSelection.current;
+    // The link must be its own paragraph to become a player, so surround it with blank lines.
+    const result = insertBlock(content, start, end, `\n\n${url}\n\n`);
+    pendingSelection.current = { start: result.selectionStart, end: result.selectionEnd };
+    onContentChange(result.text);
+    setEmbedOpen(false);
   };
 
   const setCover = async (file: File) => {
@@ -280,6 +308,17 @@ export default function EditorCanvas(props: EditorCanvasProps) {
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
+          onClick={openEmbed}
+          className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-semibold text-accent transition hover:bg-accent-soft"
+          title="Embed a YouTube video or playlist"
+          aria-label="Embed video"
+        >
+          <SquarePlay className="h-4 w-4" aria-hidden />
+          <span className="hidden sm:inline">Video</span>
+        </button>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => imageInputRef.current?.click()}
           disabled={props.uploadingImage}
           className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-semibold text-accent transition hover:bg-accent-soft disabled:opacity-50"
@@ -326,6 +365,49 @@ export default function EditorCanvas(props: EditorCanvasProps) {
         placeholder="Tell your story… Markdown works. Paste or drop images anywhere."
         className="min-h-[55vh] w-full resize-none overflow-hidden border-none bg-transparent font-mono text-[15px] leading-[1.8] text-text placeholder:text-subtle focus:outline-none focus-visible:outline-none"
       />
+
+      <Dialog
+        open={embedOpen}
+        onClose={() => setEmbedOpen(false)}
+        title="Embed a YouTube video"
+        description="Paste a video or playlist link. It shows as a player in the published article."
+        footer={
+          <>
+            <Button onClick={() => setEmbedOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={confirmEmbed}>
+              Embed
+            </Button>
+          </>
+        }
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            confirmEmbed();
+          }}
+        >
+          <label htmlFor="embed-url" className="sr-only">
+            YouTube link
+          </label>
+          <Input
+            id="embed-url"
+            autoFocus
+            value={embedUrl}
+            onChange={(e) => {
+              setEmbedUrl(e.target.value);
+              setEmbedError("");
+            }}
+            placeholder="https://www.youtube.com/watch?v=…"
+            aria-invalid={embedError ? true : undefined}
+            aria-describedby={embedError ? "embed-url-error" : undefined}
+          />
+          {embedError ? (
+            <p id="embed-url-error" role="alert" className="mt-2 text-sm text-danger">
+              {embedError}
+            </p>
+          ) : null}
+        </form>
+      </Dialog>
     </div>
   );
 }

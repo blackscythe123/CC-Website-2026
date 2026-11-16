@@ -59,3 +59,14 @@ describe("track editor helpers", () => {
     expect(moved([1, 2, 3], 2, 1)).toEqual([1, 2, 3]);
   });
 });
+
+import { humanizeTrackError } from "@/lib/trackEditor";
+describe("humanizeTrackError", () => {
+  it("turns schema paths into section names", () => {
+    expect(humanizeTrackError("topics.0.subtopics.1.items.2.url must be an https link (no user:password)")).toBe(
+      "Topic 1 › Subtopic 2 › Resource 3: url must be an https link (no user:password)"
+    );
+    expect(humanizeTrackError("topics.2.title can't be empty")).toBe("Topic 3: title can't be empty");
+    expect(humanizeTrackError("Item id \"x\" is used more than once.")).toBe("Item id \"x\" is used more than once.");
+  });
+});

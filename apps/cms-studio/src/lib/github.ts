@@ -714,11 +714,11 @@ export function roleInVertical(
 }
 
 /**
- * Quorum rules (CLAUDE.md):
- *  - Member article:     2 Deputies OR 1 Vertical Head OR 1 Superadmin
- *  - Deputy article:     1 Vertical Head OR 1 Superadmin
- *  - Head article:       1 Superadmin
- *  - Superadmin article: another Superadmin
+ * Quorum rules (CLAUDE.md §2, owner decision 2026-11-16):
+ *  - Superadmin: full control everywhere; may publish anything, including their own work.
+ *  - Vertical Head: full control in their own vertical (any author, including their own work).
+ *  - Deputy: may approve Member work (2 Deputy approvals needed).
+ *  - Member: no review rights.
  * Returns "merge", "count-deputies", or an error message.
  */
 export function evaluateReviewerAuthority(
@@ -726,10 +726,7 @@ export function evaluateReviewerAuthority(
   authorRole: EditorialRole
 ): "merge" | "count-deputies" | string {
   if (reviewerRole === "superadmin") return "merge";
-  if (reviewerRole === "vertical_head") {
-    if (authorRole === "member" || authorRole === "deputy" || authorRole === "none") return "merge";
-    return `Articles by a ${authorRole} must be approved by a Superadmin.`;
-  }
+  if (reviewerRole === "vertical_head") return "merge";
   if (reviewerRole === "deputy") {
     if (authorRole === "member" || authorRole === "none") return "count-deputies";
     return `Articles by a ${authorRole} must be approved by the Vertical Head or a Superadmin.`;
@@ -915,7 +912,10 @@ async function checkReviewPreconditions(octokit: Octokit, o: ReviewOptions, inte
   const listingError = assertCompletePRListing(prData, files.length, commits.length);
   if (listingError) return fail(listingError);
   if (o.articleAuthorUsername) contributors.add(o.articleAuthorUsername.toLowerCase());
-  if (contributors.has(o.reviewerUsername.toLowerCase())) {
+  // Superadmins (everywhere) and the vertical's Head have full control, so they may publish their own
+  // or co-edited work. Deputies and Members never review work they wrote or edited.
+  const fullControl = o.reviewerRole === "superadmin" || o.reviewerRole === "vertical_head";
+  if (!fullControl && contributors.has(o.reviewerUsername.toLowerCase())) {
     return fail("Self-review is forbidden. You authored or edited this article, so you cannot review it.", 403);
   }
 

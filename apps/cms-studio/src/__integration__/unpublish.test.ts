@@ -16,7 +16,7 @@ afterEach(() => {
 });
 
 describe("12. unpublish", () => {
-  it("h1 requests unpublish -> main untouched, PR contains only the removed .md; d1 cannot request; sa1 approval removes it", async () => {
+  it("h1 requests unpublish -> main untouched, PR contains only the removed .md; d1 cannot request; h1 (full control) publishes it", async () => {
     const before = w.mainTip();
     const d = await w.call("d1", "DELETE", "/api/posts/manage", { vertical: "ai-ml", slug: "existing-ai-post" });
     expect(d.status).toBe(403);
@@ -33,15 +33,15 @@ describe("12. unpublish", () => {
     expect(w.fake.changedFiles(pr.headRef)).toEqual([{ filename: POST, status: "removed" }]);
     expect(pr.headRef).toMatch(/^draft\/ai-ml\/unpublish-existing-ai-post-\d{5}$/);
 
-    // the requester and everyone below a superadmin cannot approve a head's unpublish
-    for (const u of ["h1", "d1", "d2", "h2", "m1", "x1"]) {
+    // deputies, members, outsiders and other verticals' heads cannot approve a head's unpublish
+    for (const u of ["d1", "d2", "h2", "m1", "x1"]) {
       const a = await w.review(u, pull, "approve", { sha: w.fake.headSha(pull) });
       expect([403, 400], u).toContain(a.status);
     }
     expect(w.fake.pull(pull).merged).toBe(false);
     expect(w.fake.readText("main", POST)).toBeTruthy();
 
-    const ok = await w.review("sa1", pull, "approve");
+    const ok = await w.review("h1", pull, "approve");
     expect(ok.status).toBe(200);
     expect(ok.json.merged).toBe(true);
     expect(w.fake.readFile("main", POST)).toBeNull();
@@ -59,11 +59,10 @@ describe("12. unpublish", () => {
     expect(w.fake.pulls).toHaveLength(0);
     const r = await w.call("sa1", "DELETE", "/api/posts/manage", { vertical: "ai-ml", slug: "existing-ai-post" });
     expect(r.status).toBe(200);
-    // a superadmin's unpublish needs ANOTHER superadmin
+    // a superadmin publishes their own unpublish request; a deputy can't
+    expect((await w.review("d1", r.json.pullNumber, "approve")).status).toBe(403);
     const self = await w.review("sa1", r.json.pullNumber, "approve", { sha: w.fake.headSha(r.json.pullNumber) });
-    expect(self.status).toBe(403);
-    expect((await w.review("h1", r.json.pullNumber, "approve")).status).toBe(403);
-    expect((await w.review("sa2", r.json.pullNumber, "approve")).json.merged).toBe(true);
+    expect(self.json.merged).toBe(true);
     expect(w.fake.readFile("main", POST)).toBeNull();
   });
 

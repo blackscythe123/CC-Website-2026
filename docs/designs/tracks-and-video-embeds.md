@@ -198,7 +198,7 @@ Exports (and `tracks.d.mts` types):
 ### 3.1 Who
 | Action | Who | Approval to merge |
 |---|---|---|
-| Create / edit a track (topics, subtopics, links, videos, descriptions) | **Head** of the vertical, or a Superadmin | Head's PR → a Superadmin. Superadmin's PR → another Superadmin. A Deputy or another vertical's Head reviewing gets "needs a Superadmin". |
+| Create / edit a track (topics, subtopics, links, videos, descriptions) | **Head** of the vertical, or a Superadmin | The vertical's Head or any Superadmin, including the author (owner decision 2026-11-16: Heads and Superadmins publish their own work). Deputies and other verticals' Heads can't approve. |
 | Place / move / remove a blog's placement | Anyone who can write a blog in that vertical | The normal blog quorum for the author's role. |
 
 All existing rules apply: no self-approval, commit-author checks, `expectedHeadSha`, fail-closed live roles, CSRF guard.

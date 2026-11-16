@@ -6,9 +6,12 @@ const viewer = (role: UserRoleType, rolesByVertical: Record<string, UserRoleType
 const pr = (author: string, vertical = "ai-ml") => ({ author, vertical });
 
 describe("canReviewPr (role in the PR's vertical + author's role)", () => {
-  it("nobody reviews their own PR, whatever their role or case", () => {
-    expect(canReviewPr(viewer("superadmin"), pr("ME"), "superadmin")).toBe(false);
-    expect(canReviewPr(viewer("vertical_head", { "ai-ml": "vertical_head" }), pr("me"), "vertical_head")).toBe(false);
+  it("superadmins and the vertical's head may publish their own PR; deputies and members may not", () => {
+    expect(canReviewPr(viewer("superadmin"), pr("ME"), "superadmin")).toBe(true);
+    expect(canReviewPr(viewer("vertical_head", { "ai-ml": "vertical_head" }), pr("me"), "vertical_head")).toBe(true);
+    expect(canReviewPr(viewer("vertical_head", { "ai-ml": "vertical_head" }), pr("me", "cybersecurity"), "vertical_head")).toBe(false);
+    expect(canReviewPr(viewer("deputy", { "ai-ml": "deputy" }), pr("me"), "deputy")).toBe(false);
+    expect(canReviewPr(viewer("member", { "ai-ml": "member" }), pr("me"), "member")).toBe(false);
   });
 
   it("superadmin reviews any other author, in any vertical including club", () => {
@@ -18,12 +21,12 @@ describe("canReviewPr (role in the PR's vertical + author's role)", () => {
     }
   });
 
-  it("head reviews member/deputy authors in their own vertical only", () => {
+  it("head reviews any author in their own vertical only", () => {
     const head = viewer("vertical_head", { "ai-ml": "vertical_head" });
     expect(canReviewPr(head, pr("x"), "member")).toBe(true);
     expect(canReviewPr(head, pr("x"), "deputy")).toBe(true);
-    expect(canReviewPr(head, pr("x"), "vertical_head")).toBe(false);
-    expect(canReviewPr(head, pr("x"), "superadmin")).toBe(false);
+    expect(canReviewPr(head, pr("x"), "vertical_head")).toBe(true);
+    expect(canReviewPr(head, pr("x"), "superadmin")).toBe(true);
     expect(canReviewPr(head, pr("x", "cybersecurity"), "member")).toBe(false);
     expect(canReviewPr(head, pr("x", "club"), "member")).toBe(false);
   });

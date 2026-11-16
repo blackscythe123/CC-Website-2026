@@ -32,17 +32,17 @@ export function approvalTarget(authorRole: UserRoleType): { label: string; deput
     case "deputy":
       return { label: "1 head or superadmin", deputyApprovalsNeeded: null };
     case "vertical_head":
-      return { label: "1 superadmin", deputyApprovalsNeeded: null };
+      return { label: "the head or a superadmin", deputyApprovalsNeeded: null };
     case "superadmin":
-      return { label: "another superadmin", deputyApprovalsNeeded: null };
+      return { label: "a superadmin", deputyApprovalsNeeded: null };
   }
 }
 
 /**
- * Whether the signed-in user may approve / request changes on a PR. Mirrors the reviews API:
- * the reviewer's role is their role IN THE PR's VERTICAL (superadmin counts everywhere, and
- * `club` has no vertical roles so only superadmins qualify); nobody reviews their own PR;
- * a superadmin may review any other author, a head member/deputy authors, a deputy member authors.
+ * Whether the signed-in user may approve (publish) / request changes on a PR. Mirrors the reviews API:
+ * the reviewer's role is their role IN THE PR's VERTICAL (superadmin counts everywhere; `club` has no
+ * vertical roles so only superadmins qualify). Superadmins and the vertical's Head have full control,
+ * including their own requests; a Deputy may review Member work by others; tracks need a Head or Superadmin.
  * `authorRole` null (role lists not loaded) is treated as a member; the server re-checks anyway.
  */
 export function canReviewPr(
@@ -51,16 +51,12 @@ export function canReviewPr(
   authorRole: UserRoleType | null
 ): boolean {
   if (!viewer) return false;
-  if (pr.author.toLowerCase() === viewer.login.toLowerCase()) return false;
   const reviewerRole: UserRoleType | null = viewer.role === "superadmin" ? "superadmin" : viewer.rolesByVertical?.[pr.vertical] ?? null;
-  // Learning tracks are proposed by Heads/Superadmins and always need a Superadmin.
-  if (pr.kind === "track") return reviewerRole === "superadmin";
+  if (reviewerRole === "superadmin" || reviewerRole === "vertical_head") return true;
+  if (pr.author.toLowerCase() === viewer.login.toLowerCase()) return false;
+  if (pr.kind === "track") return false;
   const author = authorRole ?? "member";
   switch (reviewerRole) {
-    case "superadmin":
-      return true;
-    case "vertical_head":
-      return author === "member" || author === "deputy";
     case "deputy":
       return author === "member";
     default:

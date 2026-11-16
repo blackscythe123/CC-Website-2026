@@ -35,7 +35,7 @@ afterEach(() => {
 });
 
 describe("15. learning-track proposals", () => {
-  it("the Head proposes a track; Deputies and the Head can't approve it; a Superadmin merges it with a server-built subject", async () => {
+  it("the Head proposes a track; Deputies, members and other verticals can't approve it; the Head publishes it with a server-built subject", async () => {
     const before = w.mainTip();
     const r = await propose("h1", {});
     expect(r.status).toBe(200);
@@ -53,13 +53,13 @@ describe("15. learning-track proposals", () => {
     const preview = await w.call("sa1", "GET", `/api/posts/reviews?previewPullNumber=${pull}`);
     expect(preview.json.article).toMatchObject({ kind: "track", slug: "ml-roadmap", title: "ML Roadmap", vertical: "ai-ml" });
 
-    for (const u of ["h1", "d1", "d2", "m1", "h2", "x1"]) {
+    for (const u of ["d1", "d2", "m1", "h2", "x1"]) {
       const a = await w.review(u, pull, "approve", { sha: w.fake.headSha(pull) });
       expect([400, 403], u).toContain(a.status);
     }
     expect(w.fake.pull(pull).merged).toBe(false);
 
-    const ok = await w.review("sa1", pull, "approve");
+    const ok = await w.review("h1", pull, "approve");
     expect(ok.status).toBe(200);
     expect(ok.json.merged).toBe(true);
     expect(JSON.parse(w.fake.readText("main", PATH)!).title).toBe("ML Roadmap");
@@ -76,12 +76,12 @@ describe("15. learning-track proposals", () => {
     expect(w.fake.mutations().length).toBe(before);
   });
 
-  it("a Superadmin's track needs another Superadmin", async () => {
+  it("a Superadmin publishes their own track; a Deputy can't", async () => {
     const r = await propose("sa1", {});
     expect(r.status).toBe(200);
-    expect((await w.review("sa1", r.json.pullNumber, "approve", { sha: w.fake.headSha(r.json.pullNumber) })).status).toBe(403);
-    expect((await w.review("h1", r.json.pullNumber, "approve")).status).toBe(403);
-    const ok = await w.review("sa2", r.json.pullNumber, "approve");
+    expect((await w.review("d1", r.json.pullNumber, "approve")).status).toBe(403);
+    const ok = await w.review("sa1", r.json.pullNumber, "approve", { sha: w.fake.headSha(r.json.pullNumber) });
+    expect(ok.status).toBe(200);
     expect(ok.json.merged).toBe(true);
   });
 
@@ -135,11 +135,10 @@ describe("15. learning-track proposals", () => {
     expect(ok.status).toBe(200);
     expect(JSON.parse(w.fake.readText(w.fake.pull(pull).headRef, PATH)!).topics[0].items).toHaveLength(2);
 
-    // a superadmin may revise a head's proposal, but then can't approve it (they edited it)
+    // a superadmin may revise a head's proposal and still publish it (full control)
     const sa = await propose("sa1", { pullNumber: pull, expectedHeadSha: w.fake.headSha(pull) });
     expect(sa.status).toBe(200);
-    expect((await w.review("sa1", pull, "approve")).status).toBe(403);
-    expect((await w.review("sa2", pull, "approve")).json.merged).toBe(true);
+    expect((await w.review("sa1", pull, "approve")).json.merged).toBe(true);
   });
 
   it("a bad track pushed to the branch after submit is caught when approving; extra files make the PR unreviewable", async () => {

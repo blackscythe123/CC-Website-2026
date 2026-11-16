@@ -4,38 +4,46 @@
   "vertical": "competitive-programming",
   "topics": [
     {
+      "id": "foundations",
       "title": "Foundations",
+      "description": "Get comfortable with complexity analysis and the core data structures before diving into patterns.",
       "items": [
-        { "id": "f1", "type": "video", "title": "Big-O notation in 5 minutes", "url": "https://www.youtube.com/watch?v=__vX2sjlpXU" },
-        { "id": "f2", "type": "video", "title": "Data structures: easy to advanced (full course)", "url": "https://www.youtube.com/watch?v=RBSGKlAvoiM" }
+        { "id": "f1", "type": "video", "title": "Big-O notation in 5 minutes", "url": "https://www.youtube.com/watch?v=__vX2sjlpXU", "description": "A quick refresher on how to reason about time complexity." },
+        { "id": "f2", "type": "video", "title": "Data structures: easy to advanced (full course)", "url": "https://www.youtube.com/watch?v=RBSGKlAvoiM", "description": "Long-form course. Skim the chapters you already know." }
       ]
     },
     {
+      "id": "arrays-hashing",
       "title": "Arrays & Hashing",
+      "description": "Most interview problems start here. Learn to trade memory for speed with hash maps, and to walk arrays from both ends.",
       "subtopics": [
         {
+          "id": "hash-maps",
           "title": "Hash maps",
           "items": [
-            { "id": "a1", "type": "video", "title": "Two Sum explained", "url": "https://www.youtube.com/watch?v=KLlXCFG5TnA" },
+            { "id": "a1", "type": "video", "title": "Two Sum explained", "url": "https://www.youtube.com/watch?v=KLlXCFG5TnA", "description": "Watch this before attempting the problems below." },
             { "id": "a2", "type": "link", "title": "Two Sum", "url": "https://leetcode.com/problems/two-sum/", "difficulty": "easy" },
             { "id": "a3", "type": "link", "title": "Contains Duplicate", "url": "https://leetcode.com/problems/contains-duplicate/", "difficulty": "easy" },
             { "id": "a4", "type": "link", "title": "Valid Anagram", "url": "https://leetcode.com/problems/valid-anagram/", "difficulty": "easy" }
           ]
         },
         {
+          "id": "two-pointers",
           "title": "Two pointers",
+          "description": "Sorted input or a palindrome check? Try one pointer at each end.",
           "items": [
             { "id": "a5", "type": "link", "title": "Valid Palindrome", "url": "https://leetcode.com/problems/valid-palindrome/", "difficulty": "easy" },
             { "id": "a6", "type": "link", "title": "Container With Most Water", "url": "https://leetcode.com/problems/container-with-most-water/", "difficulty": "medium" },
-            { "id": "a7", "type": "link", "title": "3Sum", "url": "https://leetcode.com/problems/3sum/", "difficulty": "medium" }
+            { "id": "a7", "type": "link", "title": "3Sum", "url": "https://leetcode.com/problems/3sum/", "difficulty": "medium", "description": "Sort first, then fix one number and run two pointers on the rest." }
           ]
         }
       ]
     },
     {
+      "id": "dynamic-programming",
       "title": "Dynamic Programming",
+      "description": "Break a problem into overlapping subproblems and reuse their answers. Start with the 1-D problems, then read the club article on advanced patterns.",
       "items": [
-        { "id": "d1", "type": "post", "slug": "demystifying-advanced-dynamic-programming-patterns" },
         { "id": "d2", "type": "video", "title": "Dynamic programming course (freeCodeCamp)", "url": "https://www.youtube.com/watch?v=oBt53YbR9Kk" },
         { "id": "d3", "type": "link", "title": "Climbing Stairs", "url": "https://leetcode.com/problems/climbing-stairs/", "difficulty": "easy" },
         { "id": "d4", "type": "link", "title": "House Robber", "url": "https://leetcode.com/problems/house-robber/", "difficulty": "medium" },

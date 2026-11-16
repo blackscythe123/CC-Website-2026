@@ -105,7 +105,7 @@ describe("9. PRs created outside the CMS that smuggle extra changes are never me
   it("a new submission cannot overwrite an already published article", async () => {
     const before = w.mainTip();
     const r = await w.submit("m1", { title: "Existing AI Post", slug: "existing-ai-post", cover: false });
-    expect(r.status).toBe(500);
+    expect(r.status).toBe(409);
     expect(r.json.error).toContain("already published");
     expect(w.fake.branches("draft/")).toEqual([]);
     expect(w.fake.pulls).toHaveLength(0);

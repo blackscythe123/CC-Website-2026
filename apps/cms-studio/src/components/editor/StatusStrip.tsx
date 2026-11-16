@@ -8,6 +8,7 @@ import { Button, buttonClasses } from "@/components/ui";
 export type StripState =
   | { kind: "recovered"; updatedAt: number; onRestore: () => void; onDiscard: () => void }
   | { kind: "revising"; number: number; title: string; feedback: string }
+  | { kind: "editing"; title: string; onStop: () => void }
   | { kind: "changes-requested"; number: number; title: string; feedback: string; loading: boolean; onRevise: () => void }
   | { kind: "no-role" }
   | null;
@@ -15,6 +16,7 @@ export type StripState =
 const EDGE: Record<NonNullable<StripState>["kind"], string> = {
   recovered: "border-l-info",
   revising: "border-l-warning",
+  editing: "border-l-info",
   "changes-requested": "border-l-danger",
   "no-role": "border-l-warning",
 };
@@ -42,6 +44,19 @@ export default function StatusStrip({ state }: { state: StripState }) {
                 Discard
               </Button>
             </div>
+          </div>
+        ) : null}
+
+        {state.kind === "editing" ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <RotateCcw className="h-4 w-4 shrink-0 text-info" aria-hidden />
+            <p className="min-w-0 flex-1 text-sm">
+              <span className="font-semibold">Editing a published article</span>
+              <span className="text-muted"> · {state.title}. Submitting opens an edit request; the live page changes only after it is approved.</span>
+            </p>
+            <Button size="sm" variant="ghost" onClick={state.onStop}>
+              Stop editing
+            </Button>
           </div>
         ) : null}
 

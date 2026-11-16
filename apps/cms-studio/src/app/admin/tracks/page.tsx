@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ExternalLink, GitPullRequest, ListTree, Pencil, Plus, RefreshCw } from "lucide-react";
+import { ExternalLink, GitPullRequest, ListTree, Pencil, Plus, RefreshCw, Undo2 } from "lucide-react";
 import type { Track } from "@coding-club/content-schema/tracks";
 import { useStudio } from "@/components/shell/StudioContext";
 import { useToast } from "@/components/toast/ToastProvider";
 import { ALL_VERTICALS, getVertical } from "@/lib/verticals";
 import { readApiJson } from "@/lib/hooks/apiClient";
 import { emptyTrack, toEditable } from "@/lib/trackEditor";
-import { Badge, Button, buttonClasses, Card, EmptyState, Select, Skeleton } from "@/components/ui";
+import { Badge, Button, buttonClasses, Card, ConfirmDialog, EmptyState, Select, Skeleton } from "@/components/ui";
 import { NoArticles } from "@/components/illustrations";
 import TrackEditor, { type TrackEditorTarget } from "@/components/tracks/TrackEditor";
 
@@ -42,6 +42,54 @@ export default function TracksPage() {
   const [editor, setEditor] = useState<TrackEditorTarget | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [withdrawing, setWithdrawing] = useState<{ number: number; title: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const requestDelete = async () => {
+    if (!editor?.slug) return;
+    setBusy(true);
+    try {
+      const { ok, data } = await readApiJson(
+        await fetch("/api/tracks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ vertical: editor.vertical, slug: editor.slug, mode: "delete" }),
+        })
+      );
+      if (!ok) throw new Error(data.error || "Couldn't request deleting the track");
+      toast.success(`Deletion request opened (PR #${data.pullNumber}). The track stays live until a Superadmin approves it.`);
+      setConfirmDelete(false);
+      setEditor(null);
+      queue.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't request deleting the track");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const withdraw = async () => {
+    if (!withdrawing) return;
+    setBusy(true);
+    try {
+      const { ok, data } = await readApiJson(
+        await fetch("/api/posts/withdraw", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pullNumber: withdrawing.number }),
+        })
+      );
+      if (!ok) throw new Error(data.error || "Couldn't withdraw this proposal");
+      toast.success(data.message || `PR #${withdrawing.number} withdrawn`);
+      setWithdrawing(null);
+      queue.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't withdraw this proposal");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const load = useCallback(async () => {
     if (!vertical) return;
@@ -196,6 +244,7 @@ export default function TracksPage() {
             submitting={submitting}
             onSubmit={submit}
             onCancel={() => setEditor(null)}
+            onDelete={editor.mode === "edit" && !editor.pullNumber ? () => setConfirmDelete(true) : undefined}
           />
         </div>
       ) : (
@@ -229,9 +278,16 @@ export default function TracksPage() {
                     GitHub <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                   </a>
                   {pr.author.toLowerCase() === user.login.toLowerCase() || roleInfo?.role === "superadmin" ? (
-                    <Button size="sm" icon={Pencil} loading={opening === `pr-${pr.number}`} onClick={() => void startRevise(pr.number)}>
-                      Revise
-                    </Button>
+                    <>
+                      <Button size="sm" variant="ghost" icon={Undo2} onClick={() => setWithdrawing({ number: pr.number, title: pr.title })}>
+                        Withdraw
+                      </Button>
+                      {/^track\/[a-z0-9-]+\/remove-/.test(pr.branch) ? null : (
+                        <Button size="sm" icon={Pencil} loading={opening === `pr-${pr.number}`} onClick={() => void startRevise(pr.number)}>
+                          Revise
+                        </Button>
+                      )}
+                    </>
                   ) : null}
                 </Card>
               ))}
@@ -285,6 +341,37 @@ export default function TracksPage() {
           </section>
         </>
       )}
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`Delete the track “${editor?.initial.title || editor?.slug || ""}”?`}
+        confirmLabel="Request deletion"
+        loading={busy}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={requestDelete}
+        message={(() => {
+          const placed = Object.values(editor?.placedCounts || {}).reduce((a, b) => a + b, 0);
+          return (
+            <>
+              <p>This opens a deletion request. The track stays live until a Superadmin approves it.</p>
+              <p className={placed ? "rounded-lg bg-warning-bg p-3 text-warning" : ""}>
+                {placed
+                  ? `${placed} published blog${placed === 1 ? " is" : "s are"} placed in it. ${placed === 1 ? "It stays" : "They stay"} published as normal blog${placed === 1 ? "" : "s"} but leave the track. Readers' ticks and the track's comment threads stay on GitHub but are no longer shown.`
+                  : "No published blogs are placed in it."}
+              </p>
+            </>
+          );
+        })()}
+      />
+      <ConfirmDialog
+        open={withdrawing !== null}
+        title={`Withdraw PR #${withdrawing?.number ?? ""}?`}
+        confirmLabel="Withdraw"
+        loading={busy}
+        onCancel={() => setWithdrawing(null)}
+        onConfirm={withdraw}
+        message={<p>“{withdrawing?.title}” is closed without changing the website, and its branch is deleted.</p>}
+      />
     </div>
   );
 }

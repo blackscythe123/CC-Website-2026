@@ -46,6 +46,8 @@ interface PublishDrawerProps {
   placement: Placement | null;
   onPlacementChange: (placement: Placement | null) => void;
   revision: { number: number; feedback: string } | null;
+  /** Editing an already-published article (slug and vertical fixed). */
+  editing?: boolean;
   submitting: boolean;
   serverError: string | null;
   onSubmit: () => void;
@@ -62,7 +64,7 @@ export default function PublishDrawer(props: PublishDrawerProps) {
     coverImage: props.coverImage,
     selectedVertical,
     allowedVerticals: availableVerticals.map((v) => v.slug),
-    hasFixedSlug: Boolean(revision),
+    hasFixedSlug: Boolean(revision) || Boolean(props.editing),
   });
   const vertical = getVertical(selectedVertical);
 
@@ -83,7 +85,15 @@ export default function PublishDrawer(props: PublishDrawerProps) {
         disabled={!checklist.canSubmit}
         onClick={props.onSubmit}
       >
-        {submitting ? (revision ? "Pushing revisions…" : "Submitting…") : revision ? `Push revisions to PR #${revision.number}` : "Submit for review"}
+        {submitting
+          ? revision
+            ? "Pushing revisions…"
+            : "Submitting…"
+          : revision
+          ? `Push revisions to PR #${revision.number}`
+          : props.editing
+          ? "Submit edit for review"
+          : "Submit for review"}
         {!submitting ? (
           <kbd className="ml-1 hidden rounded border border-white/50 px-1 text-[11px] font-medium sm:inline">{isMac ? "⌘" : "Ctrl"} ↵</kbd>
         ) : null}
@@ -92,7 +102,7 @@ export default function PublishDrawer(props: PublishDrawerProps) {
   );
 
   return (
-    <Drawer open={open} onClose={onClose} title={revision ? `Update PR #${revision.number}` : "Submit for review"} footer={footer}>
+    <Drawer open={open} onClose={onClose} title={revision ? `Update PR #${revision.number}` : props.editing ? "Submit edit for review" : "Submit for review"} footer={footer}>
       <div className="space-y-5 px-5 py-5">
         {props.serverError ? (
           <div role="alert" className="flex items-start gap-2 rounded-lg bg-danger-bg p-3 text-sm text-danger">

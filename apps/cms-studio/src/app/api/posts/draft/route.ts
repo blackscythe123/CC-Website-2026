@@ -69,6 +69,8 @@ export async function POST(request: NextRequest) {
       pullNumber,
       existingBranch,
       placement,
+      editPublished,
+      expectedHeadSha,
     } = body;
 
     if (!vertical || !title || !markdownBody) {
@@ -109,6 +111,16 @@ export async function POST(request: NextRequest) {
         { error: "Invalid branch format. Path traversal characters in branch names are strictly forbidden." },
         { status: 400 }
       );
+    }
+
+    if (editPublished !== undefined && typeof editPublished !== "boolean") {
+      return NextResponse.json({ error: "editPublished must be true or false." }, { status: 400 });
+    }
+    if (editPublished && pullNumber) {
+      return NextResponse.json({ error: "An edit of a published article starts a new request; it can't be combined with pullNumber." }, { status: 400 });
+    }
+    if (pullNumber && (typeof expectedHeadSha !== "string" || !/^[0-9a-f]{40}$/.test(expectedHeadSha))) {
+      return NextResponse.json({ error: "Reopen the pull request before saving a revision (missing version)." }, { status: 400 });
     }
 
     // Anti-IDOR: a branch may only be reused through a verified PR; never trust a bare client branch name
@@ -266,6 +278,8 @@ export async function POST(request: NextRequest) {
       pullNumber: verifiedPullNumber,
       existingBranch: verifiedBranch,
       placement: placement === undefined ? undefined : placement === null ? null : parsePlacement(placement),
+      editPublished: editPublished === true,
+      expectedHeadSha: pullNumber ? expectedHeadSha : undefined,
     });
 
     return NextResponse.json({
@@ -278,6 +292,7 @@ export async function POST(request: NextRequest) {
   } catch (err: unknown) {
     console.error("Draft error:", err);
     const errorMsg = err instanceof Error ? err.message : "Failed to create draft";
-    return NextResponse.json({ error: errorMsg }, { status: 500 });
+    const status = (err as { status?: number }).status;
+    return NextResponse.json({ error: errorMsg }, { status: status && status >= 400 && status < 500 ? status : 500 });
   }
 }

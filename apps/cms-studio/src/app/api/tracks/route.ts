@@ -68,13 +68,20 @@ export async function POST(request: NextRequest) {
   if (!TRACK_SLUG_RE.test(slug) || slug.length > TRACK_SLUG_MAX) {
     return NextResponse.json({ error: `The track's short name must be lowercase words joined by hyphens (max ${TRACK_SLUG_MAX} characters).` }, { status: 400 });
   }
-  if (mode !== "create" && mode !== "edit") return NextResponse.json({ error: "mode must be 'create' or 'edit'." }, { status: 400 });
+  if (mode !== "create" && mode !== "edit" && mode !== "delete") {
+    return NextResponse.json({ error: "mode must be 'create', 'edit' or 'delete'." }, { status: 400 });
+  }
   if (pullNumber !== undefined && (!Number.isInteger(pullNumber) || pullNumber <= 0)) {
     return NextResponse.json({ error: "Invalid pullNumber." }, { status: 400 });
   }
   const raw = JSON.stringify(body.track ?? null);
-  const checked = validateTrack(body.track, { vertical, slug, bytes: Buffer.byteLength(raw) });
-  if (!checked.track) return NextResponse.json({ error: checked.errors.slice(0, 5).join(" "), errors: checked.errors }, { status: 400 });
+  const checked =
+    mode === "delete"
+      ? { track: null, errors: [] as string[] }
+      : validateTrack(body.track, { vertical, slug, bytes: Buffer.byteLength(raw) });
+  if (mode !== "delete" && !checked.track) {
+    return NextResponse.json({ error: checked.errors.slice(0, 5).join(" "), errors: checked.errors }, { status: 400 });
+  }
 
   try {
     const userRes = await fetch("https://api.github.com/user", {
@@ -100,7 +107,8 @@ export async function POST(request: NextRequest) {
       authorDisplayName: user.name || user.login,
       vertical,
       slug,
-      track: checked.track,
+      // delete mode never writes a track; validated tracks are required for create/edit (checked above)
+      track: checked.track ?? { title: slug, summary: "", vertical, topics: [] },
       mode,
       pullNumber,
       expectedHeadSha,

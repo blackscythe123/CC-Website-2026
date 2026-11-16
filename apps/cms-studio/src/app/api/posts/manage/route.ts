@@ -30,6 +30,13 @@ interface PublishedPostItem {
   author: string;
   summary: string;
   canDelete: boolean;
+  /** May open an edit request (anyone with a role in that vertical; club posts: Superadmins). */
+  canEdit: boolean;
+}
+
+function canEditPost(roleInfo: { role: string; rolesByVertical?: Record<string, string> }, vertical: string): boolean {
+  if (roleInfo.role === "superadmin") return true;
+  return vertical !== "club" && Boolean(roleInfo.rolesByVertical?.[vertical]);
 }
 
 export async function GET(request: NextRequest) {
@@ -72,6 +79,7 @@ export async function GET(request: NextRequest) {
         author: p.author,
         summary: p.summary,
         canDelete: canDeletePost(userData.login, p.vertical, liveRoles),
+        canEdit: canEditPost(roleInfo, p.vertical),
       }));
 
       return NextResponse.json({
@@ -103,6 +111,7 @@ export async function GET(request: NextRequest) {
             author: data.author || "SSN Coding Club",
             summary: data.summary || "",
             canDelete: canDeletePost(userData.login, "club", liveRoles),
+            canEdit: canEditPost(roleInfo, "club"),
           });
         } catch {
           // ignore
@@ -128,6 +137,7 @@ export async function GET(request: NextRequest) {
               author: data.author || "Anonymous",
               summary: data.summary || "",
               canDelete: canDeletePost(userData.login, vert, liveRoles),
+              canEdit: canEditPost(roleInfo, vert),
             });
           } catch {
             // ignore

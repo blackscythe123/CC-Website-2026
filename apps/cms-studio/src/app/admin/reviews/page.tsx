@@ -8,7 +8,7 @@ import { approvalTarget } from "@/lib/governance";
 import { authorRoleIn, reviewProgress } from "@/lib/reviewProgress";
 import { readApiJson } from "@/lib/hooks/apiClient";
 import type { ReviewPr } from "@/lib/hooks/useReviewQueue";
-import { Button, EmptyState, Skeleton, TabPanel, Tabs } from "@/components/ui";
+import { Button, ConfirmDialog, EmptyState, Skeleton, TabPanel, Tabs } from "@/components/ui";
 import { AllCaughtUp, NoDrafts } from "@/components/illustrations";
 import ReviewCard from "@/components/reviews/ReviewCard";
 import ReviewPreviewDrawer, { type PreviewArticle } from "@/components/reviews/ReviewPreviewDrawer";
@@ -45,6 +45,32 @@ export default function ReviewsPage() {
   const [preview, setPreview] = useState<PreviewArticle | null>(null);
   const [changesFor, setChangesFor] = useState<ReviewPr | null>(null);
   const [sendingChanges, setSendingChanges] = useState(false);
+  const [withdrawing, setWithdrawing] = useState<ReviewPr | null>(null);
+  const [withdrawBusy, setWithdrawBusy] = useState(false);
+  const canWithdraw = (pr: ReviewPr) => pr.author.toLowerCase() === login || roleInfo?.role === "superadmin";
+
+  const withdraw = async () => {
+    if (!withdrawing) return;
+    setWithdrawBusy(true);
+    try {
+      const { ok, data } = await readApiJson(
+        await fetch("/api/posts/withdraw", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pullNumber: withdrawing.number }),
+        })
+      );
+      if (!ok) throw new Error(data.error || "Couldn't withdraw this request");
+      toast.success(data.message || `PR #${withdrawing.number} withdrawn`);
+      setWithdrawing(null);
+      setPreview(null);
+      await queue.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't withdraw this request");
+    } finally {
+      setWithdrawBusy(false);
+    }
+  };
 
   const refresh = async () => {
     setRefreshing(true);
@@ -199,6 +225,7 @@ export default function ReviewsPage() {
                   onPreview={() => openPreview(pr)}
                   onApprove={() => approve(pr)}
                   onRequestChanges={() => setChangesFor(pr)}
+                  onWithdraw={canWithdraw(pr) ? () => setWithdrawing(pr) : undefined}
                 />
               ))}
             </div>
@@ -219,6 +246,19 @@ export default function ReviewsPage() {
         onRequestChanges={() => previewPr && setChangesFor(previewPr)}
       />
       <RequestChangesDialog pr={changesFor} submitting={sendingChanges} onCancel={() => setChangesFor(null)} onSubmit={sendChanges} />
+      <ConfirmDialog
+        open={withdrawing !== null}
+        title={`Withdraw PR #${withdrawing?.number ?? ""}?`}
+        confirmLabel="Withdraw"
+        loading={withdrawBusy}
+        onCancel={() => setWithdrawing(null)}
+        onConfirm={withdraw}
+        message={
+          <p>
+            “{withdrawing?.title}” is closed without being published and its draft branch is deleted. Nothing on the website changes. Copy anything you want to keep first.
+          </p>
+        }
+      />
     </div>
   );
 }

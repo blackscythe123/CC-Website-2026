@@ -5,8 +5,8 @@ const ids = (role: Parameters<typeof navItemsFor>[0], verticals: string[] = []) 
 
 it("superadmin sees everything", () => expect(ids("superadmin")).toEqual(["write", "reviews", "articles", "tracks", "people"]));
 it("head sees articles, tracks and people", () => expect(ids("vertical_head", ["ai-ml"])).toEqual(["write", "reviews", "articles", "tracks", "people"]));
-it("deputy sees people but not articles", () => expect(ids("deputy", ["ai-ml"])).toEqual(["write", "reviews", "people"]));
-it("member gets a join entry", () => expect(ids("member", ["ai-ml"])).toEqual(["write", "reviews", "join"]));
+it("deputy sees articles (to propose edits) and people", () => expect(ids("deputy", ["ai-ml"])).toEqual(["write", "reviews", "articles", "people"]));
+it("member with a vertical sees articles and a join entry", () => expect(ids("member", ["ai-ml"])).toEqual(["write", "reviews", "articles", "join"]));
 it("unassigned member gets a join entry", () => expect(ids("member", [])).toEqual(["write", "reviews", "join"]));
 it("signed-out gets nothing", () => expect(navItemsFor(null, [])).toEqual([]));
 it("join points at the people page", () => expect(navItemsFor("member", []).find((i) => i.id === "join")?.href).toBe("/admin/roles"));

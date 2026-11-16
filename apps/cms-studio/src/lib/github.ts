@@ -1043,18 +1043,42 @@ export async function approveAndMergePR(
       if (problem) return { success: false, merged: false, status: 409, message: problem };
     }
 
-    // Record the approval pinned to the reviewed commit
-    try {
-      await octokit.pulls.createReview({
-        owner: REPO_OWNER,
-        repo: REPO_NAME,
-        pull_number: pullNumber,
-        commit_id: headSha,
-        event: "APPROVE",
-        body: `Approved by @${reviewerUsername} (${reviewerRole}) via SSN Coding Club CMS Studio`,
-      });
-    } catch {
-      // Quorum below uses our own count of reviews on this exact commit
+    // A Superadmin or the vertical's Head publishing work they wrote or edited (no independent reviewer).
+    const selfPublished = contributors.has(cleanReviewer);
+    // GitHub never counts an approval from the PR's own opener, so main's "1 approving review" rule would
+    // refuse that merge. After every Studio check above has passed, it is performed with the publish token
+    // (the repo admin, who bypasses the rule). Heads keep plain write access on GitHub itself.
+    const ownRequest = cleanReviewer === prAuthor;
+    let mergeOctokit = octokit;
+    if (ownRequest) {
+      const publishToken = process.env.CMS_PUBLISH_TOKEN || process.env.GITHUB_ADMIN_TOKEN;
+      if (!publishToken) {
+        return { success: false, merged: false, status: 503, message: "Publishing your own work isn't set up on this server yet (missing publish token). Ask the site owner." };
+      }
+      mergeOctokit = getOctokit(publishToken);
+    }
+
+    // CI must be green on the exact version being published (the admin token bypasses GitHub's own check).
+    // Checked before recording an approval that would merge, so a retry while CI runs adds nothing.
+    if (decision === "merge") {
+      const ci = await ciProblem(octokit, headSha);
+      if (ci) return { success: false, merged: false, status: 409, message: ci };
+    }
+
+    // Record the approval pinned to the reviewed commit (GitHub refuses one on your own PR; that's fine)
+    if (!ownRequest) {
+      try {
+        await octokit.pulls.createReview({
+          owner: REPO_OWNER,
+          repo: REPO_NAME,
+          pull_number: pullNumber,
+          commit_id: headSha,
+          event: "APPROVE",
+          body: `Approved by @${reviewerUsername} (${reviewerRole}) via SSN Coding Club CMS Studio`,
+        });
+      } catch {
+        // Quorum below uses our own count of reviews on this exact commit
+      }
     }
 
     if (decision === "count-deputies") {
@@ -1073,29 +1097,12 @@ export async function approveAndMergePR(
           message: `Deputy approval recorded! (${deputyApproverCount}/2 Deputy Approvals on the latest revision). Awaiting second Deputy or Vertical Head approval.`,
         };
       }
-    }
-
-    // CI must be green on the exact version being published (the repo admin bypasses GitHub's own rule).
-    const ci = await ciProblem(octokit, headSha);
-    if (ci) return { success: false, merged: false, status: 409, message: ci };
-
-    // A Superadmin or the vertical's Head publishing work they wrote or edited: say so on the PR and in history.
-    const selfPublished = contributors.has(cleanReviewer);
-    if (selfPublished) {
-      try {
-        await octokit.issues.createComment({
-          owner: REPO_OWNER,
-          repo: REPO_NAME,
-          issue_number: pullNumber,
-          body: `### ✅ Published by @${reviewerUsername} (${reviewerRole}) without a second reviewer\nSuperadmins and a vertical's head may publish their own work. Published version: \`${headSha.slice(0, 7)}\`.`,
-        });
-      } catch {
-        // the merge trailer still records it
-      }
+      const ci = await ciProblem(octokit, headSha);
+      if (ci) return { success: false, merged: false, status: 409, message: ci };
     }
 
     const slug = check.articlePath.replace(/^.*\/([a-z0-9-]+)\.(?:md|json)$/, "$1");
-    const { data: mergeResult } = await octokit.pulls.merge({
+    const { data: mergeResult } = await mergeOctokit.pulls.merge({
       owner: REPO_OWNER,
       repo: REPO_NAME,
       pull_number: pullNumber,
@@ -1108,8 +1115,23 @@ export async function approveAndMergePR(
         slug,
         pullNumber
       ),
-      commit_message: `Authored-by: @${prAuthor} <${prAuthor}@users.noreply.github.com>\n${selfPublished ? "Self-published-by" : "Approved-by"}: @${reviewerUsername} <${reviewerUsername}@users.noreply.github.com> (${reviewerRole})`,
+      commit_message: `Authored-by: @${prAuthor} <${prAuthor}@users.noreply.github.com>
+${selfPublished ? "Self-published-by" : "Approved-by"}: @${reviewerUsername} <${reviewerUsername}@users.noreply.github.com> (${reviewerRole})`,
     });
+
+    if (mergeResult.merged && selfPublished) {
+      try {
+        await octokit.issues.createComment({
+          owner: REPO_OWNER,
+          repo: REPO_NAME,
+          issue_number: pullNumber,
+          body: `### ✅ Published by @${reviewerUsername} (${reviewerRole}) without a second reviewer
+Superadmins and a vertical's head may publish their own work. Published version: \`${headSha.slice(0, 7)}\`.`,
+        });
+      } catch {
+        // the merge trailer still records it
+      }
+    }
 
     if (mergeResult.merged && headBranch && REVIEWABLE_BRANCH_RE.test(headBranch)) {
       try {
@@ -1987,9 +2009,14 @@ export async function withdrawPullRequest(
   if (pr.base.ref !== MAIN_BRANCH || pr.head.repo?.full_name !== `${REPO_OWNER}/${REPO_NAME}` || !REVIEWABLE_BRANCH_RE.test(pr.head.ref)) {
     return { status: 400, message: `PR #${pullNumber} wasn't made by the Studio, so it can't be withdrawn here.` };
   }
-  const vertical = pr.head.ref.split("/")[1] || "";
-  if ((pr.user?.login || "").toLowerCase() !== login.toLowerCase() && !managesVertical(vertical)) {
-    return { status: 403, message: "You can only withdraw your own submissions (Heads: any in their vertical)." };
+  const isAuthor = (pr.user?.login || "").toLowerCase() === login.toLowerCase();
+  if (!isAuthor) {
+    // The vertical comes from the files the PR changes (never from its branch name, which anyone can choose).
+    const files = await octokit.paginate(octokit.pulls.listFiles, { owner: REPO_OWNER, repo: REPO_NAME, pull_number: pullNumber, per_page: 100 });
+    const check = validateArticlePRFiles(files);
+    if (!check.ok || !managesVertical(check.vertical)) {
+      return { status: 403, message: "You can only withdraw your own submissions (Heads: any in their vertical)." };
+    }
   }
   await octokit.issues.createComment({
     owner: REPO_OWNER,
@@ -2137,6 +2164,9 @@ export async function ciProblem(octokit: Octokit, sha: string): Promise<string |
   const runs = data.check_runs || [];
   if (runs.length === 0) return "The site checks haven't started for this version yet. Try again in a minute.";
   if (runs.some((r) => r.status !== "completed")) return "The site checks are still running for this version (about 2 minutes). Try again shortly.";
+  if (runs.every((r) => r.conclusion === "cancelled")) {
+    return "The site checks were cancelled for this version (usually because a newer change started them again). Re-run them on GitHub, then try again.";
+  }
   if (runs.some((r) => r.conclusion !== "success" && r.conclusion !== "skipped" && r.conclusion !== "neutral")) {
     return "The site checks failed for this version, so it can't be published. Open it on GitHub to see what failed, fix it, then try again.";
   }

@@ -52,6 +52,7 @@ This document serves as the single source of truth for all human developers, ver
 2. **Anti-Self-Review for Deputies and Members**:
    - Deputies and Members can NEVER approve or merge work they wrote or edited (enforced at API route level).
    - Superadmins (everywhere) and a Vertical Head (in their own vertical) have full control and may publish their own work through the Studio's "Publish" button. It still goes through a PR, never a direct push to `main` (owner decision, 2026-11-16).
+   - GitHub's `main` ruleset (1 approving review + the `Validate Content & Build Apps` check) is unchanged, and Heads keep plain write access on GitHub. Because GitHub never counts an approval from a PR's own opener, the Studio server merges a self-publish with `CMS_PUBLISH_TOKEN` (falls back to `GITHUB_ADMIN_TOKEN`) only after every Studio check passed, including green CI on the exact version. The merge carries a `Self-published-by:` trailer and a PR comment.
 3. **Anti-IDOR Verification**:
    - The review and draft APIs never trust client-supplied metadata. The server parses the real PR markdown file, author ownership, and branch ref directly from GitHub before authorizing revisions or approvals.
 4. **Media Deferred Upload & Draft Isolation**:

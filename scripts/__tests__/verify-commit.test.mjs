@@ -173,3 +173,9 @@ test("CMS self-publish trailer: Superadmins and Heads only, own noreply address"
   bad("feat(ai-ml): Post (#5)\n\nAuthored-by: @d1 <d1@users.noreply.github.com>\nSelf-published-by: @d1 <d1@users.noreply.github.com> (deputy)");
   bad("feat(ai-ml): Post (#5)\n\nSelf-published-by: @h1 <someone-else@users.noreply.github.com> (vertical_head)");
 });
+
+test("a self-published CMS merge counts as a CMS merge (subject may name a tool), but not with both trailers", () => {
+  const self = "\n\nAuthored-by: @h1 <h1@users.noreply.github.com>\nSelf-published-by: @h1 <h1@users.noreply.github.com> (vertical_head)";
+  ok(`feat(ai-ml): Apps Made with ChatGPT (#7)${self}`);
+  bad(`feat(ai-ml): Apps Made with ChatGPT (#7)${self}\nApproved-by: @sa1 <sa1@users.noreply.github.com> (superadmin)`);
+});

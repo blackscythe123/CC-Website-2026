@@ -12,7 +12,6 @@ import {
   getLiveClubRolesForWrite,
   ALL_VERTICAL_SLUGS,
   GITHUB_USERNAME_REGEX,
-  githubPermissionFor,
 } from "@/lib/roles";
 import type { UserRoleType } from "@/lib/roles";
 import { getSessionToken } from "@/lib/session";
@@ -249,25 +248,36 @@ export async function POST(request: NextRequest) {
     const activeAdminToken = process.env.GITHUB_ADMIN_TOKEN || token;
     let inviteDispatched = false;
 
-    // GitHub access follows the club role after this change (owner decision 2026-11-16): Heads (of any
-    // vertical) and Superadmins get "maintain", which the main-branch ruleset lets merge their own PRs
-    // without a second review; everyone else with a role gets "push" (their PRs still need review);
-    // someone left with no role loses access.
     const isRepoOwner = cleanUsername.toLowerCase() === REPO_OWNER.toLowerCase();
-    if (!isRepoOwner) {
-      const permission = githubPermissionFor(roles, cleanUsername);
-      const hadRole = getUserRoleInfo(cleanUsername, liveRoles).verticals.length > 0 || isTargetSuperadmin;
+    if (action === "assign" && !isRepoOwner) {
       try {
         const adminOctokit = new Octokit({ auth: activeAdminToken });
-        if (permission) {
-          // PUT /collaborators also updates the permission of an existing collaborator
-          await adminOctokit.repos.addCollaborator({ owner: REPO_OWNER, repo: REPO_NAME, username: cleanUsername, permission });
-          inviteDispatched = action === "assign";
-        } else if (action === "remove" && hadRole) {
-          await adminOctokit.repos.removeCollaborator({ owner: REPO_OWNER, repo: REPO_NAME, username: cleanUsername });
+        await adminOctokit.repos.addCollaborator({
+          owner: REPO_OWNER,
+          repo: REPO_NAME,
+          username: cleanUsername,
+          permission: "push",
+        });
+        inviteDispatched = true;
+      } catch (invErr) {
+        console.warn("Could not dispatch repo collaborator invite:", invErr);
+      }
+    } else if (action === "remove" && !isRepoOwner) {
+      // Only revoke repo access when this removal actually took away the user's last club role.
+      const hadRole = getUserRoleInfo(cleanUsername, liveRoles).verticals.length > 0 || isTargetSuperadmin;
+      const remainingInfo = getUserRoleInfo(cleanUsername, roles);
+      const stillSuperadmin = roles.superadmins.some((u) => u.toLowerCase() === cleanUsername.toLowerCase());
+      if (hadRole && !stillSuperadmin && remainingInfo.verticals.length === 0) {
+        try {
+          const adminOctokit = new Octokit({ auth: activeAdminToken });
+          await adminOctokit.repos.removeCollaborator({
+            owner: REPO_OWNER,
+            repo: REPO_NAME,
+            username: cleanUsername,
+          });
+        } catch (remErr) {
+          console.warn("Could not remove repo collaborator:", remErr);
         }
-      } catch (accessErr) {
-        console.warn("Could not update repo collaborator access:", accessErr);
       }
     }
 

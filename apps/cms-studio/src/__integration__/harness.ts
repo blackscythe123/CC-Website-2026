@@ -116,6 +116,8 @@ export function makeWorld(): World {
 
   fake.install(vi);
   vi.stubEnv("GITHUB_ADMIN_TOKEN", "");
+  // Server-side token used only to merge a Head's/Superadmin's own request after all Studio checks pass.
+  vi.stubEnv("CMS_PUBLISH_TOKEN", fake.tokenFor(OWNER));
   vi.stubEnv("GITHUB_PAT", "");
   vi.stubEnv("GITHUB_TOKEN", "");
   vi.stubEnv("SESSION_SECRET", "integration-test-secret");

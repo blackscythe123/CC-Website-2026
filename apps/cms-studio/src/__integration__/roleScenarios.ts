@@ -24,23 +24,6 @@ export function defineRoleScenarios() {
   const remove = (actor: string, target: string, role: string, vertical?: string) =>
     w.roles(actor, { action: "remove", targetUsername: target, role, vertical });
 
-  describe("13a. GitHub access follows the club role", () => {
-    it("Heads and Superadmins get maintain, other roles push, demotion downgrades, no role removes access", async () => {
-      expect((await assign("h1", "x1", "member", "ai-ml")).status).toBe(200);
-      expect(w.fake.collaboratorPermission.get("x1")).toBe("push");
-      expect((await assign("sa1", "x2", "vertical_head", "cybersecurity")).status).toBe(200);
-      expect(w.fake.collaboratorPermission.get("x2")).toBe("maintain");
-      expect((await assign("sa1", "x2", "member", "ai-ml")).status).toBe(200);
-      expect(w.fake.collaboratorPermission.get("x2")).toBe("maintain"); // still a head elsewhere
-      expect((await remove("sa1", "x2", "vertical_head", "cybersecurity")).status).toBe(200);
-      expect(w.fake.collaboratorPermission.get("x2")).toBe("push"); // demoted, still a member
-      expect((await assign("sa1", "x1", "superadmin")).status).toBe(200);
-      expect(w.fake.collaboratorPermission.get("x1")).toBe("maintain");
-      expect((await remove("sa1", "x2", "member", "ai-ml")).status).toBe(200);
-      expect(w.fake.collaboratorPermission.has("x2")).toBe(false); // no role left
-    });
-  });
-
   describe("13. role assignment governance", () => {
     it("h1 assigns x1 as ai-ml member: roles.json + CODEOWNERS change in ONE commit on main, collaborator invited", async () => {
       const commitsBefore = w.fake.history("main").length;

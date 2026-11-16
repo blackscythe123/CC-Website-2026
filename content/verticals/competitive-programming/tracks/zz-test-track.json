@@ -1,0 +1,36 @@
+{
+  "title": "ZZ Test Track",
+  "summary": "Temporary track created by an automated UI test. Safe to delete.",
+  "vertical": "competitive-programming",
+  "topics": [
+    {
+      "id": "graphs-pzbq",
+      "title": "Graphs",
+      "description": "BFS first.\nThen DFS.",
+      "items": [
+        {
+          "id": "af429",
+          "type": "link",
+          "title": "Number of Islands",
+          "url": "https://leetcode.com/problems/number-of-islands/",
+          "difficulty": "medium"
+        }
+      ],
+      "subtopics": [
+        {
+          "id": "shortest-paths-7eq3",
+          "title": "Shortest paths",
+          "items": [
+            {
+              "id": "vevsx",
+              "type": "video",
+              "title": "Dijkstra explained",
+              "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+              "description": "Watch before the problems."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

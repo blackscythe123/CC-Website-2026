@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@coding-club/content-render": "workspace:*",
     "@octokit/rest": "^22.0.1",
     "@types/sanitize-html": "^2.16.2",
     "gray-matter": "^4.0.3",

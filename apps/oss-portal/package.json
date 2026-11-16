@@ -16,14 +16,15 @@
     "tailwindcss": "^4.2.1"
   },
   "dependencies": {
-    "remark-html": "^16.0.1",
-    "react-dom": "19.2.4",
-    "lucide-react": "^1.16.0",
+    "@coding-club/content-render": "workspace:*",
+    "@coding-club/scrapbook-ui": "workspace:*",
     "gray-matter": "^4.0.3",
-    "remark": "^15.0.1",
-    "react": "19.2.4",
+    "lucide-react": "^1.16.0",
     "next": "16.4.4",
-    "@coding-club/scrapbook-ui": "workspace:*"
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "remark": "^15.0.1",
+    "remark-html": "^16.0.1"
   },
   "private": true
 }

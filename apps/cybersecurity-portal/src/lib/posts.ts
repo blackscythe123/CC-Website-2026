@@ -3,6 +3,7 @@ import path from "path";
 import matter from "gray-matter";
 import { remark } from "remark";
 import html from "remark-html";
+import { extractEmbeds, injectEmbeds } from "@coding-club/content-render";
 import portalConfig from "../../portal.config.json";
 
 export interface PortalPostSummary {
@@ -122,7 +123,9 @@ export async function getPortalPost(slug: string): Promise<PortalPostDetail | nu
     return null;
   }
 
-  const processed = await remark().use(html).process(content);
+  // YouTube links alone on a line become players; the iframe is added only after remark-html sanitizes.
+  const { markdown: renderable, embeds } = extractEmbeds(content);
+  const processed = await remark().use(html).process(renderable);
 
   return {
     slug,
@@ -134,6 +137,6 @@ export async function getPortalPost(slug: string): Promise<PortalPostDetail | nu
     coverImage: data.coverImage || "",
     tags: Array.isArray(data.tags) ? data.tags : [],
     readMinutes: estimateReadMinutes(content),
-    contentHtml: processed.toString(),
+    contentHtml: injectEmbeds(processed.toString(), embeds),
   };
 }

@@ -4,6 +4,7 @@ import matter from "gray-matter";
 import { remark } from "remark";
 import html from "remark-html";
 import sanitizeHtml from "sanitize-html";
+import { extractEmbeds, injectEmbeds } from "@coding-club/content-render";
 
 export interface PostSummary {
   slug: string;
@@ -181,9 +182,11 @@ export async function getPost(
 
   const authorUsername = data.authorUsername || "";
   const authorAvatar = data.authorAvatar || (authorUsername ? `https://github.com/${authorUsername}.png` : "");
-  const processed = await remark().use(html).process(content);
+  // YouTube links alone on a line become players; the iframe is added only after sanitizing.
+  const { markdown: renderable, embeds } = extractEmbeds(content);
+  const processed = await remark().use(html).process(renderable);
   const rawHtml = processed.toString();
-  const contentHtml = sanitizeHtml(rawHtml, {
+  const sanitizedHtml = sanitizeHtml(rawHtml, {
     allowedTags: [
       "h1", "h2", "h3", "h4", "h5", "h6",
       "p", "a", "b", "i", "strong", "em", "strike", "code", "hr", "br",
@@ -249,6 +252,7 @@ export async function getPost(
     },
     disallowedTagsMode: "discard",
   });
+  const contentHtml = injectEmbeds(sanitizedHtml, embeds);
 
   return {
     slug: postSlug,

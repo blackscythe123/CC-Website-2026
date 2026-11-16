@@ -63,6 +63,13 @@ jobs:
       - name: "Run Content CI Validation Test"
         run: pnpm run test:content
 
+      - name: "Run CI Script Tests"
+        run: node --test scripts/__tests__/*.test.mjs
+
+      - name: "Run CMS Unit & Multi-User Integration Tests"
+        # Integration tests run the real API routes against an in-memory GitHub; no network or secrets.
+        run: pnpm --filter cms-studio test
+
       - name: "Run Monorepo Build Smoke Test"
         run: pnpm run build
         env:

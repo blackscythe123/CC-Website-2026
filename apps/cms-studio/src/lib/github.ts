@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest";
 import matter from "gray-matter";
-import { parsePlacement, placementErrors, validateTrack, type Track } from "@coding-club/content-schema/tracks";
+import { parsePlacement, placementErrors, placementLabel, validateTrack, TRACK_SLUG_RE, type Placement, type Track } from "@coding-club/content-schema/tracks";
 
 const REPO_OWNER = "blackscythe123";
 const REPO_NAME = "CC-Website-2026";
@@ -31,6 +31,8 @@ export interface CreateDraftParams {
   pendingImages?: PendingImage[];
   pullNumber?: number;
   existingBranch?: string;
+  /** Learning-track placement: an object sets it, null removes it, undefined keeps what the PR already has. */
+  placement?: Placement | null;
 }
 
 export interface DraftResult {
@@ -313,7 +315,10 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
     vertical,
     ...(processedCoverImage ? { coverImage: processedCoverImage } : {}),
     tags: tags && tags.length > 0 ? tags : [vertical],
-    ...(vertical !== "club" && parsePlacement(preservedPlacement) ? { placement: parsePlacement(preservedPlacement) } : {}),
+    ...(() => {
+      const chosen = params.placement === undefined ? parsePlacement(preservedPlacement) : params.placement;
+      return vertical !== "club" && chosen ? { placement: chosen } : {};
+    })(),
   };
 
   const fileContent = matter.stringify(processedBody, fileData);
@@ -757,6 +762,7 @@ export async function getPRArticleContent(token: string, pullNumber: number) {
       authorUsername: typeof parsed.data.authorUsername === "string" ? parsed.data.authorUsername : "",
       headSha: prData.head.sha,
       pullNumber,
+      ...(await placementInfo(octokit, check.vertical, parsed.data.placement)),
     };
   }
 
@@ -1198,6 +1204,7 @@ export interface PersonalDraftParams {
   tags: string[];
   markdownBody: string;
   pendingImages?: PendingImage[];
+  placement?: Placement | null;
 }
 
 export interface PersonalDraftInfo {
@@ -1318,6 +1325,7 @@ export async function savePersonalDraftBranch(params: PersonalDraftParams): Prom
     vertical: vertical || "club",
     ...(processedCoverImage ? { coverImage: processedCoverImage } : {}),
     tags: tags && tags.length > 0 ? tags : [vertical],
+    ...(vertical !== "club" && params.placement ? { placement: params.placement } : {}),
     isWipDraft: true,
   };
 
@@ -1462,6 +1470,7 @@ export async function getPersonalDraftBranch(token: string, branchName: string) 
       coverImage: frontmatter.coverImage || "",
       tags: Array.isArray(frontmatter.tags) ? frontmatter.tags : [],
       targetPortals: Array.isArray(frontmatter.targetPortals) ? frontmatter.targetPortals : ["main-portal"],
+      placement: parsePlacement(frontmatter.placement),
       markdownBody,
     };
   } catch (err) {
@@ -1506,4 +1515,83 @@ export async function placementProblemAtMerge(octokit: Octokit, articlePath: str
   if (problems.length === 0) return null;
   const where = [placement.track, placement.topic, placement.subtopic].filter(Boolean).join(" › ");
   return `This blog is placed under "${where}", which doesn't exist on main any more. Edit the blog and pick another place (or none).`;
+}
+
+/** One learning track as the CMS pickers need it (no resource items). */
+export interface TrackOutline {
+  slug: string;
+  title: string;
+  topics: { id: string; title: string; subtopics: { id: string; title: string }[] }[];
+}
+
+/** Valid tracks of a vertical on current main (invalid files are skipped; CI blocks them anyway). */
+export async function listTracksOnMain(octokit: Octokit, vertical: string): Promise<{ slug: string; track: Track }[]> {
+  if (vertical === "club") return [];
+  let listing: unknown;
+  try {
+    ({ data: listing } = await octokit.repos.getContent({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: `content/verticals/${vertical}/tracks`,
+      ref: MAIN_BRANCH,
+    }));
+  } catch (err) {
+    if ((err as { status?: number }).status === 404) return [];
+    throw err;
+  }
+  if (!Array.isArray(listing)) return [];
+  const files = (listing as { name: string; path: string; type: string }[]).filter(
+    (e) => e.type === "file" && e.name.endsWith(".json") && TRACK_SLUG_RE.test(e.name.slice(0, -5))
+  );
+  const out: { slug: string; track: Track }[] = [];
+  for (const entry of files.slice(0, 50)) {
+    const { data: file } = await octokit.repos.getContent({ owner: REPO_OWNER, repo: REPO_NAME, path: entry.path, ref: MAIN_BRANCH });
+    if (Array.isArray(file) || !("content" in file) || typeof file.content !== "string") continue;
+    try {
+      const slug = entry.name.slice(0, -5);
+      const result = validateTrack(JSON.parse(Buffer.from(file.content, "base64").toString("utf-8")), { vertical, slug });
+      if (result.track) out.push({ slug, track: result.track });
+    } catch {
+      // not JSON: skipped
+    }
+  }
+  return out.sort((a, b) => a.track.title.localeCompare(b.track.title));
+}
+
+export function trackOutline(slug: string, track: Track): TrackOutline {
+  return {
+    slug,
+    title: track.title,
+    topics: track.topics.map((t) => ({
+      id: t.id,
+      title: t.title,
+      subtopics: (t.subtopics || []).map((s) => ({ id: s.id, title: s.title })),
+    })),
+  };
+}
+
+/**
+ * Why a placement can't be used for a new submission (null = fine). Checked against current main.
+ */
+export async function placementProblemOnSubmit(octokit: Octokit, vertical: string, raw: unknown): Promise<string | null> {
+  if (raw === undefined || raw === null) return null;
+  if (vertical === "club") return "Club announcements can't be placed in a learning track.";
+  const placement = parsePlacement(raw);
+  if (!placement) return "That track placement isn't valid. Pick the track, topic and subtopic again.";
+  const tracks = Object.fromEntries((await listTracksOnMain(octokit, vertical)).map((t) => [t.slug, t.track]));
+  const problems = placementErrors(placement, { vertical, tracks });
+  return problems.length ? `${problems[0]} Pick another place for this blog (or none).` : null;
+}
+
+/** Placement of an article plus a readable label from the track on main (marked if it no longer exists). */
+async function placementInfo(octokit: Octokit, vertical: string, raw: unknown): Promise<{ placement: Placement | null; placementLabel: string | null }> {
+  const placement = parsePlacement(raw);
+  if (!placement || vertical === "club") return { placement: null, placementLabel: null };
+  try {
+    const found = (await listTracksOnMain(octokit, vertical)).find((t) => t.slug === placement.track);
+    const label = found ? placementLabel(placement, found.track) : null;
+    return { placement, placementLabel: label ?? `${[placement.track, placement.topic, placement.subtopic].filter(Boolean).join(" › ")} (no longer exists)` };
+  } catch {
+    return { placement, placementLabel: [placement.track, placement.topic, placement.subtopic].filter(Boolean).join(" › ") };
+  }
 }

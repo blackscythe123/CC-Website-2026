@@ -8,6 +8,8 @@ import * as reviewsRoute from "@/app/api/posts/reviews/route";
 import * as manageRoute from "@/app/api/posts/manage/route";
 import * as rolesRoute from "@/app/api/roles/route";
 import * as requestsRoute from "@/app/api/roles/requests/route";
+import * as tracksRoute from "@/app/api/tracks/route";
+import * as remoteDraftsRoute from "@/app/api/posts/drafts/remote/route";
 
 const ROUTES: Record<string, Record<string, (r: NextRequest) => Promise<Response>>> = {
   "/api/posts/draft": draftRoute as never,
@@ -15,6 +17,8 @@ const ROUTES: Record<string, Record<string, (r: NextRequest) => Promise<Response
   "/api/posts/manage": manageRoute as never,
   "/api/roles": rolesRoute as never,
   "/api/roles/requests": requestsRoute as never,
+  "/api/tracks": tracksRoute as never,
+  "/api/posts/drafts/remote": remoteDraftsRoute as never,
 };
 
 // 1x1 transparent PNG
@@ -82,6 +86,8 @@ export interface SubmitOpts {
   pendingImages?: { filename: string; base64: string; placeholderUrl: string }[];
   markdownBody?: string;
   coverImage?: string;
+  /** Sent only when the key is present (undefined = keep, null = none). */
+  placement?: { track: string; topic: string; subtopic?: string } | null | Record<string, unknown>;
 }
 
 export function makeWorld(): World {
@@ -141,6 +147,7 @@ export function makeWorld(): World {
       pendingImages: o.pendingImages ?? (withCover ? [{ filename: "cover.png", base64: PNG_B64, placeholderUrl: placeholder }] : []),
       pullNumber: o.pullNumber,
       existingBranch: o.existingBranch,
+      ...("placement" in o ? { placement: o.placement } : {}),
     };
     const r = await call(login, "POST", "/api/posts/draft", body);
     return { ...r, pull: r.json?.pullNumber, branch: r.json?.branch };

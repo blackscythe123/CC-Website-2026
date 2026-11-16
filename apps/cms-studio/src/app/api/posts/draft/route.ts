@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createDraftAndPullRequest, getPRDetails } from "@/lib/github";
+import { createDraftAndPullRequest, getOctokit, getPRDetails, placementProblemOnSubmit } from "@/lib/github";
+import { parsePlacement } from "@coding-club/content-schema/tracks";
 import { getUserRoleInfo, getLiveClubRoles } from "@/lib/roles";
 import { getSessionToken } from "@/lib/session";
 
@@ -67,6 +68,7 @@ export async function POST(request: NextRequest) {
       pendingImages,
       pullNumber,
       existingBranch,
+      placement,
     } = body;
 
     if (!vertical || !title || !markdownBody) {
@@ -241,6 +243,12 @@ export async function POST(request: NextRequest) {
 
     const assignedPortal = VERTICAL_PORTAL_MAP[vertical] || "main-portal";
 
+    // Learning-track placement: undefined = keep what the PR has, null = none, object = checked against main.
+    if (placement !== undefined) {
+      const problem = await placementProblemOnSubmit(getOctokit(token), vertical, placement);
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+    }
+
     // Create or update branch & PR on GitHub (never direct merge!)
     const result = await createDraftAndPullRequest({
       token,
@@ -257,6 +265,7 @@ export async function POST(request: NextRequest) {
       pendingImages: Array.isArray(pendingImages) ? pendingImages : [],
       pullNumber: verifiedPullNumber,
       existingBranch: verifiedBranch,
+      placement: placement === undefined ? undefined : placement === null ? null : parsePlacement(placement),
     });
 
     return NextResponse.json({

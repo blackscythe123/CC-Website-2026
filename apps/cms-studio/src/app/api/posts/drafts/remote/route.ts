@@ -7,6 +7,7 @@ import {
 } from "@/lib/github";
 import { getSessionToken } from "@/lib/session";
 import { getUserRoleInfo, getLiveClubRoles } from "@/lib/roles";
+import { parsePlacement } from "@coding-club/content-schema/tracks";
 
 const REPO_OWNER = "blackscythe123";
 const REPO_NAME = "CC-Website-2026";
@@ -152,7 +153,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { vertical, slug, title, summary, coverImage, tags, markdownBody, pendingImages, targetPortals } = body;
+    const { vertical, slug, title, summary, coverImage, tags, markdownBody, pendingImages, targetPortals, placement } = body;
 
     const roleInfo = getUserRoleInfo(userData.login, await getLiveClubRoles(true, { token }));
     if (roleInfo.role !== "superadmin" && (!roleInfo.verticals || roleInfo.verticals.length === 0)) {
@@ -224,6 +225,8 @@ export async function POST(request: NextRequest) {
       markdownBody: markdownBody || "",
       pendingImages,
       targetPortals,
+      // Work in progress: a well-formed placement is kept even if its topic is gone; Submit re-checks it.
+      placement: parsePlacement(placement),
     });
 
     return NextResponse.json({ success: true, branch: result.branch });

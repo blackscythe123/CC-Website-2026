@@ -14,6 +14,7 @@ import {
   type StoredRevision,
 } from "@/lib/draftStorage";
 import type { SaveState } from "@/lib/saveStatus";
+import type { Placement } from "@coding-club/content-schema/tracks";
 
 export interface DraftFields {
   title: string;
@@ -23,6 +24,8 @@ export interface DraftFields {
   summary: string;
   tags: string[];
   pendingImages: PendingDraftImage[];
+  /** Where the blog sits in a learning track, or null for a normal blog only. */
+  placement: Placement | null;
 }
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -48,7 +51,7 @@ function fingerprintOf(d: DraftFields) {
 const AUTOSAVE_MS = 2000;
 
 function emptyDraft(vertical: string): DraftFields {
-  return { title: "", content: "", coverImage: "", selectedVertical: vertical, summary: "", tags: [], pendingImages: [] };
+  return { title: "", content: "", coverImage: "", selectedVertical: vertical, summary: "", tags: [], pendingImages: [], placement: null };
 }
 
 function hasAnyContent(d: DraftFields) {
@@ -85,6 +88,7 @@ async function persist(login: string | null, d: DraftFields, revision: StoredRev
     summary: d.summary,
     tags: d.tags,
     pendingImages: d.pendingImages,
+    placement: d.placement,
     revision,
   });
 }
@@ -322,6 +326,7 @@ export function useArticleDraft(initialVertical: string, login: string | null | 
       summary: recovered.summary || "",
       tags: recovered.tags || [],
       pendingImages: images,
+      placement: recovered.placement ?? null,
     }));
     setSaveState({ kind: "local", at: new Date(recovered.updatedAt) });
     setRecovered(null);

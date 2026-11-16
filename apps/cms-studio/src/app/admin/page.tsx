@@ -82,6 +82,7 @@ export default function AdminEditorPage() {
     (v: string) => {
       if (revision?.vertical) return;
       set("selectedVertical", v);
+      set("placement", null); // tracks belong to a vertical
     },
     [revision, set]
   );
@@ -141,6 +142,7 @@ export default function AdminEditorPage() {
             selectedVertical: target?.vertical || a.vertical,
             summary: a.summary || "",
             tags: a.tags || [],
+            placement: a.placement ?? null,
           },
           `PR #${prNumber}`
         );
@@ -253,6 +255,7 @@ export default function AdminEditorPage() {
           summary: draft.summary,
           tags: draft.tags,
           coverImage: draft.coverImage,
+          placement: draft.placement,
           pendingImages: images.map(({ filename, base64, placeholderUrl }) => ({ filename, base64, placeholderUrl })),
         }),
       });
@@ -309,7 +312,7 @@ export default function AdminEditorPage() {
         pendingImages.push({ filename: img.filename, base64: img.base64, mimeType, placeholderUrl: url });
       }
       editor.loadFrom(
-        { title: d.title || "", content, coverImage: cover, selectedVertical: d.vertical, summary: d.summary || "", tags: d.tags || [], pendingImages },
+        { title: d.title || "", content, coverImage: cover, selectedVertical: d.vertical, summary: d.summary || "", tags: d.tags || [], pendingImages, placement: d.placement ?? null },
         branch
       );
       setRevision(null);
@@ -361,6 +364,7 @@ export default function AdminEditorPage() {
           tags: draft.tags,
           markdownBody: draft.content,
           pendingImages: images,
+          placement: draft.placement,
           pullNumber: revision?.number,
           existingBranch: revision?.branch,
         }),
@@ -494,6 +498,8 @@ export default function AdminEditorPage() {
         onSummaryChange={(v) => set("summary", v)}
         tags={draft.tags}
         onTagsChange={(v) => set("tags", v)}
+        placement={draft.placement}
+        onPlacementChange={(v) => set("placement", v)}
         revision={revision ? { number: revision.number, feedback: revision.feedback } : null}
         submitting={submitting}
         serverError={submitError}

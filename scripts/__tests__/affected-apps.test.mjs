@@ -72,6 +72,13 @@ test("real repo: scrapbook-ui does not redeploy cms-studio but does redeploy mai
   assert.ok(DEPLOYABLE_APPS.includes("cms-studio"));
 });
 
+test("content/club/comments.json redeploys every portal but not the CMS; giscus.json redeploys nothing", async () => {
+  const { DEPLOYABLE_APPS, shouldDeployApp } = await import("../lib/affected-apps.mjs");
+  const hit = DEPLOYABLE_APPS.filter((a) => shouldDeployApp(a, ["content/club/comments.json"]).build);
+  assert.deepEqual(hit.sort(), DEPLOYABLE_APPS.filter((a) => a !== "cms-studio").sort());
+  assert.deepEqual(DEPLOYABLE_APPS.filter((a) => shouldDeployApp(a, ["giscus.json"]).build), []);
+});
+
 test("content/club/portals.json redeploys every portal (it feeds their link back to the main portal)", async () => {
   const { DEPLOYABLE_APPS, shouldDeployApp } = await import("../lib/affected-apps.mjs");
   const hit = DEPLOYABLE_APPS.filter((a) => shouldDeployApp(a, ["content/club/portals.json"]).build);

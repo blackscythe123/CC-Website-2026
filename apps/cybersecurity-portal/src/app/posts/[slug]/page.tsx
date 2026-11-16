@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPortalPosts, getPortalPost } from "@/lib/posts";
-import { getPlacementCrumb } from "@/lib/tracks";
+import { getCommentsConfig, getPlacementCrumb } from "@/lib/tracks";
+import Comments from "@coding-club/content-render/comments";
+import { commentTerm } from "@coding-club/content-render";
 import portalConfig from "../../../../portal.config.json";
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
@@ -114,6 +116,7 @@ export default async function PostDetailPage({
           &larr; Back to Index
         </Link>
       </footer>
+      <Comments config={getCommentsConfig()} term={commentTerm("post", portalConfig.verticalSlug, post.slug)} />
     </article>
   );
 }

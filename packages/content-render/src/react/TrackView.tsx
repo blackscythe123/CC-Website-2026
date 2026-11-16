@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Track, TrackItem } from "@coding-club/content-schema/tracks";
+import Comments from "./Comments";
 import {
+  commentTerm,
   countDone,
   parseTrackProgress,
   parseYouTubeUrl,
@@ -11,6 +13,7 @@ import {
   serializeTrackProgress,
   trackProgressKey,
   youTubeEmbedSrc,
+  type CommentsConfig,
   type PlacedPost,
 } from "../index";
 
@@ -43,6 +46,7 @@ export default function TrackView({
   slug,
   placed,
   readOnly = false,
+  comments = null,
 }: {
   track: Track;
   vertical: string;
@@ -51,6 +55,8 @@ export default function TrackView({
   placed: Record<string, PlacedPost[]>;
   /** Preview mode (e.g. in CMS review): no checkboxes, nothing stored. */
   readOnly?: boolean;
+  /** Reader comments config; adds a "Discuss" toggle to every topic and subtopic. */
+  comments?: CommentsConfig | null;
 }) {
   const sections = useMemo(
     () =>
@@ -223,11 +229,13 @@ export default function TrackView({
             )}
           </h2>
           {topic.description ? <p className="cc-track__desc cc-track__desc--section">{topic.description}</p> : null}
+          {readOnly ? null : <Comments config={comments} term={commentTerm("topic", vertical, slug, topic.id)} mode="button" label={`Discussion: ${topic.title}`} />}
           {own.length ? <ul className="cc-track__list">{own.map(renderRow)}</ul> : null}
           {subs.map(({ sub, rows }) => (
             <div key={sub.id} id={`t-${sub.id}`} className="cc-track__sub">
               <h3>{sub.title}</h3>
               {sub.description ? <p className="cc-track__desc cc-track__desc--section">{sub.description}</p> : null}
+              {readOnly ? null : <Comments config={comments} term={commentTerm("topic", vertical, slug, sub.id)} mode="button" label={`Discussion: ${sub.title}`} />}
               {rows.length ? (
                 <ul className="cc-track__list">{rows.map(renderRow)}</ul>
               ) : (

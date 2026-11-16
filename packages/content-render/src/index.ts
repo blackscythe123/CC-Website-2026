@@ -254,3 +254,36 @@ export function groupPlacedPosts(
   }
   return groups;
 }
+
+// ---------------------------------------------------------------------------
+// Reader comments (GitHub Discussions via giscus). Pure helpers; the widget is ./comments.
+// ---------------------------------------------------------------------------
+
+export interface CommentsConfig {
+  enabled: boolean;
+  repo: string;
+  repoId: string;
+  category: string;
+  categoryId: string;
+  disabledVerticals: string[];
+}
+
+const SAFE_PART = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Discussion term (also the Discussion title) for a page. Stable across domains:
+ *   post:<vertical|club>/<slug>, track:<vertical>/<track>, topic:<vertical>/<track>/<section-id>
+ * Returns null for anything that isn't a safe kebab-case part.
+ */
+export function commentTerm(kind: "post" | "track" | "topic", ...parts: string[]): string | null {
+  const expected = kind === "topic" ? 3 : 2;
+  if (parts.length !== expected || !parts.every((p) => typeof p === "string" && p.length <= 80 && SAFE_PART.test(p))) return null;
+  return `${kind}:${parts.join("/")}`;
+}
+
+export { parseCommentsConfig } from "@coding-club/content-schema/comments";
+
+/** Whether comments should render for a vertical ("club" for club posts). */
+export function commentsOn(config: CommentsConfig | null | undefined, vertical: string): config is CommentsConfig {
+  return Boolean(config && config.enabled && config.categoryId && !config.disabledVerticals.includes(vertical));
+}

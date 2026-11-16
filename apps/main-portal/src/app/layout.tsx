@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import SiteNavbar from '../components/SiteNavbar';
 import HeadingReveal from '../components/HeadingReveal';
 import './globals.css';
+import '@coding-club/content-render/styles/track-view.css';
 import '@coding-club/scrapbook-ui/scrapbook.css';
 import '@coding-club/scrapbook-ui/responsive.css';
 import '@coding-club/scrapbook-ui/vertical-portal.css';

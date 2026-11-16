@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
  * POST /api/tracks { vertical, slug, track, mode: "create" | "edit", pullNumber?, expectedHeadSha? }
  *   → { pullNumber, prUrl, branch }
  * Opens (or revises) a learning-track pull request. Only the vertical's Head or a Superadmin may do this;
- * a Superadmin must approve it before it reaches main.
+ * the vertical's Head or a Superadmin publishes it (their own included) before it reaches main.
  */
 export async function POST(request: NextRequest) {
   const token = getSessionToken(request);
@@ -97,7 +97,8 @@ export async function POST(request: NextRequest) {
     if (pullNumber !== undefined) {
       // Anti-IDOR: only the PR's own author (or a Superadmin) may push revisions into it.
       const pr = await getPRDetails(token, pullNumber);
-      if ((pr.user?.login || "").toLowerCase() !== String(user.login).toLowerCase() && role !== "superadmin") {
+      // Only the vertical's Head or a Superadmin reach this point (checked above); both may revise any track proposal there.
+      if ((pr.user?.login || "").toLowerCase() !== String(user.login).toLowerCase() && role !== "superadmin" && role !== "vertical_head") {
         return NextResponse.json({ error: "You can't update a track proposal opened by someone else." }, { status: 403 });
       }
     }

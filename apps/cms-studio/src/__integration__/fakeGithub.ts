@@ -118,6 +118,10 @@ export class FakeGitHub {
 
   users = new Map<string, { login: string; name: string }>(); // token -> user
   collaborators = new Set<string>([OWNER]);
+  /** CI result per commit sha for GET /commits/:sha/check-runs; unset = a completed, successful run. */
+  ciStatus = new Map<string, "success" | "failure" | "in_progress" | "none">();
+  /** Last permission requested per user via PUT /collaborators/:user (invite or update). */
+  collaboratorPermission = new Map<string, string>();
   invitations = new Set<string>();
 
   log: LoggedRequest[] = [];
@@ -772,6 +776,16 @@ export class FakeGitHub {
     }
 
     // ------------------------------------------------------------ commits / compare
+    if ((m = p.match(/^\/commits\/([^/]+)\/check-runs$/)) && method === "GET") {
+      const sha = this.resolveRef(m[1]);
+      if (!sha) throw new HttpError(404, "Not Found");
+      const st = this.ciStatus.get(sha) ?? "success";
+      const runs =
+        st === "none"
+          ? []
+          : [{ id: 1, name: "Validate Content & Build Apps", head_sha: sha, status: st === "in_progress" ? "in_progress" : "completed", conclusion: st === "in_progress" ? null : st }];
+      return { status: 200, body: { total_count: runs.length, check_runs: runs } };
+    }
     if (p === "/commits" && method === "GET") {
       // first-parent history of a ref, newest first (enough for the Studio's "recent changes" reads)
       let sha = this.resolveRef(c.query.get("sha") || "main");
@@ -986,11 +1000,13 @@ export class FakeGitHub {
       const login = m[1];
       if (method === "PUT") {
         if (login === OWNER) throw new HttpError(422, "Repository owner cannot be added as a collaborator");
+        this.collaboratorPermission.set(login, String(c.body?.permission || "push"));
         if (this.collaborators.has(login)) return { status: 204 };
         this.invitations.add(login);
         return { status: 201, body: { id: this.nextId++, invitee: this.userJson(login) } };
       }
       if (method === "DELETE") {
+        this.collaboratorPermission.delete(login);
         this.collaborators.delete(login);
         this.invitations.delete(login);
         return { status: 204 };

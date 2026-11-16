@@ -3,7 +3,7 @@ import matter from "gray-matter";
 import { articleMd, makeWorld, type World } from "./harness";
 
 // Phase 3b: learning tracks are proposed by the Vertical Head (or a Superadmin) as one-file PRs on
-// track/<v>/<slug>-<id> branches and must be approved by a Superadmin (another one for a Superadmin's track).
+// track/<v>/<slug>-<id> branches; the vertical's Head or a Superadmin publishes them (their own included).
 let w: World;
 const PATH = "content/verticals/ai-ml/tracks/ml-roadmap.json";
 

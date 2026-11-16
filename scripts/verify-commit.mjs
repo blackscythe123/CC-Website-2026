@@ -58,6 +58,10 @@ const cmsAuthoredRegex = new RegExp(`^Authored-by: @(${GH_USER}) <\\1@users\\.no
 const cmsApprovedRegex = new RegExp(
   `^Approved-by: @(${GH_USER}) <\\1@users\\.noreply\\.github\\.com> \\((superadmin|vertical_head|deputy)\\)$`
 );
+// A Superadmin (anywhere) or the vertical's Head publishing their own work, with no second reviewer.
+const cmsSelfPublishedRegex = new RegExp(
+  `^Self-published-by: @(${GH_USER}) <\\1@users\\.noreply\\.github\\.com> \\((superadmin|vertical_head)\\)$`
+);
 const cmsSubjectRegex = /^feat\([a-z0-9-]+\):\s+.+\s\(#\d+\)$/;
 const trailerLikeRegex = /^[A-Za-z][A-Za-z-]*-by:/i;
 const validEmailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -69,7 +73,7 @@ function validateTrailer(line) {
     fail(`AI assistants cannot be credited in commit trailers (${aiHit}). Only real human collaborators are permitted.`, `Invalid line: "${line}"`);
   }
 
-  if (cmsAuthoredRegex.test(line) || cmsApprovedRegex.test(line)) {
+  if (cmsAuthoredRegex.test(line) || cmsApprovedRegex.test(line) || cmsSelfPublishedRegex.test(line)) {
     return "cms";
   }
 

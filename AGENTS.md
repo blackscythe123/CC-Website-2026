@@ -119,7 +119,7 @@ The central hub connecting all 8 technical verticals, cross-vertical blog index 
   - Member post: 2 Deputy approvals OR 1 Vertical Head OR 1 Superadmin.
   - Deputy post: 1 Vertical Head OR 1 Superadmin.
   - Vertical Head post: 1 Superadmin.
-  - Anti-Self-Review: Authors are strictly blocked from reviewing or merging their own articles (enforced by API and GitHub).
+  - Anti-Self-Review: Deputies and Members can never approve or merge work they wrote or edited. Superadmins (everywhere) and a Vertical Head (in their own vertical) have full control and may publish their own work through the Studio; it still goes through a PR, the merge is marked `Self-published-by`, and CI must pass first (owner decision 2026-11-16).
 
 ---
 

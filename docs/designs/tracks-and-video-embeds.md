@@ -217,7 +217,7 @@ All existing rules apply: no self-approval, commit-author checks, `expectedHeadS
 - Review/merge as §7.3 (patched for v3.1): `track/` namespace in `REVIEWABLE_BRANCH_RE` and the draft route's revision check; `classifyEditorialPR` (renamed from `validateArticlePRFiles`) → `publish | unpublish | track`; `getPRContent` (renamed from `getPRArticleContent`) union; merge re-runs `validateTrack` at head sha; subject `feat(<v>): track <title> (#n)`.
 
 ### 3.4 Phase 3 tests
-3a: member places a blog → normal quorum merges it → it appears in the tree; invalid placement refused at submit; edit keeps/changes placement. 3b: Head creates → Superadmin approves → merges; Deputy/Member refused to submit; Deputy approval doesn't count; extra file refused; type crossover refused; bad JSON pushed after review caught at merge; changed id refused; stale `expectedHeadSha` 409. Fixtures `zz-test-*`, deleted afterwards.
+3a: member places a blog → normal quorum merges it → it appears in the tree; invalid placement refused at submit; edit keeps/changes placement. 3b: Head creates → the Head (or a Superadmin) publishes → merges; Deputy/Member refused to submit; Deputy approval doesn't count; extra file refused; type crossover refused; bad JSON pushed after review caught at merge; changed id refused; stale `expectedHeadSha` 409. Fixtures `zz-test-*`, deleted afterwards.
 
 ## 4. Phase 4: Reader comments (GitHub Discussions via giscus)
 
@@ -350,7 +350,7 @@ Each phase is reviewed and merged on its own.
   - The opener must be Head or Superadmin of that vertical (v3.1), checked again at merge.
 - **Authority:**
   - For tracks, `evaluateReviewerAuthority` uses the article table except that `count-deputies` is never returned.
-  - A Deputy or Head reviewer of a track gets "needs a Superadmin" (v3.1: tracks are authored by Heads or Superadmins, so only a Superadmin can approve).
+  - A Deputy reviewer of a track is refused. The vertical's Head or a Superadmin publishes it, including their own (owner decision 2026-11-16).
 - **Order inside `checkReviewPreconditions` (all before any review is recorded):**
   1. PR state, base and branch checks
   2. classify and complete-listing checks

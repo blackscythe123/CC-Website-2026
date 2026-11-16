@@ -113,11 +113,10 @@ describe("17. merges never overwrite a change made on main in the meantime", () 
 });
 
 describe("18. withdrawing a pending request", () => {
-  it("the author withdraws: PR closed, branch deleted, main untouched; others can't; superadmins can", async () => {
+  it("the author withdraws: PR closed, branch deleted, main untouched; other members, deputies and other heads can't; superadmins and the vertical's head can", async () => {
     const before = w.mainTip();
     const s = await w.submit("m1");
-    expect((await w.call("m2", "POST", "/api/posts/withdraw", { pullNumber: s.pull })).status).toBe(403);
-    expect((await w.call("h1", "POST", "/api/posts/withdraw", { pullNumber: s.pull })).status).toBe(403);
+    for (const u of ["m2", "d1", "h2"]) expect((await w.call(u, "POST", "/api/posts/withdraw", { pullNumber: s.pull })).status, u).toBe(403);
     const ok = await w.call("m1", "POST", "/api/posts/withdraw", { pullNumber: s.pull });
     expect(ok.status).toBe(200);
     expect(w.fake.pull(s.pull).state).toBe("closed");
@@ -128,6 +127,17 @@ describe("18. withdrawing a pending request", () => {
 
     const t = await w.submit("m2", { title: "Another one" });
     expect((await w.call("sa1", "POST", "/api/posts/withdraw", { pullNumber: t.pull })).status).toBe(200);
+    const u = await w.submit("m2", { title: "Third one" });
+    expect((await w.call("h1", "POST", "/api/posts/withdraw", { pullNumber: u.pull })).status).toBe(200);
+  });
+
+  it("the vertical's head may revise a member's request there; other heads and deputies can't", async () => {
+    const s = await w.submit("m1");
+    expect((await w.submit("h2", { pullNumber: s.pull, existingBranch: s.branch, cover: false })).status).toBe(403);
+    expect((await w.submit("d1", { pullNumber: s.pull, existingBranch: s.branch, cover: false })).status).toBe(403);
+    const ok = await w.submit("h1", { pullNumber: s.pull, existingBranch: s.branch, body: "Fixed by the head.", cover: false });
+    expect(ok.status).toBe(200);
+    expect(matter(w.fake.readText(s.branch, "content/verticals/ai-ml/posts/intro-to-transformers.md")!).data.authorUsername).toBe("m1");
   });
 
   it("refuses PRs not made by the Studio", async () => {
@@ -162,7 +172,7 @@ describe("19. restoring an unpublished article", () => {
     expect(w.fake.readText(pr.headRef, AI_POST)).toBe(original);
     expect(w.fake.readFile("main", AI_POST)).toBeNull();
 
-    // the original author (h1) restored it, so a Superadmin approves
+    // h1 (the vertical's Head) asked to restore it; a Deputy can't publish that, a Superadmin (or h1) can
     expect((await w.review("d1", r.json.pullNumber, "approve")).status).toBe(403);
     expect((await w.review("sa2", r.json.pullNumber, "approve")).json.merged).toBe(true);
     expect(w.fake.readText("main", AI_POST)).toBe(original);
@@ -213,5 +223,38 @@ describe("20. deleting a track", () => {
     expect(w.fake.readFile("main", TRACK)).toBeNull();
     expect(w.fake.readText("main", AI_POST)).toBeTruthy();
     expect(w.fake.history("main")[0].message.split("\n")[0]).toBe(`chore(ai-ml): remove track ml-basics (#${r.json.pullNumber})`);
+  });
+});
+
+describe("21. publishing waits for CI and self-publishes are recorded", () => {
+  it("refuses while CI hasn't run, is running or failed on the exact version; merges once it passed", async () => {
+    const s = await w.submit("m1");
+    const sha = w.fake.headSha(s.pull);
+    for (const [st, msg] of [
+      ["none", /haven't started/],
+      ["in_progress", /still running/],
+      ["failure", /failed for this version/],
+    ] as const) {
+      w.fake.ciStatus.set(sha, st);
+      const r = await w.review("h1", s.pull, "approve");
+      expect(r.status, st).toBe(409);
+      expect(r.json.error).toMatch(msg);
+      expect(w.fake.pull(s.pull).merged).toBe(false);
+    }
+    w.fake.ciStatus.set(sha, "success");
+    expect((await w.review("h1", s.pull, "approve")).json.merged).toBe(true);
+  });
+
+  it("a head's own publish is marked Self-published-by with a PR comment; a normal approval stays Approved-by", async () => {
+    const own = await w.submit("h1", { title: "Head Own", slug: "head-own" });
+    expect((await w.review("h1", own.pull, "approve")).json.merged).toBe(true);
+    const msg = w.fake.history("main")[0].message;
+    expect(msg).toContain("Self-published-by: @h1 <h1@users.noreply.github.com> (vertical_head)");
+    expect(msg).not.toContain("Approved-by");
+    expect(w.fake.commentsOf(own.pull).some((c) => /Published by @h1 \(vertical_head\) without a second reviewer/.test(c.body))).toBe(true);
+
+    const other = await w.submit("m1", { title: "Member Post", slug: "member-post" });
+    expect((await w.review("h1", other.pull, "approve")).json.merged).toBe(true);
+    expect(w.fake.history("main")[0].message).toContain("Approved-by: @h1 <h1@users.noreply.github.com> (vertical_head)");
   });
 });

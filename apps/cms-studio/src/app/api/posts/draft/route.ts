@@ -143,7 +143,8 @@ export async function POST(request: NextRequest) {
       try {
         const prDetails = await getPRDetails(token, parsedPull);
         const prAuthor = prDetails.user?.login?.toLowerCase();
-        if (prAuthor !== userData.login.toLowerCase() && roleInfo.role !== "superadmin") {
+        // The PR's author, a Superadmin, or the Head of this vertical (full control there) may revise it.
+        if (prAuthor !== userData.login.toLowerCase() && roleInfo.role !== "superadmin" && roleInfo.rolesByVertical?.[vertical] !== "vertical_head") {
           return NextResponse.json(
             { error: "Access Denied: You cannot submit revisions to a Pull Request opened by another author." },
             { status: 403 }

@@ -48,6 +48,8 @@ interface PublishDrawerProps {
   revision: { number: number; feedback: string } | null;
   /** Editing an already-published article (slug and vertical fixed). */
   editing?: boolean;
+  /** The signed-in user can create tracks in the selected vertical (its Head, or a Superadmin). */
+  canManageTracks?: boolean;
   submitting: boolean;
   serverError: string | null;
   onSubmit: () => void;
@@ -204,13 +206,13 @@ export default function PublishDrawer(props: PublishDrawerProps) {
             <h3 id="placement-title" className="text-[13px] font-bold">
               Where does this go?
             </h3>
-            {open ? <PlacementPicker vertical={selectedVertical} value={props.placement} onChange={props.onPlacementChange} /> : null}
+            {open ? <PlacementPicker vertical={selectedVertical} value={props.placement} onChange={props.onPlacementChange} canManageTracks={props.canManageTracks} /> : null}
           </section>
         ) : null}
 
         <p className="flex items-start gap-2 text-[13px] leading-relaxed text-muted">
           <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          Submitting opens a pull request on a draft branch. A deputy, head or superadmin must approve it before it goes live — even superadmins need another reviewer.
+          Submitting opens a pull request on a draft branch. It goes live once approved: Member work by 2 deputies or the head; Deputy work by the head or a superadmin. Heads (in their vertical) and superadmins can publish their own work from Reviews.
         </p>
       </div>
     </Drawer>

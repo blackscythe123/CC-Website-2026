@@ -30,10 +30,13 @@ export default function PlacementPicker({
   vertical,
   value,
   onChange,
+  canManageTracks = false,
 }: {
   vertical: string;
   value: Placement | null;
   onChange: (next: Placement | null) => void;
+  /** Heads of this vertical and Superadmins: offer a link to create a track. */
+  canManageTracks?: boolean;
 }) {
   const [load, setLoad] = useState<Load>({ state: "loading" });
 
@@ -70,6 +73,15 @@ export default function PlacementPicker({
     return (
       <p className="text-[13px] text-muted">
         This vertical has no learning tracks yet, so the blog is published as a normal blog.
+        {canManageTracks ? (
+          <>
+            {" "}
+            <a href="/admin/tracks" target="_blank" rel="noopener noreferrer" className="font-semibold text-accent underline">
+              Create a track
+            </a>{" "}
+            (opens in a new tab), then reopen this panel to pick it.
+          </>
+        ) : null}
       </p>
     );
   }

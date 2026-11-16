@@ -575,6 +575,7 @@ export default function AdminEditorPage() {
         onPlacementChange={(v) => set("placement", v)}
         revision={revision ? { number: revision.number, feedback: revision.feedback } : null}
         editing={Boolean(editing)}
+        canManageTracks={isSuperadmin || roleInfo?.rolesByVertical?.[draft.selectedVertical] === "vertical_head"}
         submitting={submitting}
         serverError={submitError}
         onSubmit={submit}

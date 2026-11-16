@@ -7,6 +7,8 @@ import { CLUB_VERTICAL, getVertical } from "@/lib/verticals";
 import { getSubmitChecklist, type ChecklistItem } from "@/lib/submitChecklist";
 import { addTag } from "@/lib/tags";
 import { Button, Drawer, Field, Input, Select, Textarea } from "@/components/ui";
+import type { Placement } from "@coding-club/content-schema/tracks";
+import PlacementPicker from "@/components/editor/PlacementPicker";
 
 const SUMMARY_SOFT_LIMIT = 200;
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
@@ -41,6 +43,8 @@ interface PublishDrawerProps {
   onSummaryChange: (value: string) => void;
   tags: string[];
   onTagsChange: (tags: string[]) => void;
+  placement: Placement | null;
+  onPlacementChange: (placement: Placement | null) => void;
   revision: { number: number; feedback: string } | null;
   submitting: boolean;
   serverError: string | null;
@@ -184,6 +188,15 @@ export default function PublishDrawer(props: PublishDrawerProps) {
             />
           </div>
         </Field>
+
+        {selectedVertical !== "club" ? (
+          <section aria-labelledby="placement-title" className="space-y-2 rounded-xl border border-border px-4 py-3">
+            <h3 id="placement-title" className="text-[13px] font-bold">
+              Where does this go?
+            </h3>
+            {open ? <PlacementPicker vertical={selectedVertical} value={props.placement} onChange={props.onPlacementChange} /> : null}
+          </section>
+        ) : null}
 
         <p className="flex items-start gap-2 text-[13px] leading-relaxed text-muted">
           <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />

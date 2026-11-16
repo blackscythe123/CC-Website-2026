@@ -1,4 +1,5 @@
 // Native IndexedDB helper for local draft auto-saving and power-cut recovery
+import type { Placement } from "@coding-club/content-schema/tracks";
 const DB_NAME = "CodingClubCMS";
 const DB_VERSION = 1;
 const STORE_NAME = "canvas_drafts";
@@ -41,6 +42,8 @@ export interface StoredDraft {
   summary: string;
   tags: string[];
   pendingImages: PendingDraftImage[];
+  /** Where the blog sits in a learning track (optional; older drafts don't have it). */
+  placement?: Placement | null;
   /** Set while the draft is a revision of an open PR; re-verified against GitHub on Restore. */
   revision?: StoredRevision | null;
   updatedAt: number;

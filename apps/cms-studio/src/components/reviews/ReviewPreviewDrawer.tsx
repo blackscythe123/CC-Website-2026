@@ -19,6 +19,8 @@ export interface PreviewArticle {
   pullNumber: number;
   /** Head commit shown in this preview; sent back as expectedHeadSha when reviewing. */
   headSha?: string;
+  /** "DSA Sheet › Arrays › Two pointers" when the blog is placed in a learning track. */
+  placementLabel?: string | null;
 }
 
 export default function ReviewPreviewDrawer({
@@ -90,6 +92,11 @@ export default function ReviewPreviewDrawer({
           {stale ? (
             <p role="alert" className="mb-4 rounded-lg bg-warning-bg p-3 text-sm text-warning">
               This article changed since you opened it. Close and reopen the preview to review the latest version.
+            </p>
+          ) : null}
+          {article.placementLabel ? (
+            <p className="mb-4 rounded-lg border border-border bg-bg p-3 text-sm">
+              <span className="font-semibold">Placed in learning track:</span> {article.placementLabel}
             </p>
           ) : null}
           <ArticlePreview

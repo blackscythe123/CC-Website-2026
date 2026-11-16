@@ -115,3 +115,83 @@ describe("13. blog placement in learning tracks", () => {
     expect(w.fake.readFile("main", ARTICLE)).toBeNull();
   });
 });
+
+describe("14. placement picker (Phase 3a): tracks API, submit, revise, cloud drafts, review preview", () => {
+  it("GET /api/tracks lists the vertical's tracks (ids and titles only); needs a session; club is empty; bad vertical 400", async () => {
+    const r = await w.call("m1", "GET", "/api/tracks?vertical=ai-ml");
+    expect(r.status).toBe(200);
+    expect(r.json.tracks).toEqual([
+      {
+        slug: "ml-basics",
+        title: "ML Basics",
+        topics: [
+          { id: "basics", title: "BASICS", subtopics: [{ id: "attention", title: "attention" }] },
+          { id: "advanced", title: "ADVANCED", subtopics: [] },
+        ],
+      },
+    ]);
+    expect((await w.call(null, "GET", "/api/tracks?vertical=ai-ml")).status).toBe(401);
+    expect((await w.call("m1", "GET", "/api/tracks?vertical=club")).json.tracks).toEqual([]);
+    expect((await w.call("m1", "GET", "/api/tracks?vertical=full-stack")).json.tracks).toEqual([]);
+    expect((await w.call("m1", "GET", "/api/tracks?vertical=../x")).status).toBe(400);
+  });
+
+  it("submitting with a placement writes it; the review preview shows a readable label", async () => {
+    const s = await w.submit("m1", { placement: { track: "ml-basics", topic: "basics", subtopic: "attention" } });
+    expect(s.status).toBe(200);
+    expect(matter(w.fake.readText(s.branch, ARTICLE)!).data.placement).toEqual({ track: "ml-basics", topic: "basics", subtopic: "attention" });
+
+    const preview = await w.call("h1", "GET", `/api/posts/reviews?previewPullNumber=${s.pull}`);
+    expect(preview.status).toBe(200);
+    expect(preview.json.article.placementLabel).toBe("ML Basics › BASICS › attention");
+    expect(preview.json.article.placement).toEqual({ track: "ml-basics", topic: "basics", subtopic: "attention" });
+  });
+
+  it("refuses a placement that doesn't resolve on main, a malformed one, and one on a club post — before anything is written", async () => {
+    const before = w.fake.mutations().length;
+    for (const bad of [
+      { track: "ml-basics", topic: "graphs" },
+      { track: "ml-basics", topic: "advanced", subtopic: "attention" },
+      { track: "nope", topic: "basics" },
+      { track: "ml-basics", topic: "basics", evil: "x" },
+      { track: "ml-basics" },
+    ]) {
+      const r = await w.submit("m1", { placement: bad });
+      expect(r.status, JSON.stringify(bad)).toBe(400);
+    }
+    const club = await w.submit("sa1", { vertical: "club", title: "Club news", placement: { track: "ml-basics", topic: "basics" } });
+    expect(club.status).toBe(400);
+    expect(club.json.error).toMatch(/Club announcements can't be placed/);
+    expect(w.fake.mutations().length).toBe(before);
+    expect(w.fake.pulls).toHaveLength(0);
+  });
+
+  it("a revision can move the placement, remove it (null), or keep it (field omitted)", async () => {
+    const s = await w.submit("m1", { placement: { track: "ml-basics", topic: "basics" } });
+    const fm = () => matter(w.fake.readText(s.branch, ARTICLE)!).data;
+
+    await w.submit("m1", { pullNumber: s.pull, existingBranch: s.branch, cover: false, placement: { track: "ml-basics", topic: "advanced" } });
+    expect(fm().placement).toEqual({ track: "ml-basics", topic: "advanced" });
+
+    await w.submit("m1", { pullNumber: s.pull, existingBranch: s.branch, cover: false, body: "v3" });
+    expect(fm().placement).toEqual({ track: "ml-basics", topic: "advanced" });
+
+    await w.submit("m1", { pullNumber: s.pull, existingBranch: s.branch, cover: false, placement: null });
+    expect(fm().placement).toBeUndefined();
+  });
+
+  it("a cloud (WIP) draft keeps the placement and gives it back when reopened", async () => {
+    const saved = await w.call("m1", "POST", "/api/posts/drafts/remote", {
+      vertical: "ai-ml",
+      title: "ZZ wip placement",
+      markdownBody: "Body",
+      summary: "",
+      tags: [],
+      placement: { track: "ml-basics", topic: "basics" },
+    });
+    expect(saved.status).toBe(200);
+    const opened = await w.call("m1", "GET", `/api/posts/drafts/remote?branch=${encodeURIComponent(saved.json.branch)}`);
+    expect(opened.status).toBe(200);
+    expect(opened.json.draft.placement).toEqual({ track: "ml-basics", topic: "basics" });
+  });
+});

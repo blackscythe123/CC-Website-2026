@@ -1,12 +1,16 @@
-# Design: YouTube Embeds and Learning Tracks
+# Design: YouTube Embeds, Learning Tracks and Comments
 
-Status: **v2.1, revised after two EGM goldfish review rounds (round 2: no blockers; its 3 majors and nits are resolved in §6); awaiting owner approval**
+Status: **v3.1.** Phase 1 (v2.1) is shipped (PR #31). Phases 2–4 redesigned on 2026-11-16 after the owner's clarification, then revised after an EGM review (design, readiness, codebase accuracy, scope) and two owner decisions: blogs join a tree only through their own placement, and placement follows the normal blog quorum.
 Date: 2026-11-16
 Request (club leads): "add an option to embed YT videos/playlists into a blog, and a way to organise blogs according to topic and subtopic (NeetCode was only an example of the shape) so CP and other verticals can create DSA courses or internship guidance; let the CMS manage it."
 
 Owner decisions already made:
 - Build in phases, with a simple CMS form, not a full tree editor.
 - Name: **Tracks**, which appears in URLs and menus.
+- (v3) A vertical can have **several** tracks (topic trees). **Only the Head** (or a Superadmin) creates and organises a track's topics and subtopics.
+- (v3) **Any blog author** in a vertical can place their blog **directly under a topic or under a subtopic** of one of that vertical's tracks, or leave it as a normal blog. Placement is chosen in the blog editor and reviewed with the blog under the normal blog quorum (v3.1). Blogs join a tree **only** this way; the track file holds topics, subtopics, links and videos.
+- (v3) Topics, subtopics, links and videos can carry a written **description**.
+- (v3) **Any reader can comment** on any blog, track, topic or subtopic after signing in with GitHub. Readers get no CMS access. Comments are stored in **this repo's GitHub Discussions** (one repo, a dedicated category), via giscus.
 
 ## 0. What changed from v1 (and why)
 
@@ -83,10 +87,18 @@ Deploy impact: changing `packages/content-render` redeploys the apps that depend
   - a built portal article shows the player and plays.
   - Real Chromium is required, and Obscura is not enough, because its renderer is not faithful.
 
-## 2. Phase 2: Track pages (vertical portals)
+## 2. Phase 2: Tracks on the portals (v3.1)
 
-### 2.1 File format
-**Path:** `content/verticals/<vertical>/tracks/<track-slug>.json`. There are no club-level tracks.
+### 2.1 Concepts
+- **Track:** a named topic tree in one vertical, e.g. CP's "DSA Sheet" and "Internship Prep". A vertical can have several.
+- **Topic → Subtopic:** two levels, no deeper.
+- **What sits in a topic or subtopic:**
+  1. **Resources** stored in the track file by the Head: `link` items (e.g. a LeetCode problem) and `video` items (YouTube), each with an optional description.
+  2. **Blogs** that chose that topic/subtopic in their own frontmatter (`placement`). **This is the only way a blog joins a tree** (owner decision, v3.1). To add an existing blog, its author or an editor edits the blog and picks a topic; it goes through normal review.
+- A placed blog is **still a normal blog**: same URL, still in the blog list. Its row in the tree shows its title and its existing `summary` as the description.
+
+### 2.2 Track file
+**Path:** `content/verticals/<vertical>/tracks/<track-slug>.json`. No club-level tracks.
 
 ```json
 {
@@ -95,20 +107,21 @@ Deploy impact: changing `packages/content-render` redeploys the apps that depend
   "vertical": "competitive-programming",
   "topics": [
     {
+      "id": "arrays",
       "title": "Arrays & Hashing",
+      "description": "Start here. Most interview problems reduce to these patterns.",
       "items": [
-        { "id": "a1", "type": "post", "slug": "two-pointers-explained" },
-        { "id": "a2", "type": "link", "title": "Two Sum", "url": "https://leetcode.com/problems/two-sum/", "difficulty": "easy" }
+        { "id": "a2", "type": "link", "title": "Two Sum", "url": "https://leetcode.com/problems/two-sum/", "difficulty": "easy", "description": "Classic hash-map warm-up." }
       ],
       "subtopics": [
-        { "title": "Sliding window", "items": [{ "id": "a3", "type": "video", "title": "Sliding window in 10 min", "url": "https://youtu.be/AAAAAAAAAAA" }] }
+        { "id": "sliding-window", "title": "Sliding window", "items": [
+          { "id": "a3", "type": "video", "title": "Sliding window in 10 min", "url": "https://youtu.be/AAAAAAAAAAA", "description": "Watch before the problems below." }
+        ] }
       ]
     }
   ]
 }
 ```
-
-**Field rules:**
 
 | Field | Rule |
 |---|---|
@@ -116,142 +129,151 @@ Deploy impact: changing `packages/content-render` redeploys the apps that depend
 | `summary` | 0–300 chars |
 | `vertical` | must equal the folder |
 | `topics` | 1–30 |
-| each topic | `title` 1–120; `items` 0–100; `subtopics` 0–30 |
-| each subtopic | `title` 1–120; `items` 1–100 |
-| total items per track | ≤ 500 |
-| file size | ≤ 200 KB |
-| item `id` | `^[a-z0-9]{1,12}$`, unique within the track; never reused for a different item |
-| `post` item | `slug` must be kebab-case |
-| `link` item | `title` 1–120; `url` https only, no user:pass, ≤ 500 chars; optional `difficulty` of `easy`, `medium` or `hard` |
-| `video` item | `title` 1–120; `url` must pass `parseYouTubeUrl` |
-| unknown keys | rejected (strict) |
+| topic | `id`, `title` 1–120, optional `description` ≤ 1000, `items` 0–100 (optional), `subtopics` 0–30 (optional) |
+| subtopic | `id`, `title` 1–120, optional `description` ≤ 1000, `items` 0–100 (optional) |
+| topic / subtopic `id` | `^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$`, ≤ 40 chars, **unique across the whole track** (topics and subtopics share one namespace). Starts with a letter so an id like `2024` can never be read by YAML as a number. |
+| item `id` | `^[a-z0-9]{1,12}$`, unique within the track |
+| `link` item | `title` 1–120; `url` https only, no user:pass, ≤ 500; optional `difficulty` easy/medium/hard; optional `description` ≤ 500 |
+| `video` item | `title` 1–120; `url` passes the YouTube parser; optional `description` ≤ 500 |
+| totals | ≤ 500 resource items per track (placed blogs are not capped); file ≤ 200 KB |
+| unknown keys | rejected (strict) everywhere |
 
-- **Track slug:** `^[a-z0-9]+(?:-[a-z0-9]+)*$`, at most 60 characters. Once a track is published its slug must not change, because progress is keyed by it. The CMS doesn't offer renaming.
-- **Schema location:** the schema lives **once**, in `packages/content-schema/src/tracks.mjs`, with a hand-written `tracks.d.mts`. The `.mjs` extension makes it ESM whatever the package type. It is imported by:
-  - the Next apps and the CMS server, as `@coding-club/content-schema/tracks`;
-  - the Node validation script, as a relative import (see §6.2). It exports `validateTrack(json, { vertical, postSlugs }) → { ok, errors: string[] }`, which returns plain-language messages.
+- Topics and subtopics may be empty in the file, because blogs can fill them.
+- **Descriptions are plain text**, rendered as React text with `white-space: pre-line`. Never markdown or HTML.
+- **Ids are permanent by convention.** Placements, progress and comment threads point at them; renaming changes only `title`. This is not enforced by CI (a base-vs-head diff is out of scope). The Phase 3 editor generates ids once, as `<kebab-of-title>-<4 random [a-z0-9]>`, so deleting a topic and re-creating one with the same title never reuses an id. Hand edits must follow the same rule.
+- **Track slug:** kebab-case, ≤ 60, never changed after publishing.
 
-### 2.2 Validation and dangling references
-- **CI:** `scripts/validate-content.mjs` walks `content/verticals/*/tracks/*.json` and runs `validateTrack`.
-  - Unknown files in a `tracks/` folder fail.
-  - A `post` item whose slug doesn't exist in that vertical **fails CI**, so a broken track can't merge.
-- **Readers:** portals **never** fail the build on a missing post. The item renders as "No longer available", and nothing throws during the static build.
-- **Unpublish:** the server refuses to merge an unpublish PR while a track on `main` still references that article, with the message "Remove it from track X first".
+### 2.3 Blog placement (frontmatter)
+```yaml
+placement:
+  track: dsa-sheet          # track slug, same vertical as the blog
+  topic: arrays             # topic id
+  subtopic: sliding-window  # optional subtopic id (must belong to that topic)
+```
+- One placement per blog. Club posts can't have one.
+- Strict shape: only those three keys, matching the slug/id regexes.
+- **Order within a topic/subtopic:** resource items first, in file order; then placed blogs by `date` ascending (ISO `YYYY-MM-DD` string compare; a missing date sorts last), ties by slug.
+- **Approval:** a placement is part of the blog and follows the normal blog quorum for the author's role (owner decision, v3.1). The Head is not specially required.
 
-### 2.3 Reader pages (vertical portals only)
-- **Routes:** `apps/<portal>/src/app/tracks/page.tsx` (the list) and `apps/<portal>/src/app/tracks/[slug]/page.tsx`, with `generateStaticParams` from the vertical's tracks and `dynamicParams = false`.
-  - Applies to the 8 vertical portals and the template.
-  - No 404s for valid tracks; unknown slugs give 404.
-- **Loader:** `loadTracks(contentRoot, vertical)` and `loadTrack(...)` live in `@coding-club/content-render/server`, a server-only entry that uses `fs`.
-  - The content root is resolved the same way each `posts.ts` does today.
-  - Post titles and summaries come from that portal's `getPortalPosts()`.
-- **UI:** one shared client component, `TrackView` (`"use client"`), in `@coding-club/content-render/track-view`, with styles in `content-render/styles/track-view.css`. It isn't in scrapbook-ui, so the CMS can use it without pulling in gsap and three (see §6.1).
-  - Topics appear as sections, with subtopic headings inside.
-  - Each item is a row: a checkbox with an accessible label, a title link, a type badge, and difficulty if set.
-    - Post links go to `/posts/<slug>`.
-    - External links open in a new tab with `rel="noopener noreferrer"`.
-    - Video items show the title, and an "Watch" toggle that lazily mounts the embed.
-  - Overall and per-topic "x / y done" counters.
-- **Progress:** stored in `localStorage` under `cc-track:v1:<vertical>/<slug>` as a JSON array of item ids.
-  - Unknown ids are pruned on load.
-  - Counts include only current items.
-  - The UI renders unchecked on the server and reads storage in `useEffect`, so there's no hydration mismatch.
-  - Unavailable or corrupt storage shows the page without saving and with no crash.
-  - A `storage` event listener keeps tabs in sync.
-  - Progress lives in one browser on one site; there's no login.
-- **Navigation:** each portal's nav gets **Tracks** only when that vertical has at least one track. The main portal's vertical hub page links to `https://<portal-domain>/tracks`, using the domain from `content/club/portals.json`.
-- **Sample:** one hand-written CP track ships in phase 2, using the existing CP article plus a few links and videos.
+### 2.4 Shared validation (`packages/content-schema/src/tracks.mjs`)
+Exports (and `tracks.d.mts` types):
+- `validateTrack(json, { vertical, slug?, bytes? }) → { ok, errors: string[], track | null }`
+- `parsePlacement(raw: unknown) → Placement | null` — null for anything that isn't exactly the strict shape.
+- `placementErrors(placement, { vertical, tracks }) → string[]` — `tracks` is `Record<trackSlug, Track>`; checks the track, topic and subtopic exist and the subtopic belongs to the topic.
+- `trackItems(track)`, `placementLabel(placement, track) → "DSA Sheet › Arrays & Hashing › Sliding window"`.
 
-### 2.4 Phase 2 tests
-- **Schema:** unit-tested valid and invalid fixtures, under `scripts/__tests__/` and `packages/content-schema`, in temp dirs and never under `content/`.
-- **TrackView:** progress pruning and counting are pure helpers, unit-tested.
-- **Browser:** the track page renders, and ticks survive a reload.
+### 2.5 CI (`scripts/validate-content.mjs`)
+- Load and validate every `tracks/*.json` **before** the post loop (unknown files in `tracks/` already fail).
+- Post frontmatter gets an optional `placement`; if present and `parsePlacement` returns null → **error**; on a club post → **error**.
+- A placed post whose `targetPortals` doesn't include its own vertical portal → **error** (it would be invisible in the tree).
+- A placement whose track/topic/subtopic doesn't exist → **warning only** (printed, CI stays green). Reason: a Head must be able to remove a topic even if blogs point at it; those blogs simply drop out of the tree until moved. Readers ignore dangling placements, so nothing breaks.
 
-## 3. Phase 3: Managing tracks in the CMS
+### 2.6 Merge-time check (CMS)
+- Merging a **blog** PR whose file has a placement re-checks it against the track file on **current `main`** (`ref: main`, not the PR's recorded base sha): one `getContent` of `tracks/<track>.json`. A dangling placement is refused (409): `This blog is placed under "<track> › <topic>", which doesn't exist on main any more. Edit the blog and pick another place (or none).`
+- Track merges (Phase 3b) don't check placements; they may orphan blogs, which the editor warns about first.
+- The v2 unpublish guard and `findTracksUsingPost` are **removed** — tracks no longer reference blogs.
+
+### 2.7 CMS edits must keep the placement (Phase 2, before the picker exists)
+`createDraftAndPullRequest` rebuilds frontmatter from fixed fields. It must carry `placement` over from the existing file on edit and revision, exactly as it carries the author fields, so a blog placed by hand isn't silently un-placed when someone edits it in the CMS. The Phase 3a picker then makes it editable.
+
+### 2.8 Reader pages (8 vertical portals + template)
+- Routes `/tracks` and `/tracks/[slug]` (static, `dynamicParams = false`, unknown → 404). Invalid track files are skipped with a build warning (CI already blocks them on `main`).
+- Each portal's `posts.ts`: `PortalPostSummary` gains `placement: Placement | null` via `parsePlacement(data.placement)`. Main-portal: no change.
+- Browser-safe helper in `@coding-club/content-render`: `groupPlacedPosts(posts, trackSlug, track) → Record<sectionKey, PlacedPost[]>` where `sectionKey` is `<topicId>` or `<topicId>/<subtopicId>`; filters `placement.track === trackSlug`, drops dangling ones, sorts per §2.3. `PlacedPost = { slug, title, summary, date, href }` (plain strings only, serialisable to the client component).
+- `TrackView` props: `{ track: Track; vertical: string; slug: string; placed: Record<string, PlacedPost[]>; readOnly?: boolean }`.
+  - Sections carry anchors `id="t-<topicId>"` / `id="t-<subtopicId>"`; topic/subtopic descriptions; rows show checkbox, title, badge (Article / Link / Video), difficulty, description.
+- **Progress:** `localStorage` `cc-track:v1:<vertical>/<slug>`, JSON array of ids. Resource items use their id; placed blogs `post:<slug>`. **Unknown ids are kept in storage but not counted** (so a blog briefly moved or a track edit doesn't erase ticks). Corrupt/unavailable storage never crashes; tabs sync via `storage` events; no hydration mismatch.
+- **Breadcrumb** on a placed blog's page (vertical portal): "Part of DSA Sheet › Arrays & Hashing › Sliding window", linking to `/tracks/<slug>#t-<id>`.
+- **Nav:** layout calls `getTracks()` and passes `extraLinks` to `VerticalNavbar` only when ≥ 1 track. **Main hub** lists tracks and links to `https://<domain>/tracks/<slug>` using the `portals.json` entry whose `vertical` matches (today `*.vercel.app`; updates with the domain move).
+- **Sample:** migrate `competitive-programming/tracks/dsa-starter-sheet.json`: keep slug and item ids (existing ticks survive), add topic/subtopic ids (`foundations`, `arrays-hashing`, `hash-maps`, `two-pointers`, `dynamic-programming`), add descriptions, remove the `post` item and instead give the existing CP article `placement: { track: dsa-starter-sheet, topic: dynamic-programming }`.
+
+### 2.9 Phase 2 tests
+- Unit: schema (ids, shared namespace, leading letter, descriptions, empty sections allowed, strict keys, old `post` items rejected with a clear message); `parsePlacement`; `placementErrors`; `groupPlacedPosts` (filter, dangling drop, date/slug order, missing date last); progress keeps unknown ids but doesn't count them.
+- CI script (temp copy of `content/`): bad placement shape fails; club placement fails; dangling placement warns but passes; placed post hidden from its portal fails.
+- Integration (in-memory GitHub): blog PR placed under a topic that was removed on `main` after the PR opened → refused at merge; same PR passes once the placement is fixed; CMS edit of a placed blog keeps `placement`.
+- Browser (real Chromium): track with resources + a placed blog, descriptions, ticks survive reload, Watch toggle, breadcrumb link lands on the topic anchor, nav link, hub link-out.
+
+## 3. Phase 3: Managing it in the CMS (split)
 
 ### 3.1 Who
-- Superadmins, and the Head or a Deputy **of that vertical**, can create or edit tracks. Members can't.
-- This is enforced at submit **and** at merge.
+| Action | Who | Approval to merge |
+|---|---|---|
+| Create / edit a track (topics, subtopics, links, videos, descriptions) | **Head** of the vertical, or a Superadmin | Head's PR → a Superadmin. Superadmin's PR → another Superadmin. A Deputy or another vertical's Head reviewing gets "needs a Superadmin". |
+| Place / move / remove a blog's placement | Anyone who can write a blog in that vertical | The normal blog quorum for the author's role. |
 
-### 3.2 UI
-- New sidebar item **Tracks** (`/admin/tracks`), shown when the user can manage at least one vertical.
-- **List:** that user's verticals' tracks, read from `main` via the Contents API, plus "open PR" badges matched by the branch prefix `track/<v>/`.
-- **Form** (`/admin/tracks/edit?vertical=&slug=`, or new):
-  - title and summary;
-  - topics and subtopics as nested fieldsets, with add, rename, remove (with confirm) and move up/down within the same parent;
-  - items added via an article picker (that vertical's published posts), "Add link" or "Add video";
-  - the CMS generates item `id`s;
-  - inline errors from the shared `validateTrack`;
-  - a preview built from the same `TrackView` component.
-- **Local draft:** IndexedDB, using the existing `CodingClubCMS` object store and per-user namespacing, with key `track:<login>:<vertical>/<slug|new>`. There's no schema version bump.
+All existing rules apply: no self-approval, commit-author checks, `expectedHeadSha`, fail-closed live roles, CSRF guard.
 
-### 3.3 API: `POST /api/tracks`
-- **Request:** `{ vertical, slug, track, pullNumber?, expectedHeadSha? }`
-- **Response:** `{ pullNumber, prUrl, branch }`. Errors are 400, 401, 403, 404, 409 or 503 with `{ error }`.
-- **Rules:**
-  - The session token goes through the existing same-origin and JSON CSRF guard.
-  - Post slugs "currently on `main`" come from one recursive git tree read of `main` (`git.getTree`, filtered to `content/verticals/<v>/posts/*.md`), not from fetching every file.
-  - Identity comes from GitHub `/user`.
-  - The role in the vertical comes from live roles (fail closed, 503).
-  - `validateTrack` must pass, checked against the post slugs currently on `main`.
-- **New track:** refused (409) if `content/verticals/<v>/tracks/<slug>.json` exists on `main`.
-  - Creates branch `track/<v>/<slug>-<5 digits>`. This is a separate namespace from articles' `draft/`, so an article slug starting with "track-" can never be mistaken for a track (see §6.3).
-  - Commits the file as `JSON.stringify(track, null, 2) + "\n"`, with commit message `feat(<v>): track <slug> [skip vercel]`.
-  - Opens a PR titled `feat(<v>): track <title>`.
-- **Edit of a published track:** same, but the file already exists on `main`, so the PR shows it as modified.
-- **Revision of an open track PR** (`pullNumber`): the same checks as article revisions (open PR, own or superadmin, same-repo `track/<v>/` head, base main, `expectedHeadSha` matches). The PR must also classify as a **track** PR for the **same file**.
+### 3.2 Phase 3a — placement picker in the blog editor
+- "Where does this go?" → *Normal blog only* (default) / *In a track* → Track ▸ Topic ▸ (Subtopic). Options come from `GET /api/tracks?vertical=<v>` (tracks on `main`: slug, title, topics with ids/titles/subtopics).
+- Stored in the draft (IndexedDB draft type, `draftStorage`, sync/publish bodies), sent to `/api/posts/draft`, validated server-side with `parsePlacement` + `placementErrors` against `main` (400 with the message), written to frontmatter only when set. Changing vertical clears it.
+- Review preview shows "Placed in: …" (from frontmatter + the track on `main`).
 
-### 3.4 Review and merge integration
-- **Classifier:** `validateArticlePRFiles` becomes `classifyEditorialPR(files)` → `publish | unpublish | track`. Its old name stays as an alias for the article kinds.
-  - A track PR is **exactly one** added or modified `content/verticals/<v>/tracks/<slug>.json`, and nothing else (no uploads).
-  - Mixing with articles is refused.
-  - The existing complete-listing checks (file count = `changed_files`, ≤ 40; commit count) apply unchanged.
-- **Reviews:**
-  - `getPRArticleContent` → `getPRContent`, which returns `{ kind, ... }`. For tracks it returns the parsed JSON plus the post titles it references.
-  - The queue's list item gets `kind`.
-  - The preview drawer renders a track with `TrackView` (read-only).
-- **Who can approve:**
-  - A track by a Deputy needs that vertical's Head or a Superadmin.
-  - A track by a Head needs a Superadmin.
-  - A track by a Superadmin needs another Superadmin.
-  - Deputy votes never count for tracks.
-  - All existing self-review, commit-author and `expectedHeadSha` rules apply.
-- **Merge time:**
-  - The PR author must still be Head, Deputy or Superadmin of that vertical.
-  - The JSON at `head.sha` is **re-validated** with `validateTrack` against `main`'s current post slugs. Validation at submit time alone is bypassable, because collaborators can push.
-  - Merge subject: `feat(<v>): track <title> (#n)`, built server-side.
-- **Unpublish guard:** see §2.2.
+### 3.3 Phase 3b — track editor (`/admin/tracks`)
+- Sidebar **Tracks** for Heads and Superadmins. List of the user's verticals' tracks with an "open PR" badge for `track/<v>/` branches.
+- Form: title, summary; topics/subtopics with add, rename, description, remove (confirm), move up/down; link and video items with title, URL, difficulty, description. Ids generated once (§2.2).
+- Removing a topic/subtopic that has placed blogs shows "N blogs are placed here: …; they'll drop out of the tree until moved" (list from `GET /api/tracks?vertical=` which also returns placed-blog counts per section).
+- Preview: read-only `TrackView`. Local draft: IndexedDB `track:<login>:<vertical>/<slug|new>`.
+- `POST /api/tracks` `{ vertical, slug, track, pullNumber?, expectedHeadSha? }` → `{ pullNumber, prUrl, branch }`. Head-or-Superadmin; `validateTrack`; on edit, every id present on `main` must still exist **or** be deliberately removed (ids may be removed, never changed: a new id with an old title is fine; an existing id whose section moved between topic and subtopic is refused). New track: 409 if the file exists. Branch `track/<v>/<slug>-<5 digits>`, commit `feat(<v>): track <slug> [skip vercel]`, PR `feat(<v>): track <title>`.
+- Review/merge as §7.3 (patched for v3.1): `track/` namespace in `REVIEWABLE_BRANCH_RE` and the draft route's revision check; `classifyEditorialPR` (renamed from `validateArticlePRFiles`) → `publish | unpublish | track`; `getPRContent` (renamed from `getPRArticleContent`) union; merge re-runs `validateTrack` at head sha; subject `feat(<v>): track <title> (#n)`.
 
-### 3.5 Phase 3 tests
-- **Integration (in-memory GitHub, `src/__integration__`):**
-  - Deputy creates a track, the Head approves, it merges.
-  - A Deputy's approval doesn't count.
-  - A Member is refused.
-  - A track PR with an extra file or an upload is refused.
-  - Type crossover in a revision is refused.
-  - Merge-time re-validation catches a bad JSON pushed after review.
-  - Unpublish is blocked by a referencing track.
-  - Self-approval is refused.
-- **Browser:** create a track in the CMS, see the PR, preview it in Reviews. Fixtures are named `zz-test-*`, and test PRs and branches are deleted afterwards.
+### 3.4 Phase 3 tests
+3a: member places a blog → normal quorum merges it → it appears in the tree; invalid placement refused at submit; edit keeps/changes placement. 3b: Head creates → Superadmin approves → merges; Deputy/Member refused to submit; Deputy approval doesn't count; extra file refused; type crossover refused; bad JSON pushed after review caught at merge; changed id refused; stale `expectedHeadSha` 409. Fixtures `zz-test-*`, deleted afterwards.
 
-## 4. Out of scope (later, separate work)
-- Tracks on the main portal itself
-- Club-wide tracks
-- Server-side progress sync
-- Drag-and-drop reordering
-- Embeds other than YouTube
-- The repo move to a club account, per-vertical page ownership, the production domain, and removing members' direct push access (recommended by the security review)
+## 4. Phase 4: Reader comments (GitHub Discussions via giscus)
 
-## 5. Rollout
-1. **Phase 1:** embeds, as one PR. It redeploys all apps once.
-2. **Phase 2:** the schema, validation, track pages and the sample CP track.
-3. **Phase 3:** the CMS Tracks form, `/api/tracks`, and review and merge integration.
+### 4.1 How it works
+- Comment box on every blog page (main portal and vertical portals), every track page, and every topic and subtopic section (behind a "Discuss" button, one open at a time).
+- Readers sign in with GitHub inside the box, then comment, reply, react. No CMS access, no code access.
+- One Discussion per page in **this repository**, category **Comments** (type *Announcement*: only maintainers and the giscus app can start threads; anyone signed in can reply). Created automatically on the first comment.
+- Comments never touch `main`: no CI, no deploys, no database.
+
+### 4.2 Thread keys
+`data-mapping="specific"`, `data-strict="1"`, `data-term` built by `commentTerm()` (pure, in `content-render`, unit-tested). The term is also the Discussion title.
+
+| Page | Term |
+|---|---|
+| Blog (same thread on main portal and vertical portal) | `post:<vertical>/<slug>` (`club` for club posts) |
+| Track | `track:<vertical>/<track>` |
+| Topic / subtopic | `topic:<vertical>/<track>/<id>` (ids are track-unique) |
+
+Accepted behaviours: a blog unpublished and re-published with the same slug gets its old thread back; a blog moved to another vertical starts a new thread. Not domain-based, so the domain move doesn't orphan anything.
+
+### 4.3 Abuse and moderation
+- **`giscus.json` at the repo root** with `origins` = every portal domain from `portals.json` + the main portal (and later `*.codingclub.tech`). Other sites embedding our repo ids are refused by giscus. A CI check fails if a `portals.json` domain is missing from `origins`.
+- **Moderators: Superadmins** (repo admins) hide, delete or lock comments and block users. Heads moderate by reporting to a Superadmin (they don't have repo triage rights).
+- **Kill switches** in `content/club/comments.json`: `enabled` (global) and `disabledVerticals: []`. Schema-checked in CI; a missing or invalid file means comments off.
+- `scripts/lib/affected-apps.mjs`: a change to `content/club/comments.json` or `giscus.json` redeploys all portals (with a test).
+
+### 4.4 Implementation
+- `@coding-club/content-render/comments` (new export): `<Comments term config />` client component. The config is read on the server (`comments.json`) and passed as props. It injects giscus' `client.js` (pinned to a version) only when the box scrolls near or "Discuss" is clicked, with `data-loading="lazy"`, `data-reactions-enabled="1"`, `data-input-position="bottom"`, `data-theme="light"`, `data-lang="en"`.
+- Risk accepted for now: `client.js` is third-party script on our origins (it can read that origin's `localStorage`, which holds only track progress). Moving to a self-hosted giscus on Vercel is a follow-up; terms don't change.
+- Not shown in CMS previews.
+
+### 4.5 Owner setup (one time)
+Enable Discussions → create the **Comments** category (Announcement) → install the giscus app on this repo only. On the move to the club organisation: transfer the repo, reinstall the giscus app there, update `comments.json` ids and `giscus.json` origins.
+
+### 4.6 Phase 4 tests
+Unit: `commentTerm` for every page kind; `comments.json` schema; origins-vs-portals CI check; affected-apps rule. Browser (real Chromium): box loads only near the bottom / on "Discuss"; the right term is used; kill switches render nothing. The sign-in-and-post leg needs a real GitHub login, so the owner drives it once on a preview; test comments are deleted afterwards.
+
+## 5. Out of scope (later, separate work)
+- Multiple placements per blog; Head-controlled ordering of placed blogs; more than two levels.
+- Enforcing id permanence in CI (base-vs-head diff).
+- Tracks on the main portal itself; club-wide tracks; server-side progress sync; drag-and-drop.
+- Self-hosting giscus.
+- The repo move to a club account, per-vertical page ownership, the production domain, and removing members' direct push access.
+
+## 6. Rollout
+1. **Phase 1** (shipped): embeds.
+2. **Phase 2:** schema v3.1, CI, portal track pages with placed blogs and breadcrumbs, merge-time placement check, placement kept on CMS edits, sample migrated.
+3. **Phase 3a:** placement picker. **Phase 3b:** track editor and track review/merge.
+4. **Phase 4:** comments, after the owner's GitHub setup.
 
 Each phase is reviewed and merged on its own.
 
-## 6. Implementation details (resolves EGM round 2)
+## 7. Implementation notes kept from v2.1
+(Where these mention `post` items in tracks, the unpublish guard, or Deputies authoring tracks, v3.1 above wins: tracks contain only link/video items, there is no unpublish guard, and track authors are Head or Superadmin only.)
 
-### 6.1 CMS wiring (M1)
+### 7.1 CMS wiring (M1)
 - **Phase 1:**
   - `apps/cms-studio/package.json` gains `"@coding-club/content-render": "workspace:*"`.
   - `apps/cms-studio/next.config.ts` gains `transpilePackages: ["@coding-club/content-render"]`, keeping its existing `rewrites`.
@@ -266,7 +288,7 @@ Each phase is reviewed and merged on its own.
     - Each consumer imports the stylesheet once in its global CSS: each vertical portal through the scrapbook stylesheet's `@import`, and the CMS from its `globals.css`.
   - The vertical portals take `TrackView` from the same subpath, so scrapbook-ui never needs it.
 
-### 6.2 Package wiring (M2)
+### 7.2 Package wiring (M2)
 
 **`packages/content-render/package.json`:**
 ```json
@@ -302,7 +324,7 @@ Each phase is reviewed and merged on its own.
 | 8 vertical portals and the template | content-render | content-schema is already listed; add `content-render` (index, `/server`, `/track-view`) |
 | cms-studio | content-render (+ creates `transpilePackages`) | content-schema |
 
-### 6.3 Review and merge for tracks (M3)
+### 7.3 Review and merge for tracks (M3)
 - **Branch namespace:**
   - Tracks use `track/<v>/<slug>-<id>`, and articles keep `draft/<v>/<slug>-<id>`.
   - `REVIEWABLE_BRANCH_RE` becomes `^(?:draft|cms|track)\/[a-z0-9_-]+\/[a-z0-9-]+$`.
@@ -320,16 +342,16 @@ Each phase is reviewed and merged on its own.
 - **Author role for tracks:**
   - It is always the **PR opener's** role in the vertical.
   - The "edit of a published file uses the original author's role" rule (`checkReviewPreconditions`, base-file frontmatter lookup) applies to `kind === "publish"` only. It is skipped for tracks, which have no single author.
-  - The opener must be Head, Deputy or Superadmin of that vertical, checked again at merge.
+  - The opener must be Head or Superadmin of that vertical (v3.1), checked again at merge.
 - **Authority:**
   - For tracks, `evaluateReviewerAuthority` uses the article table except that `count-deputies` is never returned.
-  - A Deputy reviewer of a track gets "needs the Vertical Head or a Superadmin".
+  - A Deputy or Head reviewer of a track gets "needs a Superadmin" (v3.1: tracks are authored by Heads or Superadmins, so only a Superadmin can approve).
 - **Order inside `checkReviewPreconditions` (all before any review is recorded):**
   1. PR state, base and branch checks
   2. classify and complete-listing checks
   3. self-review and contributor checks
   4. for `track`: fetch the JSON at `head.sha`, then run `validateTrack` against `main`'s post slugs (one tree read)
-  5. for `unpublish`: refuse if any `content/verticals/<v>/tracks/*.json` on `main` references the slug (same tree read, then fetch only that vertical's track files)
+  5. (v3.1: removed — tracks no longer reference blogs; instead, for `publish` with a placement, check it against the track on current `main`, §2.6)
   6. authority
 - **Merge:**
   - `ReviewCheck.kind` gains `"track"`.

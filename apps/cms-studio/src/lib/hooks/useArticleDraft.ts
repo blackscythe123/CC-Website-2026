@@ -79,6 +79,49 @@ function readAsBase64(file: File): Promise<string> {
  * the save-status shown in the toolbar, recovery of an unsaved draft, and reset for "New post".
  * The local draft is namespaced by `login`; nothing is read or written until it is known.
  */
+/**
+ * Rebuild a recovered draft's images with fresh blob URLs (the old session's URLs are dead).
+ * The cover must point at an entry in pendingImages, or submit can't upload it and the article
+ * ships a dead blob: link. A cover stored only as base64 is re-added to pendingImages.
+ */
+export function rebuildRecoveredImages(
+  recovered: {
+    content?: string;
+    coverImage?: string;
+    coverImageBase64?: string;
+    coverImageMime?: string;
+    pendingImages?: { filename: string; base64: string; mimeType?: string; placeholderUrl: string }[];
+  },
+  makeUrl: (base64: string, mime: string) => string
+) {
+  let content = recovered.content || "";
+  let cover = recovered.coverImage || "";
+  let coverMatched = false;
+  const images = (recovered.pendingImages || []).map((img) => {
+    const fresh = makeUrl(img.base64, img.mimeType || "image/png");
+    if (img.placeholderUrl) {
+      content = content.replaceAll(img.placeholderUrl, fresh);
+      if (!coverMatched && cover === img.placeholderUrl) {
+        cover = fresh;
+        coverMatched = true;
+      }
+    }
+    return { ...img, placeholderUrl: fresh };
+  });
+  if (!coverMatched && cover.startsWith("blob:")) {
+    if (recovered.coverImageBase64) {
+      const mime = recovered.coverImageMime || "image/png";
+      const fresh = makeUrl(recovered.coverImageBase64, mime);
+      const ext = (mime.split("/")[1] || "png").replace("jpeg", "jpg").replace(/[^a-z0-9]/g, "");
+      images.push({ filename: `cover.${ext || "png"}`, base64: recovered.coverImageBase64, mimeType: mime, placeholderUrl: fresh });
+      cover = fresh;
+    } else {
+      cover = ""; // unrecoverable: drop it rather than publish a dead link
+    }
+  }
+  return { content, cover, images };
+}
+
 export function useArticleDraft(initialVertical: string, login: string | null | undefined) {
   const userLogin = login && login.trim() ? login : null;
   const [draft, setDraft] = useState<DraftFields>(() => emptyDraft(initialVertical));
@@ -203,21 +246,8 @@ export function useArticleDraft(initialVertical: string, login: string | null | 
 
   const restoreRecovered = useCallback(() => {
     if (!recovered) return;
-    let content = recovered.content || "";
-    let cover = recovered.coverImage || "";
-
     // Blob URLs from the previous session are dead: rebuild them from the stored base64.
-    const images = (recovered.pendingImages || []).map((img) => {
-      const fresh = base64ToBlobUrl(img.base64, img.mimeType || "image/png");
-      if (img.placeholderUrl) {
-        content = content.replaceAll(img.placeholderUrl, fresh);
-        if (cover === img.placeholderUrl) cover = fresh;
-      }
-      return { ...img, placeholderUrl: fresh };
-    });
-    if (cover.startsWith("blob:") && recovered.coverImageBase64) {
-      cover = base64ToBlobUrl(recovered.coverImageBase64, recovered.coverImageMime || "image/png");
-    }
+    const { content, cover, images } = rebuildRecoveredImages(recovered, base64ToBlobUrl);
 
     keepStatusOnNextSave.current = true;
     setDraft((d) => ({

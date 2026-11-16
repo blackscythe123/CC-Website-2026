@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import "@coding-club/content-render/styles/track-view.css";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { ToastProvider } from "@/components/toast/ToastProvider";
 import { NO_FLASH_SCRIPT } from "@/lib/theme/theme";

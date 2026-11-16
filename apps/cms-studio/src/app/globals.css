@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "@coding-club/content-render/styles/track-view.css";
 
 /* Dark mode follows the data-theme attribute set by the no-flash script / ThemeProvider. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));

@@ -11,6 +11,7 @@ import {
   emptyItem,
   emptySubtopic,
   emptyTopic,
+  humanizeTrackError,
   moved,
   slugFromTitle,
   toTrack,
@@ -184,7 +185,8 @@ export default function TrackEditor({
   const problems = [
     ...(!effectiveSlug ? ["Give the track a short name for its web address."] : []),
     ...(itemProblems.length ? [`${itemProblems.length} resource${itemProblems.length === 1 ? " needs" : "s need"} a title and a valid link.`] : []),
-    ...(result.ok ? [] : result.errors.slice(0, 4)),
+    // Resource problems are already summarised above; show the schema's other errors in plain words.
+    ...(result.ok ? [] : result.errors.filter((e) => !/\.items\.\d+\./.test(e) || !itemProblems.length).slice(0, 4).map(humanizeTrackError)),
   ];
 
   const setTopic = (ti: number, patch: Partial<EditTopic>) => setEdit((e) => ({ ...e, topics: e.topics.map((t, i) => (i === ti ? { ...t, ...patch } : t)) }));
@@ -370,8 +372,9 @@ export default function TrackEditor({
         message={
           pendingRemove?.placed ? (
             <p>
-              {pendingRemove.placed} published blog{pendingRemove.placed === 1 ? " is" : "s are"} placed here. After this change is approved{" "}
-              {pendingRemove.placed === 1 ? "it drops" : "they drop"} out of the track until moved to another section (they stay published as normal blogs).
+              {pendingRemove.placed === 1
+                ? "1 published blog is placed here. After this change is approved it drops out of the track until it's moved to another section (it stays published as a normal blog)."
+                : `${pendingRemove.placed} published blogs are placed here. After this change is approved they drop out of the track until they're moved to another section (they stay published as normal blogs).`}
             </p>
           ) : (
             <p>Its links, videos and description are removed from the track when you submit.</p>

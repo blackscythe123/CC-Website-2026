@@ -179,3 +179,15 @@ export function moved<T>(list: T[], index: number, delta: -1 | 1): T[] {
   [next[index], next[to]] = [next[to], next[index]];
   return next;
 }
+
+/** "topics.0.subtopics.1.items.2.url must be …" → "Topic 1 › Subtopic 2 › Resource 3: url must be …" */
+export function humanizeTrackError(message: string): string {
+  const m = /^((?:topics|subtopics|items)\.\d+(?:\.(?:subtopics|items)\.\d+)*)\.?(\S*)\s+(.*)$/.exec(message);
+  if (!m) return message;
+  const names: Record<string, string> = { topics: "Topic", subtopics: "Subtopic", items: "Resource" };
+  const parts = m[1].split(".");
+  const where: string[] = [];
+  for (let i = 0; i < parts.length; i += 2) where.push(`${names[parts[i]]} ${Number(parts[i + 1]) + 1}`);
+  const field = m[2] ? `${m[2]} ` : "";
+  return `${where.join(" › ")}: ${field}${m[3]}`;
+}

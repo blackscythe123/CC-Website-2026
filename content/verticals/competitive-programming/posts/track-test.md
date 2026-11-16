@@ -9,7 +9,7 @@ targetPortals:
   - main-portal
   - cp-portal
 vertical: competitive-programming
-coverImage: /uploads/1794852933392-house4.jpg
+coverImage: /uploads/1794852952677-1794852933392-house4.jpg
 tags:
   - nextjs
 placement:
@@ -18,3 +18,4 @@ placement:
 isWipDraft: true
 ---
 
+testing 

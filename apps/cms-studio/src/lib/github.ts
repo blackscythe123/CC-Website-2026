@@ -1075,6 +1075,25 @@ export async function approveAndMergePR(
       }
     }
 
+    // CI must be green on the exact version being published (the repo admin bypasses GitHub's own rule).
+    const ci = await ciProblem(octokit, headSha);
+    if (ci) return { success: false, merged: false, status: 409, message: ci };
+
+    // A Superadmin or the vertical's Head publishing work they wrote or edited: say so on the PR and in history.
+    const selfPublished = contributors.has(cleanReviewer);
+    if (selfPublished) {
+      try {
+        await octokit.issues.createComment({
+          owner: REPO_OWNER,
+          repo: REPO_NAME,
+          issue_number: pullNumber,
+          body: `### ✅ Published by @${reviewerUsername} (${reviewerRole}) without a second reviewer\nSuperadmins and a vertical's head may publish their own work. Published version: \`${headSha.slice(0, 7)}\`.`,
+        });
+      } catch {
+        // the merge trailer still records it
+      }
+    }
+
     const slug = check.articlePath.replace(/^.*\/([a-z0-9-]+)\.(?:md|json)$/, "$1");
     const { data: mergeResult } = await octokit.pulls.merge({
       owner: REPO_OWNER,
@@ -1089,7 +1108,7 @@ export async function approveAndMergePR(
         slug,
         pullNumber
       ),
-      commit_message: `Authored-by: @${prAuthor} <${prAuthor}@users.noreply.github.com>\nApproved-by: @${reviewerUsername} <${reviewerUsername}@users.noreply.github.com> (${reviewerRole})`,
+      commit_message: `Authored-by: @${prAuthor} <${prAuthor}@users.noreply.github.com>\n${selfPublished ? "Self-published-by" : "Approved-by"}: @${reviewerUsername} <${reviewerUsername}@users.noreply.github.com> (${reviewerRole})`,
     });
 
     if (mergeResult.merged && headBranch && REVIEWABLE_BRANCH_RE.test(headBranch)) {
@@ -1116,8 +1135,8 @@ export async function approveAndMergePR(
 /**
  * Unpublishing never touches main directly (CLAUDE.md: no direct pushes to main). It opens an
  * "unpublish" pull request that removes the article on an isolated draft branch; the request then goes
- * through the normal review queue and quorum (a Head's request needs a Superadmin, a Superadmin's needs
- * another Superadmin), and is only merged by approveAndMergePR.
+ * through the normal review queue (the vertical's Head or a Superadmin publishes it, their own included),
+ * and is only merged by approveAndMergePR.
  */
 export async function deletePublishedPost(
   token: string,
@@ -1807,7 +1826,7 @@ function trackPrBody(p: TrackSubmitParams, isNew: boolean) {
 ## Editorial Governance
 - [x] Validated against the shared track schema
 - [x] Isolated track branch created
-- [ ] Awaiting Superadmin review before merging into \`${MAIN_BRANCH}\``;
+- [ ] Awaiting publish by the vertical's Head or a Superadmin into \`${MAIN_BRANCH}\``;
 }
 
 /**
@@ -1955,15 +1974,22 @@ export async function changedOnMainSinceBranching(octokit: Octokit, path: string
  * Close the caller's own pending CMS pull request (or any, for a Superadmin) and delete its branch.
  * Nothing reaches main, so no approval is needed.
  */
-export async function withdrawPullRequest(token: string, pullNumber: number, login: string, isSuperadmin: boolean): Promise<{ status: number; message: string }> {
+export async function withdrawPullRequest(
+  token: string,
+  pullNumber: number,
+  login: string,
+  /** Superadmin, or Head of the PR's vertical (taken from its branch) — full control there. */
+  managesVertical: (vertical: string) => boolean
+): Promise<{ status: number; message: string }> {
   const octokit = getOctokit(token);
   const { data: pr } = await octokit.pulls.get({ owner: REPO_OWNER, repo: REPO_NAME, pull_number: pullNumber });
   if (pr.state !== "open") return { status: 400, message: `PR #${pullNumber} is already closed.` };
   if (pr.base.ref !== MAIN_BRANCH || pr.head.repo?.full_name !== `${REPO_OWNER}/${REPO_NAME}` || !REVIEWABLE_BRANCH_RE.test(pr.head.ref)) {
     return { status: 400, message: `PR #${pullNumber} wasn't made by the Studio, so it can't be withdrawn here.` };
   }
-  if ((pr.user?.login || "").toLowerCase() !== login.toLowerCase() && !isSuperadmin) {
-    return { status: 403, message: "You can only withdraw your own submissions." };
+  const vertical = pr.head.ref.split("/")[1] || "";
+  if ((pr.user?.login || "").toLowerCase() !== login.toLowerCase() && !managesVertical(vertical)) {
+    return { status: 403, message: "You can only withdraw your own submissions (Heads: any in their vertical)." };
   }
   await octokit.issues.createComment({
     owner: REPO_OWNER,
@@ -2068,7 +2094,7 @@ export async function restoreUnpublishedPost(token: string, vertical: string, sl
   }
 }
 
-/** A PR that removes a whole track (Head/Superadmin; a Superadmin approves). Placed blogs stay published. */
+/** A PR that removes a whole track (Head/Superadmin, who may publish it themselves). Placed blogs stay published. */
 async function requestTrackDeletion(octokit: Octokit, p: TrackSubmitParams, path: string, exists: boolean): Promise<DraftResult> {
   const fail = (message: string, status: number) => Object.assign(new Error(message), { status });
   if (p.pullNumber) throw fail("A deletion request can't be combined with an existing proposal. Withdraw it first.", 400);
@@ -2097,7 +2123,22 @@ async function requestTrackDeletion(octokit: Octokit, p: TrackSubmitParams, path
     title: `chore(${p.vertical}): remove track ${p.slug}`,
     head: branch,
     base: MAIN_BRANCH,
-    body: `## Delete learning track\n\n@${p.authorUsername} asked to remove the track \`${p.slug}\` from ${p.vertical}.\n\n${placed ? `**${placed} published blog${placed === 1 ? " is" : "s are"} placed in it.** ${placed === 1 ? "It stays published as a normal blog but leaves the track." : "They stay published as normal blogs but leave the track."}` : "No published blogs are placed in it."}\n\nThe track stays live until a Superadmin approves this request.`,
+    body: `## Delete learning track\n\n@${p.authorUsername} asked to remove the track \`${p.slug}\` from ${p.vertical}.\n\n${placed ? `**${placed} published blog${placed === 1 ? " is" : "s are"} placed in it.** ${placed === 1 ? "It stays published as a normal blog but leaves the track." : "They stay published as normal blogs but leave the track."}` : "No published blogs are placed in it."}\n\nThe track stays live until this request is published by the vertical's Head or a Superadmin.`,
   });
   return { pullNumber: pr.number, prUrl: pr.html_url, branch };
+}
+
+/** Name of the required CI check on main's ruleset. */
+export const REQUIRED_CHECK = "Validate Content & Build Apps";
+
+/** Why a commit can't be published yet because of CI, or null when its required check passed. */
+export async function ciProblem(octokit: Octokit, sha: string): Promise<string | null> {
+  const { data } = await octokit.checks.listForRef({ owner: REPO_OWNER, repo: REPO_NAME, ref: sha, check_name: REQUIRED_CHECK, per_page: 20 });
+  const runs = data.check_runs || [];
+  if (runs.length === 0) return "The site checks haven't started for this version yet. Try again in a minute.";
+  if (runs.some((r) => r.status !== "completed")) return "The site checks are still running for this version (about 2 minutes). Try again shortly.";
+  if (runs.some((r) => r.conclusion !== "success" && r.conclusion !== "skipped" && r.conclusion !== "neutral")) {
+    return "The site checks failed for this version, so it can't be published. Open it on GitHub to see what failed, fix it, then try again.";
+  }
+  return null;
 }

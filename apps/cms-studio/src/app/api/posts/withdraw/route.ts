@@ -26,7 +26,12 @@ export async function POST(request: NextRequest) {
     const me = await whoAmI(token);
     if (!me) return NextResponse.json({ error: "Invalid GitHub token." }, { status: 401 });
     const roleInfo = getUserRoleInfo(me.login, await getLiveClubRoles(true, { token }));
-    const r = await withdrawPullRequest(token, pullNumber, me.login, roleInfo.role === "superadmin");
+    const r = await withdrawPullRequest(
+      token,
+      pullNumber,
+      me.login,
+      (vertical) => roleInfo.role === "superadmin" || roleInfo.rolesByVertical?.[vertical] === "vertical_head"
+    );
     if (r.status !== 200) return NextResponse.json({ error: r.message }, { status: r.status });
     return NextResponse.json({ success: true, message: r.message });
   } catch (err) {

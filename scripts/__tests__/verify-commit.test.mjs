@@ -166,3 +166,10 @@ test("no-arg mode verifies HEAD and skips a merge HEAD", () => {
   commit("f.txt", "oops not a tag");
   assert.equal(run([]).ok, false);
 });
+
+test("CMS self-publish trailer: Superadmins and Heads only, own noreply address", () => {
+  ok("feat(ai-ml): Post (#5)\n\nAuthored-by: @h1 <h1@users.noreply.github.com>\nSelf-published-by: @h1 <h1@users.noreply.github.com> (vertical_head)");
+  ok("feat(ai-ml): Post (#5)\n\nAuthored-by: @sa1 <sa1@users.noreply.github.com>\nSelf-published-by: @sa1 <sa1@users.noreply.github.com> (superadmin)");
+  bad("feat(ai-ml): Post (#5)\n\nAuthored-by: @d1 <d1@users.noreply.github.com>\nSelf-published-by: @d1 <d1@users.noreply.github.com> (deputy)");
+  bad("feat(ai-ml): Post (#5)\n\nSelf-published-by: @h1 <someone-else@users.noreply.github.com> (vertical_head)");
+});

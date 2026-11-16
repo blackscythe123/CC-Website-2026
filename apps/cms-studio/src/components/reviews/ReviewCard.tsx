@@ -108,8 +108,9 @@ export default function ReviewCard({ pr, progress, isMine, canReview, hasApprove
             </Link>
           ) : null}
           {selfPublish ? (
-            <Button size="sm" variant="primary" icon={ShieldCheck} loading={approving} onClick={onApprove}>
-              Publish
+            // Publishing your own request happens from the preview, pinned to the version you looked at.
+            <Button size="sm" variant="primary" icon={ShieldCheck} loading={previewing} onClick={onPreview}>
+              Review &amp; publish
             </Button>
           ) : canReview ? (
             <>

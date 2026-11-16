@@ -677,3 +677,14 @@ export async function writeRolesAndSyncCodeowners(
   // Only cache after the write succeeded, so a failed commit never grants uncommitted roles
   setCachedRoles(roles);
 }
+
+/**
+ * GitHub repository permission for a user's club roles (owner decision 2026-11-16): Heads of any vertical
+ * and Superadmins get "maintain" (the main-branch ruleset lets that role merge PRs without a second
+ * review); anyone else with a role gets "push"; no role → null (no access).
+ */
+export function githubPermissionFor(roles: ClubRoles, username: string): "maintain" | "push" | null {
+  const info = getUserRoleInfo(username, roles);
+  if (info.role === "superadmin" || Object.values(info.rolesByVertical || {}).includes("vertical_head")) return "maintain";
+  return info.verticals.length > 0 ? "push" : null;
+}

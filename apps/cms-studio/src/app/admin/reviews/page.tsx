@@ -47,7 +47,8 @@ export default function ReviewsPage() {
   const [sendingChanges, setSendingChanges] = useState(false);
   const [withdrawing, setWithdrawing] = useState<ReviewPr | null>(null);
   const [withdrawBusy, setWithdrawBusy] = useState(false);
-  const canWithdraw = (pr: ReviewPr) => pr.author.toLowerCase() === login || roleInfo?.role === "superadmin";
+  const canWithdraw = (pr: ReviewPr) =>
+    pr.author.toLowerCase() === login || roleInfo?.role === "superadmin" || roleInfo?.rolesByVertical?.[pr.vertical] === "vertical_head";
 
   const withdraw = async () => {
     if (!withdrawing) return;

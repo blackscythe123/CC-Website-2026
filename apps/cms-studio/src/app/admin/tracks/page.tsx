@@ -20,7 +20,7 @@ interface TrackOutline {
 
 /**
  * Learning tracks: Vertical Heads (and Superadmins) create and edit their vertical's topic trees.
- * Every save opens or updates a pull request that a Superadmin approves.
+ * Every save opens or updates a pull request; the vertical's Head or a Superadmin publishes it (their own included).
  */
 export default function TracksPage() {
   const { user, roleInfo, queue } = useStudio();
@@ -58,7 +58,7 @@ export default function TracksPage() {
         })
       );
       if (!ok) throw new Error(data.error || "Couldn't request deleting the track");
-      toast.success(`Deletion request opened (PR #${data.pullNumber}). The track stays live until a Superadmin approves it.`);
+      toast.success(`Deletion request opened (PR #${data.pullNumber}). Publish it from Reviews; the track stays live until then.`);
       setConfirmDelete(false);
       setEditor(null);
       queue.refresh();
@@ -187,7 +187,7 @@ export default function TracksPage() {
       toast.success(
         editor.pullNumber
           ? `PR #${data.pullNumber} updated. It's back in review.`
-          : `Pull request #${data.pullNumber} opened. A Superadmin will review it.`
+          : `Pull request #${data.pullNumber} opened. Publish it from Reviews (Heads and Superadmins can publish their own).`
       );
       setEditor(null);
       queue.refresh();
@@ -277,7 +277,7 @@ export default function TracksPage() {
                   <a href={pr.htmlUrl} target="_blank" rel="noopener noreferrer" className={buttonClasses({ size: "sm", variant: "ghost" })}>
                     GitHub <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                   </a>
-                  {pr.author.toLowerCase() === user.login.toLowerCase() || roleInfo?.role === "superadmin" ? (
+                  {pr.author.toLowerCase() === user.login.toLowerCase() || roleInfo?.role === "superadmin" || roleInfo?.rolesByVertical?.[vertical] === "vertical_head" ? (
                     <>
                       <Button size="sm" variant="ghost" icon={Undo2} onClick={() => setWithdrawing({ number: pr.number, title: pr.title })}>
                         Withdraw
@@ -353,7 +353,7 @@ export default function TracksPage() {
           const placed = Object.values(editor?.placedCounts || {}).reduce((a, b) => a + b, 0);
           return (
             <>
-              <p>This opens a deletion request. The track stays live until a Superadmin approves it.</p>
+              <p>This opens a deletion request. The track stays live until it is published from Reviews by the vertical&apos;s Head or a Superadmin.</p>
               <p className={placed ? "rounded-lg bg-warning-bg p-3 text-warning" : ""}>
                 {placed
                   ? `${placed} published blog${placed === 1 ? " is" : "s are"} placed in it. ${placed === 1 ? "It stays published as a normal blog but leaves the track." : "They stay published as normal blogs but leave the track."} Readers' ticks and the track's comment threads stay on GitHub but are no longer shown.`

@@ -328,13 +328,27 @@ export async function createDraftAndPullRequest(params: CreateDraftParams): Prom
 
   // 4. Prepare markdown frontmatter
   const today = new Date().toISOString().split("T")[0];
+  // Revisions and edits keep the original byline EXACTLY: a field the published file doesn't have stays
+  // absent (never filled with the editor's name), so an edit can't re-attribute someone else's article.
+  const asText = (v: unknown) => (typeof v === "string" && v.trim() ? v : undefined);
+  const preservedDate =
+    preservedAuthor?.date instanceof Date ? preservedAuthor.date.toISOString().slice(0, 10) : asText(preservedAuthor?.date);
+  const byline = preservedAuthor
+    ? {
+        date: preservedDate || today,
+        author: asText(preservedAuthor.author) || "Contributor",
+        ...(asText(preservedAuthor.authorUsername) ? { authorUsername: asText(preservedAuthor.authorUsername) } : {}),
+        ...(asText(preservedAuthor.authorAvatar) ? { authorAvatar: asText(preservedAuthor.authorAvatar) } : {}),
+      }
+    : {
+        date: today,
+        author: authorDisplayName || authorUsername,
+        authorUsername,
+        authorAvatar: `https://github.com/${authorUsername}.png`,
+      };
   const fileData = {
     title,
-    date: (preservedAuthor?.date as string | undefined) || today,
-    author: (preservedAuthor?.author as string | undefined) || authorDisplayName || authorUsername,
-    authorUsername: (preservedAuthor?.authorUsername as string | undefined) || authorUsername,
-    authorAvatar:
-      (preservedAuthor?.authorAvatar as string | undefined) || `https://github.com/${authorUsername}.png`,
+    ...byline,
     summary,
     targetPortals: resolveTargetPortals(vertical, targetPortals),
     vertical,
@@ -2083,7 +2097,7 @@ async function requestTrackDeletion(octokit: Octokit, p: TrackSubmitParams, path
     title: `chore(${p.vertical}): remove track ${p.slug}`,
     head: branch,
     base: MAIN_BRANCH,
-    body: `## Delete learning track\n\n@${p.authorUsername} asked to remove the track \`${p.slug}\` from ${p.vertical}.\n\n${placed ? `**${placed} published blog${placed === 1 ? " is" : "s are"} placed in it.** ${placed === 1 ? "It stays" : "They stay"} published as normal blog${placed === 1 ? "" : "s"} but leave the tree.` : "No published blogs are placed in it."}\n\nThe track stays live until a Superadmin approves this request.`,
+    body: `## Delete learning track\n\n@${p.authorUsername} asked to remove the track \`${p.slug}\` from ${p.vertical}.\n\n${placed ? `**${placed} published blog${placed === 1 ? " is" : "s are"} placed in it.** ${placed === 1 ? "It stays published as a normal blog but leaves the track." : "They stay published as normal blogs but leave the track."}` : "No published blogs are placed in it."}\n\nThe track stays live until a Superadmin approves this request.`,
   });
   return { pullNumber: pr.number, prUrl: pr.html_url, branch };
 }

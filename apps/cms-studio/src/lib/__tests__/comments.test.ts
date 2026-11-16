@@ -20,6 +20,10 @@ describe("reader comments", () => {
     expect(commentTerm("topic", "ai-ml", "ml-basics")).toBeNull();
     expect(commentTerm("post", "ai-ml", "../x")).toBeNull();
     expect(commentTerm("post", "ai-ml", "a/b")).toBeNull();
+    // long slugs from before the CMS's 80-character cap still get a thread
+    const long = "introducing-the-coding-club-website-a-new-home-for-builders-thinkers-and-innovators";
+    expect(commentTerm("post", "club", long)).toBe(`post:club/${long}`);
+    expect(commentTerm("post", "club", "a".repeat(121))).toBeNull();
   });
 
   it("is off when disabled, unconfigured or for a disabled vertical", () => {

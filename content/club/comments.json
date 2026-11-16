@@ -1,8 +1,8 @@
 {
-  "enabled": false,
+  "enabled": true,
   "repo": "blackscythe123/CC-Website-2026",
   "repoId": "R_kgDOVDzCDw",
-  "category": "Comments",
-  "categoryId": "",
+  "category": "Announcements",
+  "categoryId": "DIC_kwDOVDzCD84DLRpk",
   "disabledVerticals": []
 }

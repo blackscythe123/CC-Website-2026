@@ -251,8 +251,11 @@ Accepted behaviours: a blog unpublished and re-published with the same slug gets
 - Remaining dependency: the widget itself is served by giscus.app inside a sandboxed cross-origin iframe. Self-hosting giscus on Vercel stays a follow-up; terms don't change. If giscus changes its widget URL parameters, update `giscusWidgetUrl` (unit-tested).
 - Not shown in CMS previews.
 
-### 4.5 Owner setup (one time)
-Enable Discussions → create the **Comments** category (Announcement) → install the giscus app on this repo only. On the move to the club organisation: transfer the repo, reinstall the giscus app there, update `comments.json` ids and `giscus.json` origins.
+### 4.5 Owner setup (done 2026-11-16)
+- Discussions enabled from the CLI (`gh repo edit --enable-discussions`).
+- GitHub's API can't create Discussions categories, so comments use the default **Announcements** category (Announcement type: only maintainers and the giscus app start threads; anyone signed in replies). It can be renamed in the GitHub UI later without changing anything here (the config keeps its id).
+- The giscus app was installed by the owner in the browser (installing an app always needs a consent click), on this repository only, with read/write access to Discussions.
+- On the move to the club organisation: transfer the repo, reinstall the giscus app there, update `comments.json` ids and `giscus.json` origins.
 
 ### 4.6 Phase 4 tests
 Unit: `commentTerm` for every page kind; `comments.json` schema; origins-vs-portals CI check; affected-apps rule. Browser (real Chromium): box loads only near the bottom / on "Discuss"; the right term is used; kill switches render nothing. The sign-in-and-post leg needs a real GitHub login, so the owner drives it once on a preview; test comments are deleted afterwards.

@@ -9,18 +9,19 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@coding-club/content-render": "workspace:*",
+    "@coding-club/scrapbook-ui": "workspace:*",
     "@types/sanitize-html": "^2.16.2",
     "date-fns": "^4.4.0",
     "gray-matter": "^4.0.3",
+    "gsap": "^3.14.0",
+    "lucide-react": "^0.468.0",
     "next": "16.4.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "remark": "^15.0.1",
     "remark-html": "^16.0.1",
-    "sanitize-html": "^2.18.1",
-    "gsap": "^3.14.0",
-    "lucide-react": "^0.468.0",
-    "@coding-club/scrapbook-ui": "workspace:*"
+    "sanitize-html": "^2.18.1"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",

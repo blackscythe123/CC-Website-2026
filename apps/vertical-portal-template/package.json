@@ -8,13 +8,14 @@
     "start": "next start"
   },
   "dependencies": {
+    "@coding-club/content-render": "workspace:*",
+    "gray-matter": "^4.0.3",
+    "lucide-react": "^1.16.0",
     "next": "16.4.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "gray-matter": "^4.0.3",
     "remark": "^15.0.1",
-    "remark-html": "^16.0.1",
-    "lucide-react": "^1.16.0"
+    "remark-html": "^16.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.1",

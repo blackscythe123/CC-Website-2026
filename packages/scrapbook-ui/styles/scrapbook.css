@@ -1409,3 +1409,7 @@ html,body{overscroll-behavior-x:none}
 .vertical-arrival-cover{position:fixed;top:var(--site-nav-height,60px);left:0;right:0;bottom:0;overflow:hidden;z-index:20;background:#f8e8d4;pointer-events:none}
 
 .vertical-project-surface{background:#f8e8d4;min-height:calc(100svh - var(--site-nav-height,60px));width:100%}
+
+/* YouTube embeds (from @coding-club/content-render): responsive 16:9 player */
+.cc-embed { position: relative; width: 100%; aspect-ratio: 16 / 9; margin: 1.5rem 0; overflow: hidden; border-radius: 12px; background: #000; }
+.cc-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }

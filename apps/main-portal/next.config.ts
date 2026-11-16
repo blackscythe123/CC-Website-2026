@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@coding-club/scrapbook-ui"],
+  transpilePackages: ["@coding-club/scrapbook-ui", "@coding-club/content-render"],
   turbopack: {
     rules: {
       "*.css": {

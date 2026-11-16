@@ -596,7 +596,18 @@ importers:
         specifier: ^5
         version: 5.9.3
 
-  packages/content-render: {}
+  packages/content-render:
+    dependencies:
+      '@coding-club/content-schema':
+        specifier: workspace:*
+        version: link:../content-schema
+      react:
+        specifier: ^19.0.0
+        version: 19.3.0
+    devDependencies:
+      '@types/react':
+        specifier: ^19
+        version: 19.3.0
 
   packages/content-schema:
     dependencies:

@@ -6,6 +6,18 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./track-view": "./src/react/TrackView.tsx",
+    "./styles/track-view.css": "./styles/track-view.css"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "dependencies": {
+    "@coding-club/content-schema": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19"
   }
 }

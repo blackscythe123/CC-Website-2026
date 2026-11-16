@@ -147,3 +147,39 @@ export function injectEmbeds(html: string, embeds: EmbedSet): string {
     return out || match;
   });
 }
+
+/** iframe src for an embed, or "" if the IDs are invalid (for React components that build the element). */
+export function youTubeEmbedSrc(e: Embed): string {
+  if (e.kind === "playlist") return LIST_ID.test(e.list) ? `https://www.youtube-nocookie.com/embed/videoseries?list=${e.list}` : "";
+  if (!VIDEO_ID.test(e.id)) return "";
+  return `https://www.youtube-nocookie.com/embed/${e.id}${e.list && LIST_ID.test(e.list) ? `?list=${e.list}` : ""}`;
+}
+
+// ---------------------------------------------------------------------------
+// Learning-track progress (browser-only, no login): stored per site in localStorage.
+// ---------------------------------------------------------------------------
+
+export function trackProgressKey(vertical: string, slug: string): string {
+  return `cc-track:v1:${vertical}/${slug}`;
+}
+
+/** Parse stored progress, keeping only ids that still exist in the track (prunes removed items). */
+export function parseTrackProgress(raw: string | null | undefined, validIds: Iterable<string>): Set<string> {
+  const valid = new Set(validIds);
+  if (!raw) return new Set();
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((x): x is string => typeof x === "string" && valid.has(x)));
+  } catch {
+    return new Set();
+  }
+}
+
+export function serializeTrackProgress(done: Set<string>): string {
+  return JSON.stringify([...done].sort());
+}
+
+export function countDone(ids: string[], done: Set<string>): number {
+  return ids.reduce((n, id) => n + (done.has(id) ? 1 : 0), 0);
+}

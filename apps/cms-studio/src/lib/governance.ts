@@ -37,3 +37,31 @@ export function approvalTarget(authorRole: UserRoleType): { label: string; deput
       return { label: "another superadmin", deputyApprovalsNeeded: null };
   }
 }
+
+/**
+ * Whether the signed-in user may approve / request changes on a PR. Mirrors the reviews API:
+ * the reviewer's role is their role IN THE PR's VERTICAL (superadmin counts everywhere, and
+ * `club` has no vertical roles so only superadmins qualify); nobody reviews their own PR;
+ * a superadmin may review any other author, a head member/deputy authors, a deputy member authors.
+ * `authorRole` null (role lists not loaded) is treated as a member; the server re-checks anyway.
+ */
+export function canReviewPr(
+  viewer: { login: string; role: UserRoleType; rolesByVertical?: Record<string, UserRoleType> } | null | undefined,
+  pr: { author: string; vertical: string },
+  authorRole: UserRoleType | null
+): boolean {
+  if (!viewer) return false;
+  if (pr.author.toLowerCase() === viewer.login.toLowerCase()) return false;
+  const reviewerRole: UserRoleType | null = viewer.role === "superadmin" ? "superadmin" : viewer.rolesByVertical?.[pr.vertical] ?? null;
+  const author = authorRole ?? "member";
+  switch (reviewerRole) {
+    case "superadmin":
+      return true;
+    case "vertical_head":
+      return author === "member" || author === "deputy";
+    case "deputy":
+      return author === "member";
+    default:
+      return false;
+  }
+}

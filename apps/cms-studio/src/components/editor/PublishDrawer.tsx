@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CircleAlert, CircleCheck, CircleDashed, GitPullRequest, Info, Send, X } from "lucide-react";
 import type { VerticalOption } from "@/lib/verticals";
-import { getVertical } from "@/lib/verticals";
+import { CLUB_VERTICAL, getVertical } from "@/lib/verticals";
 import { getSubmitChecklist, type ChecklistItem } from "@/lib/submitChecklist";
 import { addTag } from "@/lib/tags";
 import { Button, Drawer, Field, Input, Select, Textarea } from "@/components/ui";
@@ -58,6 +58,7 @@ export default function PublishDrawer(props: PublishDrawerProps) {
     coverImage: props.coverImage,
     selectedVertical,
     allowedVerticals: availableVerticals.map((v) => v.slug),
+    hasFixedSlug: Boolean(revision),
   });
   const vertical = getVertical(selectedVertical);
 
@@ -121,7 +122,7 @@ export default function PublishDrawer(props: PublishDrawerProps) {
             vertical ? (
               <>
                 Publishes to <strong className="text-text">{vertical.domain}</strong>
-                {vertical.slug !== "club" ? " and codingclub.tech" : ""}
+                {vertical.slug !== "club" ? ` and ${CLUB_VERTICAL.domain}` : ""}
               </>
             ) : undefined
           }

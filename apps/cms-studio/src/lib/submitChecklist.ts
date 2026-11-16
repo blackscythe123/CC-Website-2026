@@ -13,10 +13,23 @@ export interface ChecklistInput {
   coverImage: string;
   selectedVertical: string;
   allowedVerticals: string[];
+  /** Revising a PR keeps its existing slug, so the title needn't produce one. */
+  hasFixedSlug?: boolean;
 }
 
-const BLOCKING_REASONS: Record<"title" | "body" | "vertical", string> = {
+/** The article slug the server derives from a title (POST /api/posts/draft): lowercase alphanumerics and hyphens. */
+export function slugFromTitle(title: string): string {
+  return title
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 80);
+}
+
+const BLOCKING_REASONS: Record<"title" | "slug" | "body" | "vertical", string> = {
   title: "Add a title (at least 3 characters) to submit",
+  slug: "Title needs at least two letters or digits",
   body: "Write the article body to submit",
   vertical: "You need a vertical role to submit",
 };
@@ -28,7 +41,7 @@ export function getSubmitChecklist(input: ChecklistInput): {
   blockingReason: string | null;
 } {
   const items: ChecklistItem[] = [
-    { id: "title", label: "Title", level: "required", ok: input.title.trim().length >= 3, hint: "At least 3 characters" },
+    { id: "title", label: "Title", level: "required", ok: input.title.trim().length >= 3 && (input.hasFixedSlug || slugFromTitle(input.title).length >= 2), hint: "At least 3 characters, including two letters or digits" },
     { id: "body", label: "Article body", level: "required", ok: input.content.trim().length > 0 },
     {
       id: "vertical",
@@ -41,9 +54,11 @@ export function getSubmitChecklist(input: ChecklistInput): {
   ];
 
   const firstBlocking = items.find((i) => i.level === "required" && !i.ok);
-  return {
-    items,
-    canSubmit: !firstBlocking,
-    blockingReason: firstBlocking ? BLOCKING_REASONS[firstBlocking.id as "title" | "body" | "vertical"] : null,
-  };
+  let blockingReason: string | null = null;
+  if (firstBlocking) {
+    const longEnough = input.title.trim().length >= 3;
+    blockingReason =
+      firstBlocking.id === "title" && longEnough ? BLOCKING_REASONS.slug : BLOCKING_REASONS[firstBlocking.id as "title" | "body" | "vertical"];
+  }
+  return { items, canSubmit: !firstBlocking, blockingReason };
 }

@@ -1,10 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CircleAlert, Clock, LogOut, SquareCheck } from "lucide-react";
-import { Avatar, Menu } from "@/components/ui";
+import { Avatar, ConfirmDialog, Menu } from "@/components/ui";
 import ThemeSwitch from "@/components/theme/ThemeSwitch";
-import { clearLocalDraftOnSignOut } from "@/lib/draftStorage";
+import { clearLocalDraftOnSignOut, hasUnsyncedWork } from "@/lib/draftStorage";
 import type { UserProfile } from "@/lib/hooks/useStudioSession";
 import type { InboxItem } from "@/lib/hooks/useReviewQueue";
 import type { UserRoleInfo } from "@/lib/roles";
@@ -48,9 +49,13 @@ export default function AccountMenu({
   placement?: "below" | "above";
 }) {
   const router = useRouter();
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
-  const signOut = async () => {
-    // Don't leave this user's unsaved draft on a shared browser.
+  const doSignOut = async () => {
+    setSigningOut(true);
+    // Don't leave this user's unsaved draft on a shared browser. (This also marks the user signed out, which
+    // lifts the editor's leave-page warning so the redirect below can't be blocked with autosave switched off.)
     try {
       await clearLocalDraftOnSignOut(user.login);
     } catch {
@@ -62,6 +67,18 @@ export default function AccountMenu({
       // ignore
     }
     window.location.href = "/";
+  };
+
+  /** Signing out deletes the copy on this device: ask first when it holds work that isn't on GitHub. */
+  const signOut = async () => {
+    let unsynced = true; // unknown => ask rather than silently delete
+    try {
+      unsynced = await hasUnsyncedWork(user.login);
+    } catch {
+      // keep the safe default
+    }
+    if (unsynced) setConfirmSignOut(true);
+    else await doSignOut();
   };
 
   const items = [
@@ -90,6 +107,7 @@ export default function AccountMenu({
   );
 
   return (
+    <>
     <div className={placement === "above" ? "[&_[role=menu]]:bottom-full [&_[role=menu]]:top-auto [&_[role=menu]]:mb-1.5" : ""}>
       <Menu
         align={align}
@@ -118,5 +136,15 @@ export default function AccountMenu({
         )}
       />
     </div>
+    <ConfirmDialog
+      open={confirmSignOut}
+      title="Sign out and discard your draft?"
+      message="You have an article on this device that isn't synced to GitHub. Signing out deletes this device's copy. Cancel and use Sync to GitHub first if you want to keep it."
+      confirmLabel="Sign out and discard"
+      loading={signingOut}
+      onConfirm={() => void doSignOut()}
+      onCancel={() => setConfirmSignOut(false)}
+    />
+    </>
   );
 }

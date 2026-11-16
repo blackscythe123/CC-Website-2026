@@ -18,6 +18,8 @@ export interface PreviewArticle {
   summary?: string;
   tags?: string[];
   pullNumber: number;
+  /** Head commit shown in this preview; sent back as expectedHeadSha when reviewing. */
+  headSha?: string;
 }
 
 export default function ReviewPreviewDrawer({
@@ -26,6 +28,7 @@ export default function ReviewPreviewDrawer({
   canReview,
   isMine,
   hasApproved,
+  stale = false,
   approving,
   onClose,
   onApprove,
@@ -36,6 +39,8 @@ export default function ReviewPreviewDrawer({
   canReview: boolean;
   isMine: boolean;
   hasApproved: boolean;
+  /** The PR got new commits after this preview was opened. */
+  stale?: boolean;
   approving: boolean;
   onClose: () => void;
   onApprove: () => void;
@@ -62,10 +67,10 @@ export default function ReviewPreviewDrawer({
       ) : null}
       {canReview && pr ? (
         <>
-          <Button size="sm" onClick={onRequestChanges}>
+          <Button size="sm" onClick={onRequestChanges} disabled={stale}>
             Request changes
           </Button>
-          <Button size="sm" variant="primary" icon={ShieldCheck} loading={approving} disabled={hasApproved} onClick={onApprove}>
+          <Button size="sm" variant="primary" icon={ShieldCheck} loading={approving} disabled={hasApproved || stale} onClick={onApprove}>
             {hasApproved ? "Approved by you" : "Approve"}
           </Button>
         </>
@@ -83,6 +88,11 @@ export default function ReviewPreviewDrawer({
     >
       {article ? (
         <div className="bg-surface p-4 sm:p-6">
+          {stale ? (
+            <p role="alert" className="mb-4 rounded-lg bg-warning-bg p-3 text-sm text-warning">
+              This article changed since you opened it. Close and reopen the preview to review the latest version.
+            </p>
+          ) : null}
           <ArticlePreview
             authorName={article.author}
             authorLogin={pr?.author || article.author}

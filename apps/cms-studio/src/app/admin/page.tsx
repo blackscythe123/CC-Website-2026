@@ -5,6 +5,8 @@ import { marked } from "marked";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
 import { ALL_VERTICALS, CLUB_VERTICAL, getVertical } from "@/lib/verticals";
 import { parseArticlePath, useArticleDraft } from "@/lib/hooks/useArticleDraft";
+import { imagesTooLarge, readApiJson, TOO_LARGE_MESSAGE } from "@/lib/hooks/apiClient";
+import { base64ToBlobUrl, type PendingDraftImage, type StoredRevision } from "@/lib/draftStorage";
 import { useStudio } from "@/components/shell/StudioContext";
 import { useToast } from "@/components/toast/ToastProvider";
 import { ConfirmDialog } from "@/components/ui";
@@ -25,6 +27,8 @@ interface RevisionPr {
   slug: string | null;
   vertical: string | null;
 }
+
+const SAFE_UPLOAD_FILE = /^[A-Za-z0-9._-]+\.(png|jpe?g|webp|gif)$/;
 
 interface PendingConfirm {
   title: string;
@@ -61,6 +65,16 @@ export default function AdminEditorPage() {
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   const [revision, setRevision] = useState<RevisionPr | null>(null);
   const [loadingRevision, setLoadingRevision] = useState(false);
+
+  // Keep the revision context in the local draft record so Restore after a reload keeps updating the same PR.
+  const { setRevisionContext } = editor;
+  useEffect(() => {
+    setRevisionContext(
+      revision
+        ? { number: revision.number, branch: revision.branch, title: revision.title, filePath: revision.filePath, slug: revision.slug, vertical: revision.vertical }
+        : null
+    );
+  }, [revision, setRevisionContext]);
 
   // While revising a PR the vertical is fixed by the PR's file path: only offer that one.
   const revisionVertical = revision?.vertical ? getVertical(revision.vertical) : undefined;
@@ -115,8 +129,8 @@ export default function AdminEditorPage() {
       setLoadingRevision(true);
       try {
         const res = await fetch(`/api/posts/reviews?previewPullNumber=${prNumber}`);
-        const data = await res.json();
-        if (!res.ok || !data.article) throw new Error(data.error || `Couldn't load PR #${prNumber}`);
+        const { ok, data } = await readApiJson(res);
+        if (!ok || !data.article) throw new Error(data.error || `Couldn't load PR #${prNumber}`);
         const a = data.article;
         const filePath = typeof a.filePath === "string" ? a.filePath : null;
         const target = parseArticlePath(filePath);
@@ -151,6 +165,49 @@ export default function AdminEditorPage() {
     [editor, queue.mine, toast]
   );
 
+  /**
+   * After Restore: the restored draft was a revision of an open PR. Re-check with GitHub that the PR is
+   * still open, is yours and still has that branch before Submit may update it; otherwise drop it.
+   */
+  const reattachRevision = useCallback(
+    async (stored: StoredRevision) => {
+      const drop = (why: string) => {
+        setRevision(null);
+        toast.info(`${why} Submit will open a new pull request instead.`);
+      };
+      try {
+        const [listRes, previewRes] = await Promise.all([
+          fetch("/api/posts/reviews"),
+          fetch(`/api/posts/reviews?previewPullNumber=${stored.number}`),
+        ]);
+        const list = await readApiJson(listRes);
+        const preview = await readApiJson(previewRes);
+        const open = list.ok && Array.isArray(list.data.prs) ? list.data.prs.find((p: { number?: number }) => p.number === stored.number) : undefined;
+        if (!list.ok) return drop(`Couldn't confirm PR #${stored.number} is still open.`);
+        if (!open || String(open.author || "").toLowerCase() !== user.login.toLowerCase()) {
+          return drop(`PR #${stored.number} is closed or no longer yours.`);
+        }
+        const article = preview.ok ? preview.data.article : null;
+        if (!article || article.branch !== stored.branch) return drop(`PR #${stored.number} changed on GitHub.`);
+        const target = parseArticlePath(typeof article.filePath === "string" ? article.filePath : null);
+        const fromQueue = queue.mine.find((p) => p.number === stored.number);
+        setRevision({
+          number: stored.number,
+          branch: article.branch,
+          title: stored.title || article.title || "",
+          feedback: fromQueue?.latestFeedback || "",
+          filePath: typeof article.filePath === "string" ? article.filePath : null,
+          slug: target?.slug ?? null,
+          vertical: target?.vertical ?? null,
+        });
+        toast.info(`Still revising PR #${stored.number}`);
+      } catch {
+        drop(`Couldn't confirm PR #${stored.number} is still open.`);
+      }
+    },
+    [queue.mine, toast, user.login]
+  );
+
   const requestRevision = useCallback(
     (prNumber: number, feedback = "") => guardReplace(`PR #${prNumber}`, () => loadRevision(prNumber, feedback)),
     [guardReplace, loadRevision]
@@ -176,6 +233,12 @@ export default function AdminEditorPage() {
       toast.info("Write a title or some text before syncing.");
       return;
     }
+    // Only images the article still references (same rule as submit), and stay under the request limit.
+    const images = editor.activeImages();
+    if (imagesTooLarge(images)) {
+      toast.error(TOO_LARGE_MESSAGE);
+      return;
+    }
     setSyncing(true);
     try {
       await editor.saveNow();
@@ -189,11 +252,11 @@ export default function AdminEditorPage() {
           summary: draft.summary,
           tags: draft.tags,
           coverImage: draft.coverImage,
-          pendingImages: draft.pendingImages.map(({ filename, base64, placeholderUrl }) => ({ filename, base64, placeholderUrl })),
+          pendingImages: images.map(({ filename, base64, placeholderUrl }) => ({ filename, base64, placeholderUrl })),
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Couldn't sync to GitHub");
+      const { ok, data } = await readApiJson(res);
+      if (!ok) throw new Error(data.error || "Couldn't sync to GitHub");
       editor.markSynced();
       toast.success(`Synced to GitHub · ${data.branch}`);
     } catch (err) {
@@ -208,8 +271,8 @@ export default function AdminEditorPage() {
     setLoadingDrafts(true);
     try {
       const res = await fetch("/api/posts/drafts/remote");
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Couldn't load your drafts");
+      const { ok, data } = await readApiJson(res);
+      if (!ok) throw new Error(data.error || "Couldn't load your drafts");
       setRemoteDrafts(Array.isArray(data.drafts) ? data.drafts : []);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't load your drafts");
@@ -224,11 +287,28 @@ export default function AdminEditorPage() {
     setLoadingDrafts(true);
     try {
       const res = await fetch(`/api/posts/drafts/remote?branch=${encodeURIComponent(branch)}`);
-      const data = await res.json();
-      if (!res.ok || !data.draft) throw new Error(data.error || "Couldn't open that draft");
+      const { ok, data } = await readApiJson(res);
+      if (!ok || !data.draft) throw new Error(data.error || "Couldn't open that draft");
       const d = data.draft;
+      let content: string = d.markdownBody || "";
+      let cover: string = d.coverImage || "";
+      // Images that only exist on the draft branch: re-attach them as local images so Submit uploads them
+      // onto the PR branch (otherwise the published article would point at files that aren't on main).
+      const pendingImages: PendingDraftImage[] = [];
+      const incoming: unknown = data.pendingImages ?? d.pendingImages;
+      for (const raw of Array.isArray(incoming) ? incoming : []) {
+        const img = raw as { filename?: unknown; base64?: unknown; mimeType?: unknown; uploadPath?: unknown };
+        if (typeof img.filename !== "string" || typeof img.base64 !== "string" || typeof img.uploadPath !== "string") continue;
+        if (!SAFE_UPLOAD_FILE.test(img.filename) || img.uploadPath !== `/uploads/${img.filename}`) continue;
+        const mimeType = typeof img.mimeType === "string" && /^image\/(png|jpeg|webp|gif)$/.test(img.mimeType) ? img.mimeType : "image/png";
+        const url = base64ToBlobUrl(img.base64, mimeType);
+        if (!url.startsWith("blob:")) continue; // never let a data: URL reach the body
+        content = content.split(img.uploadPath).join(url);
+        if (cover === img.uploadPath) cover = url;
+        pendingImages.push({ filename: img.filename, base64: img.base64, mimeType, placeholderUrl: url });
+      }
       editor.loadFrom(
-        { title: d.title || "", content: d.markdownBody || "", coverImage: d.coverImage || "", selectedVertical: d.vertical, summary: d.summary || "", tags: d.tags || [] },
+        { title: d.title || "", content, coverImage: cover, selectedVertical: d.vertical, summary: d.summary || "", tags: d.tags || [], pendingImages },
         branch
       );
       setRevision(null);
@@ -258,6 +338,12 @@ export default function AdminEditorPage() {
   };
 
   const submit = async () => {
+    const images = editor.activeImages();
+    if (imagesTooLarge(images)) {
+      setSubmitError(TOO_LARGE_MESSAGE);
+      toast.error(TOO_LARGE_MESSAGE);
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -273,13 +359,13 @@ export default function AdminEditorPage() {
           coverImage: draft.coverImage,
           tags: draft.tags,
           markdownBody: draft.content,
-          pendingImages: editor.activeImages(),
+          pendingImages: images,
           pullNumber: revision?.number,
           existingBranch: revision?.branch,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Couldn't submit the post");
+      const { ok, data } = await readApiJson(res);
+      if (!ok) throw new Error(data.error || "Couldn't submit the post");
       setPublishOpen(false);
       setSubmissionResult({ pullNumber: data.pullNumber, prUrl: data.prUrl });
       setRevision(null);
@@ -298,9 +384,12 @@ export default function AdminEditorPage() {
   const strip: StripState = editor.recovered
     ? { kind: "recovered", updatedAt: editor.recovered.updatedAt, onRestore: () => {
           // The restored snapshot is unrelated to any PR open in the editor: don't push it into that PR.
+          const storedRevision = editor.recovered?.revision ?? null;
           editor.restoreRecovered();
           setRevision(null);
           toast.info("Draft restored");
+          // ...unless the snapshot itself was a revision of an open PR of yours: re-verify and re-attach it.
+          if (storedRevision) void reattachRevision(storedRevision);
         }, onDiscard: editor.discardRecovered }
     : revision
     ? { kind: "revising", number: revision.number, title: revision.title, feedback: revision.feedback }
